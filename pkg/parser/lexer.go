@@ -17,6 +17,13 @@ var keywords = map[string]TokenType{
 	"elif":         ELSE_IF,
 	"selain":       ELSE,
 	"else":         ELSE,
+	"cocok":        SWITCH,
+	"switch":       SWITCH,
+	"match":        SWITCH,
+	"kasus":        CASE,
+	"case":         CASE,
+	"lainnya":      DEFAULT,
+	"default":      DEFAULT,
 	"selama":       WHILE,
 	"while":        WHILE,
 	"untuk":        FOR,
@@ -156,7 +163,7 @@ func (l *Lexer) NextToken() Token {
 			l.readChar()
 			tok = Token{Type: AND, Literal: "&&", Line: tok.Line, Column: tok.Column}
 		} else {
-			tok = Token{Type: ILLEGAL, Literal: string(l.ch), Line: tok.Line, Column: tok.Column}
+			tok = Token{Type: AMPERSAND, Literal: "&", Line: tok.Line, Column: tok.Column}
 		}
 	case '|':
 		if l.peekChar() == '|' {

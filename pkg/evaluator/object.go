@@ -22,6 +22,7 @@ const (
 	BUILTIN_OBJ      ObjectType = "BUILTIN"
 	ARRAY_OBJ        ObjectType = "ARRAY"
 	MAP_OBJ          ObjectType = "MAP"
+	POINTER_OBJ      ObjectType = "POINTER"
 )
 
 type Object interface {
@@ -150,4 +151,19 @@ func (m *Map) Inspect() string {
 		pairs = append(pairs, fmt.Sprintf("%q: %s", k, v.Inspect()))
 	}
 	return fmt.Sprintf("{%s}", strings.Join(pairs, ", "))
+}
+
+// Pointer represents a memory reference to a variable in an Environment.
+type Pointer struct {
+	Env     *Environment
+	VarName string
+}
+
+func (p *Pointer) Type() ObjectType { return POINTER_OBJ }
+func (p *Pointer) Inspect() string {
+	valStr := "null"
+	if val, ok := p.Env.Get(p.VarName); ok {
+		valStr = val.Inspect()
+	}
+	return fmt.Sprintf("&%s (-> %s)", p.VarName, valStr)
 }

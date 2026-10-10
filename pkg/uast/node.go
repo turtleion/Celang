@@ -13,6 +13,8 @@ const (
 	NodeTypeVariableDeclaration  NodeType = "VariableDeclaration"
 	NodeTypeAssignmentStatement  NodeType = "AssignmentStatement"
 	NodeTypeIfStatement          NodeType = "IfStatement"
+	NodeTypeSwitchStatement      NodeType = "SwitchStatement"
+	NodeTypeCaseClause           NodeType = "CaseClause"
 	NodeTypeWhileStatement       NodeType = "WhileStatement"
 	NodeTypeForStatement         NodeType = "ForStatement"
 	NodeTypeForEachStatement     NodeType = "ForEachStatement"

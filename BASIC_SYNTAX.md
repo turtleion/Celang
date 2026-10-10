@@ -93,9 +93,21 @@ skor += 5
 | ----------------------------------------------------- | ---------------------------------- | ---------------------------------------------------------------------------------- |
 | **Fungsi**                                            | `callback(fungsiA)`                | digunakan untuk memasukkan sebuah fungsi ke dalam parameter fungsi lain (callback) |
 | **Fungsi-TIPEDATADASAR** (Explicit Function Typedata) | `callbackInteger(fungsiReturnInt)` | `Bisa juga explisit kayak gitu. Fungsi-Angka Fungsi-Kebenaran, dll.`               |
+### 3.5 Pointer & Referensi Memori (`&` dan `*`)
 
-## Sebenarnya aku juga mau tambahin fitur pointer gitu. Tapi nanti aja
+Celang mendukung manipulasi memori terarah dengan sintaks yang intuitif:
+- `&variabel`: Mengambil referensi (pointer) ke variabel dalam *environment*.
+- `*pointer`: Melakukan dereferensi (membaca nilai) atau penugasan ulang (`*ptr = baru`).
 
+```celang
+buat nilai_asli = 100
+buat ptr = &nilai_asli
+
+cetak(*ptr)       // Output: 100
+
+*ptr = 200        // Mengubah nilai_asli via dereference pointer
+cetak(nilai_asli) // Output: 200
+```
 ## 4. Fitur Khusus: Time-Travel Variables
 
 Setiap variabel otomatis mencatat histori perubahannya. Variabel memiliki properti bawaan untuk mengakses masa lalu:
@@ -190,6 +202,39 @@ selesai
 ```
 
 _(dukung keduanya lewat syntax style)._
+
+### 7.3 Pencocokan Kasus / Switch (`cocok ... kasus ... lainnya`)
+
+Celang mendukung pencocokan kondisi ganda yang bersih dan ekspresif:
+
+```celang
+// Gaya Indonesia:
+buat peran = "admin"
+cocok peran {
+    kasus "admin":
+        cetak("Akses administrator")
+    kasus "editor":
+        cetak("Akses editor")
+    lainnya:
+        cetak("Akses pengunjung")
+}
+
+// Gaya JavaScript:
+switch (peran) {
+    case "admin":
+        cetak("Akses administrator")
+    default:
+        cetak("Akses pengunjung")
+}
+
+// Gaya Pythonic:
+match peran {
+    case "admin":
+        print("Akses administrator")
+    case _:
+        print("Akses pengunjung")
+}
+```
 
 ---
 

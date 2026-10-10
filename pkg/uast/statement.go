@@ -195,6 +195,85 @@ func (i *IfStatement) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// CaseClause represents a branch in a SwitchStatement.
+// If Value is nil, it is the default fallback branch.
+type CaseClause struct {
+	NodeType NodeType    `json:"type"`
+	Value    Expression  `json:"value,omitempty"`
+	Body     []Statement `json:"body"`
+}
+
+func (c *CaseClause) Type() NodeType          { return NodeTypeCaseClause }
+func (c *CaseClause) GetMetadata() *NodeMetadata { return nil }
+func (c *CaseClause) statementNode()          {}
+
+func (c *CaseClause) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		NodeType NodeType          `json:"type"`
+		Value    json.RawMessage   `json:"value,omitempty"`
+		Body     []json.RawMessage `json:"body"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	var valExpr Expression
+	if len(raw.Value) > 0 && string(raw.Value) != "null" {
+		var err error
+		valExpr, err = UnmarshalExpressionJSON(raw.Value)
+		if err != nil {
+			return fmt.Errorf("CaseClause.value unmarshal error: %w", err)
+		}
+	}
+	stmts := make([]Statement, len(raw.Body))
+	for i, stmtRaw := range raw.Body {
+		stmt, err := UnmarshalStatementJSON(stmtRaw)
+		if err != nil {
+			return fmt.Errorf("CaseClause.body[%d] unmarshal error: %w", i, err)
+		}
+		stmts[i] = stmt
+	}
+	c.NodeType = NodeTypeCaseClause
+	c.Value = valExpr
+	c.Body = stmts
+	return nil
+}
+
+// SwitchStatement represents value matching (cocok ... kasus ... lainnya).
+type SwitchStatement struct {
+	NodeType     NodeType      `json:"type"`
+	Metadata     *NodeMetadata `json:"metadata,omitempty"`
+	Discriminant Expression    `json:"discriminant"`
+	Cases        []CaseClause  `json:"cases"`
+}
+
+func (s *SwitchStatement) Type() NodeType          { return NodeTypeSwitchStatement }
+func (s *SwitchStatement) GetMetadata() *NodeMetadata { return s.Metadata }
+func (s *SwitchStatement) statementNode()          {}
+
+func (s *SwitchStatement) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		NodeType     NodeType        `json:"type"`
+		Metadata     *NodeMetadata   `json:"metadata,omitempty"`
+		Discriminant json.RawMessage `json:"discriminant"`
+		Cases        []CaseClause    `json:"cases"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	discExpr, err := UnmarshalExpressionJSON(raw.Discriminant)
+	if err != nil {
+		return fmt.Errorf("SwitchStatement.discriminant unmarshal error: %w", err)
+	}
+	if raw.Cases == nil {
+		raw.Cases = []CaseClause{}
+	}
+	s.NodeType = NodeTypeSwitchStatement
+	s.Metadata = raw.Metadata
+	s.Discriminant = discExpr
+	s.Cases = raw.Cases
+	return nil
+}
+
 // WhileStatement represents repetition while condition is true.
 type WhileStatement struct {
 	NodeType  NodeType        `json:"type"`

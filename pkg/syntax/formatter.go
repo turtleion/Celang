@@ -132,6 +132,43 @@ func (f *Formatter) formatStatement(stmt uast.Statement, indent int) string {
 		sb.WriteString("}")
 		return sb.String()
 
+	case *uast.SwitchStatement:
+		var sb strings.Builder
+		sb.WriteString(prefix)
+		sb.WriteString(f.profile.Switch)
+		if f.profile.Name == "javascript" {
+			sb.WriteString(" (")
+			sb.WriteString(f.formatExpression(s.Discriminant))
+			sb.WriteString(") {\n")
+		} else {
+			sb.WriteString(" ")
+			sb.WriteString(f.formatExpression(s.Discriminant))
+			sb.WriteString(" {\n")
+		}
+
+		for _, c := range s.Cases {
+			casePrefix := strings.Repeat(" ", (indent+1)*f.profile.IndentWidth)
+			if c.Value != nil {
+				sb.WriteString(casePrefix)
+				sb.WriteString(f.profile.Case)
+				sb.WriteString(" ")
+				sb.WriteString(f.formatExpression(c.Value))
+				sb.WriteString(":\n")
+			} else {
+				sb.WriteString(casePrefix)
+				sb.WriteString(f.profile.Default)
+				sb.WriteString(":\n")
+			}
+			for _, child := range c.Body {
+				sb.WriteString(f.formatStatement(child, indent+2))
+				sb.WriteString("\n")
+			}
+		}
+
+		sb.WriteString(prefix)
+		sb.WriteString("}")
+		return sb.String()
+
 	case *uast.WhileStatement:
 		var sb strings.Builder
 		sb.WriteString(prefix)
@@ -153,15 +190,19 @@ func (f *Formatter) formatStatement(stmt uast.Statement, indent int) string {
 
 	case *uast.ForEachStatement:
 		var sb strings.Builder
-		sb.WriteString(prefix)
-		sb.WriteString(f.profile.For)
-		sb.WriteString(" ")
-		sb.WriteString(s.Item)
-		sb.WriteString(" ")
-		sb.WriteString(f.profile.In)
-		sb.WriteString(" ")
-		sb.WriteString(f.formatExpression(s.Iterable))
-		sb.WriteString(" {\n")
+		if f.profile.Name == "javascript" {
+			sb.WriteString(fmt.Sprintf("%sfor (let %s of %s) {\n", prefix, s.Item, f.formatExpression(s.Iterable)))
+		} else {
+			sb.WriteString(prefix)
+			sb.WriteString(f.profile.For)
+			sb.WriteString(" ")
+			sb.WriteString(s.Item)
+			sb.WriteString(" ")
+			sb.WriteString(f.profile.In)
+			sb.WriteString(" ")
+			sb.WriteString(f.formatExpression(s.Iterable))
+			sb.WriteString(" {\n")
+		}
 
 		if s.Body != nil {
 			for _, child := range s.Body.Statements {
@@ -196,7 +237,7 @@ func (f *Formatter) formatStatement(stmt uast.Statement, indent int) string {
 		sb.WriteString(strings.Join(params, ", "))
 		sb.WriteString(")")
 
-		if s.ReturnType != "" {
+		if s.ReturnType != "" && f.profile.ReturnArrow != "" {
 			sb.WriteString(" ")
 			sb.WriteString(f.profile.ReturnArrow)
 			sb.WriteString(" ")

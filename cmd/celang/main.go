@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 
+	"celang/pkg/empathy"
 	"celang/pkg/evaluator"
 	"celang/pkg/parser"
 	"celang/pkg/syntax"
@@ -46,7 +47,7 @@ func main() {
 
 	case "format":
 		if len(os.Args) < 3 {
-			fmt.Println("❌ Penggunaan: celang format <file.ce | file.ast> [--style=indonesian|pythonic|classic]")
+			fmt.Println("❌ Penggunaan: celang format <file.ce | file.ast> [--style=nama_style | path/ke/style.style]")
 			os.Exit(1)
 		}
 		inputFile := os.Args[2]
@@ -73,40 +74,43 @@ func printHelp() {
 	fmt.Println("\nPerintah yang tersedia:")
 	fmt.Println("  celang run <file.ce | file.ast>           Menjalankan file kode teks (.ce) atau U-AST (.ast)")
 	fmt.Println("  celang compile <file.ce> [-o out.ast]     Mengubah kode teks menjadi file Universal AST (U-AST)")
-	fmt.Println("  celang format <file> [--style=nama]       Memformat/merender kode ke gaya sintaks tertentu")
-	fmt.Println("                                            (pilihan style: indonesian, pythonic, classic)")
+	fmt.Println("  celang format <file> [--style=nama|path]  Memformat/merender kode ke gaya sintaks tertentu")
+	fmt.Println("                                            (pilihan style: indonesian, javascript, pythonic, atau file .style)")
 	fmt.Println("  celang help                               Menampilkan bantuan ini")
 }
 
-func loadProgram(filePath string) (*uast.Program, error) {
+func loadProgram(filePath string) (*uast.Program, string, error) {
 	data, err := os.ReadFile(filePath)
 	if err != nil {
-		return nil, fmt.Errorf("gagal membaca file: %w", err)
+		return nil, "", fmt.Errorf("gagal membaca file '%s': %w", filePath, err)
 	}
+
+	sourceStr := string(data)
 
 	// If file ends with .ast or .json, attempt JSON deserialize
 	if strings.HasSuffix(filePath, ".ast") || strings.HasSuffix(filePath, ".json") {
 		prog, err := uast.FromJSON(data)
 		if err == nil {
-			return prog, nil
+			return prog, sourceStr, nil
 		}
 	}
 
 	// Otherwise, parse as source text
-	l := parser.NewLexer(string(data))
+	l := parser.NewLexer(sourceStr)
 	p := parser.NewParser(l)
 	prog, err := p.ParseProgram()
 	if err != nil {
-		return nil, fmt.Errorf("parsing gagal: %w", err)
+		return nil, sourceStr, err
 	}
 
-	return prog, nil
+	return prog, sourceStr, nil
 }
 
 func runFile(filePath string) {
-	prog, err := loadProgram(filePath)
+	prog, sourceStr, err := loadProgram(filePath)
 	if err != nil {
-		fmt.Printf("❌ %v\n", err)
+		diag := empathy.NewSyntaxDiagnostic(err.Error(), 1, 1, sourceStr)
+		fmt.Print(diag.Render())
 		os.Exit(1)
 	}
 
@@ -115,15 +119,17 @@ func runFile(filePath string) {
 
 	result := evaluator.Eval(prog, env)
 	if result != nil && result.Type() == evaluator.ERROR_OBJ {
-		fmt.Println("\n❌ " + result.Inspect())
+		diag := empathy.NewRuntimeDiagnostic(result.(*evaluator.Error), sourceStr)
+		fmt.Print(diag.Render())
 		os.Exit(1)
 	}
 }
 
 func compileFile(inputFile, outputFile string) {
-	prog, err := loadProgram(inputFile)
+	prog, sourceStr, err := loadProgram(inputFile)
 	if err != nil {
-		fmt.Printf("❌ %v\n", err)
+		diag := empathy.NewSyntaxDiagnostic(err.Error(), 1, 1, sourceStr)
+		fmt.Print(diag.Render())
 		os.Exit(1)
 	}
 
@@ -142,9 +148,10 @@ func compileFile(inputFile, outputFile string) {
 }
 
 func formatFile(filePath, styleName string) {
-	prog, err := loadProgram(filePath)
+	prog, sourceStr, err := loadProgram(filePath)
 	if err != nil {
-		fmt.Printf("❌ %v\n", err)
+		diag := empathy.NewSyntaxDiagnostic(err.Error(), 1, 1, sourceStr)
+		fmt.Print(diag.Render())
 		os.Exit(1)
 	}
 

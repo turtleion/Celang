@@ -146,6 +146,13 @@ func UnmarshalStatementJSON(data []byte) (Statement, error) {
 		}
 		return &ifStmt, nil
 
+	case NodeTypeSwitchStatement:
+		var switchStmt SwitchStatement
+		if err := json.Unmarshal(data, &switchStmt); err != nil {
+			return nil, err
+		}
+		return &switchStmt, nil
+
 	case NodeTypeWhileStatement:
 		var whileStmt WhileStatement
 		if err := json.Unmarshal(data, &whileStmt); err != nil {
@@ -368,6 +375,28 @@ func NewIf(cond Expression, cons *BlockStatement, alt Statement) *IfStatement {
 		Condition:  cond,
 		Consequent: cons,
 		Alternate:  alt,
+	}
+}
+
+func NewSwitch(discriminant Expression, cases ...CaseClause) *SwitchStatement {
+	if cases == nil {
+		cases = []CaseClause{}
+	}
+	return &SwitchStatement{
+		NodeType:     NodeTypeSwitchStatement,
+		Discriminant: discriminant,
+		Cases:        cases,
+	}
+}
+
+func NewCase(val Expression, body ...Statement) CaseClause {
+	if body == nil {
+		body = []Statement{}
+	}
+	return CaseClause{
+		NodeType: NodeTypeCaseClause,
+		Value:    val,
+		Body:     body,
 	}
 }
 

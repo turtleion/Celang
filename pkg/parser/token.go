@@ -32,6 +32,7 @@ const (
 	MINUS_ASSIGN TokenType = "-="
 	ARROW        TokenType = "->"
 	PIPE         TokenType = "|"
+	AMPERSAND    TokenType = "&"
 
 	// Delimiters
 	COMMA     TokenType = ","
@@ -52,6 +53,9 @@ const (
 	IF          TokenType = "IF"          // jika, if
 	ELSE_IF     TokenType = "ELSE_IF"     // selain jika, elif
 	ELSE        TokenType = "ELSE"        // selain, else
+	SWITCH      TokenType = "SWITCH"      // cocok, switch
+	CASE        TokenType = "CASE"        // kasus, case
+	DEFAULT     TokenType = "DEFAULT"     // lainnya, default
 	WHILE       TokenType = "WHILE"       // selama, while
 	FOR         TokenType = "FOR"         // untuk, for
 	IN          TokenType = "IN"          // dalam, in

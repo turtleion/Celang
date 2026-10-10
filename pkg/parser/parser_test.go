@@ -50,6 +50,20 @@ func TestParser_BasicSyntax(t *testing.T) {
 		kembalikan panjang * lebar
 	}
 
+	// Pointer
+	buat nilai_awal = 100
+	buat ptr = &nilai_awal
+	*ptr = 200
+
+	// Switch
+	buat peran = "admin"
+	cocok peran {
+		kasus "admin":
+			cetak("Akses penuh")
+		lainnya:
+			cetak("Akses terbatas")
+	}
+
 	// Konkurensi
 	sambil {
 		cetak("Latar belakang")
@@ -105,6 +119,11 @@ func TestParser_BasicSyntax(t *testing.T) {
 	profilMap, ok := profilVal.(*evaluator.Map)
 	if !ok || profilMap.Pairs["nama"].Inspect() != "Budi" || profilMap.Pairs["skor"].(*evaluator.Integer).Value != 100 {
 		t.Fatalf("Unexpected profil map content: %+v", profilMap)
+	}
+
+	nilaiVal, ok := env.Get("nilai_awal")
+	if !ok || nilaiVal.(*evaluator.Integer).Value != 200 {
+		t.Fatalf("Expected nilai_awal=200 after pointer mutation, got %+v", nilaiVal)
 	}
 }
 

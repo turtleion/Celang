@@ -1,5 +1,12 @@
 package syntax
 
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"strings"
+)
+
 // StyleProfile defines how keywords and block structures are mapped to U-AST.
 // It acts as the "CSS for Syntax" in Celang.
 type StyleProfile struct {
@@ -13,10 +20,13 @@ type StyleProfile struct {
 	If           string   `json:"if"`             // e.g. "jika", "if"
 	ElseIf       string   `json:"else_if"`        // e.g. "selain jika", "elif", "else if"
 	Else         string   `json:"else"`           // e.g. "selain", "else"
+	Switch       string   `json:"switch"`         // e.g. "cocok", "switch"
+	Case         string   `json:"case"`           // e.g. "kasus", "case"
+	Default      string   `json:"default"`        // e.g. "lainnya", "default"
 	While        string   `json:"while"`          // e.g. "selama", "while"
 	For          string   `json:"for"`            // e.g. "untuk", "for"
-	In           string   `json:"in"`             // e.g. "dalam", "in"
-	Func         string   `json:"func"`           // e.g. "fungsi", "def", "fn"
+	In           string   `json:"in"`             // e.g. "dalam", "of", "in"
+	Func         string   `json:"func"`           // e.g. "fungsi", "def", "function"
 	Return       string   `json:"return"`         // e.g. "kembalikan", "return"
 	Async        string   `json:"async"`          // e.g. "sambil", "async"
 	Parallel     string   `json:"parallel"`       // e.g. "bersamaan", "parallel"
@@ -44,6 +54,9 @@ func IndonesianProfile() *StyleProfile {
 		If:          "jika",
 		ElseIf:      "selain jika",
 		Else:        "selain",
+		Switch:      "cocok",
+		Case:        "kasus",
+		Default:     "lainnya",
 		While:       "selama",
 		For:         "untuk",
 		In:          "dalam",
@@ -74,6 +87,9 @@ func PythonicProfile() *StyleProfile {
 		If:          "if",
 		ElseIf:      "elif",
 		Else:        "else",
+		Switch:      "match",
+		Case:        "case",
+		Default:     "case _",
 		While:       "while",
 		For:         "for",
 		In:          "in",
@@ -88,26 +104,29 @@ func PythonicProfile() *StyleProfile {
 		Or:          "or",
 		Not:         "not",
 		ReturnArrow: "->",
-		BlockStyle:  "brace", // or colon/indent
+		BlockStyle:  "brace",
 		IndentWidth: 4,
 	}
 }
 
-// ClassicProfile returns C/JavaScript-inspired syntax styling.
-func ClassicProfile() *StyleProfile {
+// JavaScriptProfile returns pure modern JavaScript syntax styling.
+func JavaScriptProfile() *StyleProfile {
 	return &StyleProfile{
-		Name:        "classic",
-		DisplayName: "C / JavaScript Style",
+		Name:        "javascript",
+		DisplayName: "JavaScript Style (100% JS)",
 		VarDecl:     "let",
 		ConstDecl:   "const",
 		TypeAssign:  ":",
 		If:          "if",
 		ElseIf:      "else if",
 		Else:        "else",
+		Switch:      "switch",
+		Case:        "case",
+		Default:     "default",
 		While:       "while",
 		For:         "for",
-		In:          "in",
-		Func:        "fn",
+		In:          "of",
+		Func:        "function",
 		Return:      "return",
 		Async:       "async",
 		Parallel:    "parallel",
@@ -117,22 +136,66 @@ func ClassicProfile() *StyleProfile {
 		And:         "&&",
 		Or:          "||",
 		Not:         "!",
-		ReturnArrow: "->",
+		ReturnArrow: "",
 		BlockStyle:  "brace",
 		IndentWidth: 4,
 	}
 }
 
-// GetProfile returns a profile by name, falling back to Indonesian profile.
-func GetProfile(name string) *StyleProfile {
-	switch name {
+// ClassicProfile is an alias to JavaScriptProfile for convenience.
+func ClassicProfile() *StyleProfile {
+	return JavaScriptProfile()
+}
+
+// LoadProfileFromFile reads a custom .style (or .json) file from disk.
+func LoadProfileFromFile(filePath string) (*StyleProfile, error) {
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("gagal membaca berkas style '%s': %w", filePath, err)
+	}
+
+	var profile StyleProfile
+	if err := json.Unmarshal(data, &profile); err != nil {
+		return nil, fmt.Errorf("format berkas style '%s' tidak valid: %w", filePath, err)
+	}
+
+	if profile.Name == "" {
+		profile.Name = filePath
+	}
+	if profile.DisplayName == "" {
+		profile.DisplayName = profile.Name
+	}
+	if profile.IndentWidth == 0 {
+		profile.IndentWidth = 4
+	}
+
+	return &profile, nil
+}
+
+// GetProfile resolves a profile by predefined name or by file path.
+func GetProfile(nameOrPath string) *StyleProfile {
+	// 1. Check if nameOrPath is an existing file on disk
+	if strings.HasSuffix(nameOrPath, ".style") || strings.HasSuffix(nameOrPath, ".json") {
+		if prof, err := LoadProfileFromFile(nameOrPath); err == nil {
+			return prof
+		}
+	}
+
+	// 2. Predefined keyword profiles
+	switch strings.ToLower(nameOrPath) {
 	case "python", "pythonic", "py":
 		return PythonicProfile()
-	case "classic", "c", "js", "ts":
-		return ClassicProfile()
+	case "javascript", "js", "classic", "ts":
+		return JavaScriptProfile()
 	case "id", "indo", "indonesia", "indonesian":
 		return IndonesianProfile()
 	default:
+		// Attempt file loading if it exists
+		if _, err := os.Stat(nameOrPath); err == nil {
+			if prof, err := LoadProfileFromFile(nameOrPath); err == nil {
+				return prof
+			}
+		}
 		return IndonesianProfile()
 	}
 }

@@ -67,6 +67,22 @@ func Eval(node uast.Node, env *Environment) Object {
 				return newError(n.GetMetadata(), err.Error(), "Pastikan variabel ini dideklarasikan dengan 'mutable: true'.")
 			}
 			return val
+		case *uast.UnaryExpression:
+			if target.Operator == "*" {
+				ptrObj := Eval(target.Argument, env)
+				if isError(ptrObj) {
+					return ptrObj
+				}
+				ptr, ok := ptrObj.(*Pointer)
+				if !ok {
+					return newError(n.GetMetadata(), "Dereferencing target bukan pointer", "Pastikan target dereference adalah variabel pointer.")
+				}
+				if err := ptr.Env.Assign(ptr.VarName, val); err != nil {
+					return newError(n.GetMetadata(), err.Error(), "")
+				}
+				return val
+			}
+			return newError(n.GetMetadata(), "Target assignment tidak valid", "Assignment hanya dapat dilakukan ke variabel atau elemen pointer.")
 		default:
 			return newError(n.GetMetadata(), "Target assignment tidak valid", "Assignment hanya dapat dilakukan ke variabel atau elemen objek.")
 		}
@@ -82,6 +98,37 @@ func Eval(node uast.Node, env *Environment) Object {
 			return Eval(n.Alternate, env)
 		}
 		return NULL
+
+	case *uast.SwitchStatement:
+		discVal := Eval(n.Discriminant, env)
+		if isError(discVal) {
+			return discVal
+		}
+		var result Object = NULL
+		matched := false
+		var defaultCase *uast.CaseClause
+
+		for i := range n.Cases {
+			c := &n.Cases[i]
+			if c.Value == nil {
+				defaultCase = c
+				continue
+			}
+			caseVal := Eval(c.Value, env)
+			if isError(caseVal) {
+				return caseVal
+			}
+			if evalBinaryOp("==", discVal, caseVal, n.GetMetadata()) == TRUE {
+				matched = true
+				result = evalBlockStatement(c.Body, env)
+				break
+			}
+		}
+
+		if !matched && defaultCase != nil {
+			result = evalBlockStatement(defaultCase.Body, env)
+		}
+		return result
 
 	case *uast.WhileStatement:
 		var result Object = NULL
@@ -305,6 +352,27 @@ func Eval(node uast.Node, env *Environment) Object {
 		return evalBinaryOp(n.Operator, left, right, n.GetMetadata())
 
 	case *uast.UnaryExpression:
+		if n.Operator == "&" {
+			if id, ok := n.Argument.(*uast.Identifier); ok {
+				return &Pointer{Env: env, VarName: id.Name}
+			}
+			return newError(n.GetMetadata(), "Operator '&' hanya dapat mengambil alamat dari variabel", "Gunakan '&nama_variabel'.")
+		}
+		if n.Operator == "*" {
+			ptrObj := Eval(n.Argument, env)
+			if isError(ptrObj) {
+				return ptrObj
+			}
+			ptr, ok := ptrObj.(*Pointer)
+			if !ok {
+				return newError(n.GetMetadata(), fmt.Sprintf("Operator '*' tidak dapat mendereference tipe %s", ptrObj.Type()), "Pastikan objek yang didereference adalah pointer.")
+			}
+			val, ok := ptr.Env.Get(ptr.VarName)
+			if !ok {
+				return newError(n.GetMetadata(), fmt.Sprintf("Variabel target pointer '%s' tidak ditemukan", ptr.VarName), "")
+			}
+			return val
+		}
 		right := Eval(n.Argument, env)
 		if isError(right) {
 			return right

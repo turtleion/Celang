@@ -56,6 +56,8 @@ type Parser struct {
 
 	prefixParseFns map[TokenType]prefixParseFn
 	infixParseFns  map[TokenType]infixParseFn
+
+	parenDepth int
 }
 
 func NewParser(l *Lexer) *Parser {
@@ -75,6 +77,8 @@ func NewParser(l *Lexer) *Parser {
 	p.registerPrefix(BANG, p.parsePrefixExpression)
 	p.registerPrefix(NOT, p.parsePrefixExpression)
 	p.registerPrefix(MINUS, p.parsePrefixExpression)
+	p.registerPrefix(AMPERSAND, p.parsePrefixExpression)
+	p.registerPrefix(ASTERISK, p.parsePrefixExpression)
 	p.registerPrefix(LPAREN, p.parseGroupedExpression)
 	p.registerPrefix(LBRACKET, p.parseArrayLiteral)
 	p.registerPrefix(LBRACE, p.parseMapLiteral)
@@ -207,9 +211,12 @@ func (p *Parser) parseStatement() uast.Statement {
 		return p.parseConcurrencyStatement("sambil")
 	case PARALLEL:
 		return p.parseConcurrencyStatement("bersamaan")
+	case SWITCH:
+		return p.parseSwitchStatement()
 	default:
-		// Check for assignment: target = expr or target += expr
-		if p.curTokenIs(IDENT) && (p.peekTokenIs(ASSIGN) || p.peekTokenIs(PLUS_ASSIGN) || p.peekTokenIs(MINUS_ASSIGN)) {
+		// Check for assignment: target = expr or target += expr, or *ptr = expr
+		if (p.curTokenIs(IDENT) && (p.peekTokenIs(ASSIGN) || p.peekTokenIs(PLUS_ASSIGN) || p.peekTokenIs(MINUS_ASSIGN))) ||
+			(p.curTokenIs(ASTERISK) && p.peekTokenIs(IDENT)) {
 			return p.parseAssignmentStatement()
 		}
 		return p.parseExpressionStatement()
@@ -252,9 +259,31 @@ func (p *Parser) parseVariableDeclaration(isMutable bool) *uast.VariableDeclarat
 	}
 }
 
-func (p *Parser) parseAssignmentStatement() *uast.AssignmentStatement {
+func (p *Parser) parseAssignmentStatement() uast.Statement {
 	meta := p.currentMetadata()
-	target := p.parseIdentifier()
+	var target uast.Expression
+
+	if p.curTokenIs(ASTERISK) {
+		p.nextToken() // move to IDENT
+		id := p.parseIdentifier()
+		target = &uast.UnaryExpression{
+			NodeType: uast.NodeTypeUnaryExpression,
+			Metadata: meta,
+			Operator: "*",
+			Argument: id,
+			IsPrefix: true,
+		}
+	} else {
+		target = p.parseIdentifier()
+	}
+
+	if !p.peekTokenIs(ASSIGN) && !p.peekTokenIs(PLUS_ASSIGN) && !p.peekTokenIs(MINUS_ASSIGN) {
+		return &uast.ExpressionStatement{
+			NodeType:   uast.NodeTypeExpressionStatement,
+			Metadata:   meta,
+			Expression: target,
+		}
+	}
 
 	p.nextToken() // move to operator (=, +=, -=)
 	operator := p.curToken.Literal
@@ -268,6 +297,94 @@ func (p *Parser) parseAssignmentStatement() *uast.AssignmentStatement {
 		Target:   target,
 		Operator: operator,
 		Value:    val,
+	}
+}
+
+func (p *Parser) parseSwitchStatement() *uast.SwitchStatement {
+	meta := p.currentMetadata()
+	p.nextToken() // eat 'cocok' or 'switch'
+
+	hasParen := false
+	if p.curTokenIs(LPAREN) {
+		hasParen = true
+		p.nextToken()
+	}
+
+	discriminant := p.parseExpression(LOWEST)
+
+	if hasParen {
+		if !p.expectPeek(RPAREN) {
+			return nil
+		}
+	}
+
+	if !p.expectPeek(LBRACE) {
+		return nil
+	}
+	p.nextToken() // enter brace
+
+	cases := []uast.CaseClause{}
+
+	for !p.curTokenIs(RBRACE) && !p.curTokenIs(EOF) {
+		if p.curTokenIs(CASE) {
+			p.nextToken() // eat 'kasus' / 'case'
+			caseVal := p.parseExpression(LOWEST)
+			if p.peekTokenIs(COLON) {
+				p.nextToken() // eat ':'
+			}
+			p.nextToken()
+
+			body := []uast.Statement{}
+			for !p.curTokenIs(CASE) && !p.curTokenIs(DEFAULT) && !p.curTokenIs(RBRACE) && !p.curTokenIs(EOF) {
+				if p.curTokenIs(SEMICOLON) {
+					p.nextToken()
+					continue
+				}
+				stmt := p.parseStatement()
+				if stmt != nil {
+					body = append(body, stmt)
+				}
+				p.nextToken()
+			}
+			cases = append(cases, uast.CaseClause{
+				NodeType: uast.NodeTypeCaseClause,
+				Value:    caseVal,
+				Body:     body,
+			})
+		} else if p.curTokenIs(DEFAULT) {
+			p.nextToken() // eat 'lainnya' / 'default'
+			if p.peekTokenIs(COLON) {
+				p.nextToken() // eat ':'
+			}
+			p.nextToken()
+
+			body := []uast.Statement{}
+			for !p.curTokenIs(CASE) && !p.curTokenIs(DEFAULT) && !p.curTokenIs(RBRACE) && !p.curTokenIs(EOF) {
+				if p.curTokenIs(SEMICOLON) {
+					p.nextToken()
+					continue
+				}
+				stmt := p.parseStatement()
+				if stmt != nil {
+					body = append(body, stmt)
+				}
+				p.nextToken()
+			}
+			cases = append(cases, uast.CaseClause{
+				NodeType: uast.NodeTypeCaseClause,
+				Value:    nil,
+				Body:     body,
+			})
+		} else {
+			p.nextToken()
+		}
+	}
+
+	return &uast.SwitchStatement{
+		NodeType:     uast.NodeTypeSwitchStatement,
+		Metadata:     meta,
+		Discriminant: discriminant,
+		Cases:        cases,
 	}
 }
 
@@ -576,6 +693,9 @@ func (p *Parser) parseExpression(precedence int) uast.Expression {
 	leftExp := prefix()
 
 	for !p.peekTokenIs(SEMICOLON) && precedence < p.peekPrecedence() {
+		if p.peekToken.Line > p.curToken.Line && p.parenDepth == 0 {
+			break
+		}
 		infix := p.infixParseFns[p.peekToken.Type]
 		if infix == nil {
 			return leftExp
@@ -690,6 +810,8 @@ func (p *Parser) parseInfixExpression(left uast.Expression) uast.Expression {
 }
 
 func (p *Parser) parseGroupedExpression() uast.Expression {
+	p.parenDepth++
+	defer func() { p.parenDepth-- }()
 	p.nextToken() // eat '('
 	exp := p.parseExpression(LOWEST)
 

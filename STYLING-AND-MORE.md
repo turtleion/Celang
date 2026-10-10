@@ -151,10 +151,12 @@ Celang mengusung konsep **Kamus Dwibahasa / Poliglot Terbuka**.
 | **Alternatif Akhir** | `selain` | `else` | `else` | Blok penutup kondisi |
 | **Kondisi Selesai** | `selesai` / `}` | `}` | `}` | Mode kurung atau keyword |
 | **Perulangan While** | `selama` | `while` | `while` | Perulangan berdasar kondisi |
-| **Perulangan Iterasi** | `untuk ... dalam` | `for ... in` | `for ... in` | Iterasi koleksi / deret |
-| **Deklarasi Fungsi** | `fungsi` | `def` | `fn` / `function` | Blok rutin |
+| **Perulangan Iterasi** | `untuk ... dalam` | `for ... in` | `for (let item of ...)` | 100% gaya JavaScript |
+| **Pencocokan Nilai** | `cocok ... kasus ... lainnya` | `match ... case` | `switch ... case ... default` | Pattern / Switch matching |
+| **Deklarasi Fungsi** | `fungsi` | `def` | `function` | 100% JavaScript keyword |
 | **Nilai Kembali** | `kembalikan` | `return` | `return` | Return statement |
 | **Panah Tipe Return** | `mengembalikan` / `->` | `->` | `->` | Anotasi tipe keluaran |
+| **Pointer & Alamat** | `&` (alamat), `*` (deref) | `&` / `*` | `&` / `*` | Manipulasi referensi memori |
 | **Asinkron Latar** | `sambil` | `async` | `async` | Goroutine mandiri |
 | **Paralel Sinkron** | `bersamaan` | `parallel` | `parallel` | WaitGroup otomatis |
 | **Nilai Benar** | `benar` | `True` | `true` | Boolean truthy |
@@ -214,29 +216,20 @@ lamun (ngaran == "Asep") {
 
 ---
 
-## 6. Keyword Masa Depan & Rencana Fitur Lanjutan
+## 6. Fitur Canggih yang Telah Terimplementasi
 
-Beberapa ide tambahan yang telah dipersiapkan arsitekturnya:
+Fitur-fitur inovatif yang telah siap pakai:
 
-1. **Fitur Pointer & Referensi (`tunjuk` / `&`, `ambil` / `*`)**:
-   - Untuk performa tinggi dan manipulasi memori tanpa menyulitkan pemula.
-   - Usulan keyword: `alamat_dari(x)` atau `&x`, dan `nilai_dari(ptr)` atau `*ptr`.
-2. **Pattern Matching (`cocok ... dengan`)**:
-   - Pengganti `switch-case` yang mendukung pencocokan bentuk data atau tipe data.
-   - Contoh:
-     ```celang
-     cocok nilai {
-         dengan Angka: cetak("Ini bilangan")
-         dengan Teks: cetak("Ini string")
-         lainnya: cetak("Lainnya")
-     }
-     ```
-3. **Modul & Impor (`ambil ... dari ...`)**:
-   - Mengambil pustaka atau berkas lain.
-   - Contoh: `ambil cetak_warna dari "lib/warna"` atau `import math`.
-4. **Empathetic Error Guidance**:
-   - Jika pengguna salah mengetik `jika_tidak` (versi lama), compiler tidak langsung crash dengan error merah, melainkan memberikan saran ramah:
-     > *"💡 Tips: Sepertinya kamu bermaksud menulis 'selain jika' atau 'selain'. Kami sarankan menggunakan 'selain' sesuai aturan sintaks Celang."*
+1. **Fitur Pointer & Referensi (`&` dan `*`)**:
+   - Untuk efisiensi dan mutasi memori langsung: `&var` untuk mengambil alamat memori variabel, dan `*ptr = nilai_baru` untuk dereferensi dan mutasi langsung dalam environment.
+2. **Pattern Matching / Switch (`cocok ... kasus ... lainnya`)**:
+   - Percabangan multi-kasus yang bersih. Terformat otomatis menjadi `switch ... case ... default` di JavaScript dan `match ... case` di Pythonic style.
+3. **Empathetic Error Handler (Pesan Kesalahan Humanis)**:
+   - Jika pengguna salah mengetik sintaks atau tipe data, compiler menyajikan visual snippet baris kode dengan penunjuk kolom (`^`), serta saran (*Tips*) solusi perbaikan ramah manusia.
+4. **Custom SDL (.style) Loader Dinamis**:
+   - Memungkinkan pemuatan profil dialek baru (misal: `examples/sunda.style`) secara dinamis melalui flag `--style=path/to.style`.
+5. **Gaya Classic 100% JavaScript**:
+   - Menggunakan `function`, `let`, `for (let item of array)`, `switch`, dan format idiomatik JavaScript murni.
 
 ---
 

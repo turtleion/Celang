@@ -219,3 +219,58 @@ func TestEvaluator_Concurrency(t *testing.T) {
 		t.Fatalf("Expected counter=4 after sambil execution, got %v", cntAfter.Inspect())
 	}
 }
+
+func TestEvaluator_Pointers(t *testing.T) {
+	// Program:
+	// buat x = 10
+	// buat ptr = &x
+	// *ptr = 99
+	// cetak(x)            // 99
+	// cetak(x.sebelumnya) // 10
+	env := evaluator.NewEnvironment()
+	prog := uast.NewProgram(
+		uast.NewVarDecl("x", uast.NewIntLiteral(10), true, "int"),
+		uast.NewVarDecl("ptr", uast.NewUnaryExpr("&", uast.NewIdentifier("x"), true), false, "pointer"),
+		uast.NewAssign(uast.NewUnaryExpr("*", uast.NewIdentifier("ptr"), true), "=", uast.NewIntLiteral(99)),
+	)
+
+	evaluator.Eval(prog, env)
+
+	xVal, ok := env.Get("x")
+	if !ok || xVal.(*evaluator.Integer).Value != 99 {
+		t.Fatalf("Expected x=99 via pointer mutation, got %+v", xVal)
+	}
+
+	entry, _ := env.GetEntry("x")
+	prev, ok := entry.Previous()
+	if !ok || prev.(*evaluator.Integer).Value != 10 {
+		t.Fatalf("Expected x.sebelumnya=10 after pointer mutation, got %+v", prev)
+	}
+}
+
+func TestEvaluator_SwitchStatement(t *testing.T) {
+	// Program:
+	// buat status = "admin"
+	// cocok status {
+	//     kasus "user": buat hasil = "pengguna"
+	//     kasus "admin": buat hasil = "pengelola"
+	//     lainnya: buat hasil = "tamu"
+	// }
+	env := evaluator.NewEnvironment()
+	prog := uast.NewProgram(
+		uast.NewVarDecl("status", uast.NewStringLiteral("admin"), false, "string"),
+		uast.NewSwitch(
+			uast.NewIdentifier("status"),
+			uast.NewCase(uast.NewStringLiteral("user"), uast.NewVarDecl("hasil", uast.NewStringLiteral("pengguna"), true, "string")),
+			uast.NewCase(uast.NewStringLiteral("admin"), uast.NewVarDecl("hasil", uast.NewStringLiteral("pengelola"), true, "string")),
+			uast.NewCase(nil, uast.NewVarDecl("hasil", uast.NewStringLiteral("tamu"), true, "string")),
+		),
+	)
+
+	evaluator.Eval(prog, env)
+
+	hasilVal, ok := env.Get("hasil")
+	if !ok || hasilVal.(*evaluator.String).Value != "pengelola" {
+		t.Fatalf("Expected hasil='pengelola', got %+v", hasilVal)
+	}
+}
