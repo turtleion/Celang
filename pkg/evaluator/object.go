@@ -32,6 +32,20 @@ type Object interface {
 	Inspect() string
 }
 
+// Callable represents any object that can be called with arguments (e.g. bytecode CompiledFunction).
+type Callable interface {
+	Object
+	Call(args ...Object) Object
+}
+
+// ASTNodeWrapper wraps a U-AST node as an Object for bytecode chunks.
+type ASTNodeWrapper struct {
+	Node uast.Node
+}
+
+func (w *ASTNodeWrapper) Type() ObjectType { return "AST_NODE" }
+func (w *ASTNodeWrapper) Inspect() string   { return "<ast-node>" }
+
 // Integer represents a 64-bit signed integer.
 type Integer struct {
 	Value int64

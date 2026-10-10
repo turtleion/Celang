@@ -7,38 +7,54 @@ import (
 	"celang/pkg/uast"
 )
 
+const DefaultHistoryCapacity = 50
+
 // VariableEntry stores the state and timeline history for a variable.
-// This fulfills the "Time-Travel Variables" architecture.
+// Uses an Anchor Snapshot + Bounded Ring Buffer architecture to guarantee O(1) memory usage
+// even in long-running loops with millions of mutations.
 type VariableEntry struct {
-	Name       string
-	History    []Object
-	IsMutable  bool
-	TypeHint   string
-	Visibility *uast.Visibility
+	Name        string
+	InitialVal  Object
+	PreviousVal Object
+	CurrentVal  Object
+	History     []Object
+	HistoryCap  int
+	IsMutable   bool
+	TypeHint    string
+	Visibility  *uast.Visibility
 }
 
 // Current returns the most recent value of the variable.
 func (ve *VariableEntry) Current() Object {
-	if len(ve.History) == 0 {
-		return &Null{}
+	if ve.CurrentVal != nil {
+		return ve.CurrentVal
 	}
-	return ve.History[len(ve.History)-1]
+	if len(ve.History) > 0 {
+		return ve.History[len(ve.History)-1]
+	}
+	return &Null{}
 }
 
 // Previous returns the value right before the current one (if available).
 func (ve *VariableEntry) Previous() (Object, bool) {
-	if len(ve.History) < 2 {
-		return nil, false
+	if ve.PreviousVal != nil {
+		return ve.PreviousVal, true
 	}
-	return ve.History[len(ve.History)-2], true
+	if len(ve.History) >= 2 {
+		return ve.History[len(ve.History)-2], true
+	}
+	return nil, false
 }
 
 // Initial returns the first value ever assigned to this variable.
 func (ve *VariableEntry) Initial() Object {
-	if len(ve.History) == 0 {
-		return &Null{}
+	if ve.InitialVal != nil {
+		return ve.InitialVal
 	}
-	return ve.History[0]
+	if len(ve.History) > 0 {
+		return ve.History[0]
+	}
+	return &Null{}
 }
 
 // ModuleRegistry caches evaluated modules across imports to prevent duplicate execution and circular loops.
@@ -97,11 +113,14 @@ func (e *Environment) DefineWithVisibility(name string, val Object, isMutable bo
 	}
 
 	entry := &VariableEntry{
-		Name:       name,
-		History:    []Object{val},
-		IsMutable:  isMutable,
-		TypeHint:   typeHint,
-		Visibility: vis,
+		Name:        name,
+		InitialVal:  val,
+		CurrentVal:  val,
+		History:     []Object{val},
+		HistoryCap:  DefaultHistoryCapacity,
+		IsMutable:   isMutable,
+		TypeHint:    typeHint,
+		Visibility:  vis,
 	}
 	e.store[name] = entry
 	return entry, nil
@@ -149,7 +168,22 @@ func (e *Environment) Assign(name string, val Object) error {
 		return fmt.Errorf("variabel '%s' bersifat tetap (immutable) dan tidak dapat diubah", name)
 	}
 
-	entry.History = append(entry.History, val)
+	entry.PreviousVal = entry.CurrentVal
+	entry.CurrentVal = val
+
+	capLimit := entry.HistoryCap
+	if capLimit <= 0 {
+		capLimit = DefaultHistoryCapacity
+	}
+
+	if len(entry.History) >= capLimit {
+		// Zero-allocation sliding window: drop oldest, preserve last 'capLimit' entries
+		copy(entry.History, entry.History[1:])
+		entry.History[len(entry.History)-1] = val
+	} else {
+		entry.History = append(entry.History, val)
+	}
+
 	return nil
 }
 

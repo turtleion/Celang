@@ -7,12 +7,14 @@ import (
 	"runtime"
 	"strings"
 
+	"celang/pkg/compiler"
 	"celang/pkg/empathy"
 	"celang/pkg/evaluator"
 	"celang/pkg/parser"
 	"celang/pkg/repl"
 	"celang/pkg/syntax"
 	"celang/pkg/uast"
+	"celang/pkg/vm"
 )
 
 const AppVersion = "1.0.0"
@@ -43,18 +45,40 @@ func main() {
 
 	case "run":
 		if len(os.Args) < 3 {
-			fmt.Println("❌ Penggunaan: celang run <file.ce | file.ast> [-- argumen1 argumen2 ...]")
+			fmt.Println("❌ Penggunaan: celang run <file.ce | file.ast> [--ast] [-- argumen1 argumen2 ...]")
 			os.Exit(1)
 		}
-		filePath := os.Args[2]
+		filePath := ""
+		useAST := false
 		var scriptArgs []string
-		for i := 3; i < len(os.Args); i++ {
-			if os.Args[i] == "--" {
+
+		for i := 2; i < len(os.Args); i++ {
+			arg := os.Args[i]
+			if arg == "--" {
 				scriptArgs = os.Args[i+1:]
 				break
 			}
+			if arg == "--ast" || arg == "--legacy" || arg == "--tree-walk" {
+				useAST = true
+			} else if arg == "--vm" {
+				useAST = false // explicit VM confirmation
+			} else if filePath == "" && !strings.HasPrefix(arg, "-") {
+				filePath = arg
+			}
 		}
-		runFile(filePath, scriptArgs)
+
+		if filePath == "" {
+			fmt.Println("❌ Mohon sertakan berkas kode yang ingin dijalankan.")
+			os.Exit(1)
+		}
+		runFile(filePath, scriptArgs, useAST)
+
+	case "disasm", "disassemble":
+		if len(os.Args) < 3 {
+			fmt.Println("❌ Penggunaan: celang disasm <file.ce>")
+			os.Exit(1)
+		}
+		disasmFile(os.Args[2])
 
 	case "compile", "parse":
 		if len(os.Args) < 3 {
@@ -129,6 +153,7 @@ func main() {
 func printVersion() {
 	fmt.Printf("🌟 Celang Runtime v%s (%s/%s)\n", AppVersion, runtime.GOOS, runtime.GOARCH)
 	fmt.Println("   Sistem Bahasa Pemrograman Human-Centric & Syntax-Styling")
+	fmt.Println("   Bytecode Compiler & Virtual Machine (VM) Terintegrasi")
 	fmt.Println("   Lisensi: MIT")
 }
 
@@ -137,7 +162,8 @@ func printHelp() {
 	fmt.Println("\nPerintah yang tersedia:")
 	fmt.Println("  celang                                  Masuk ke Interactive REPL (otomatis)")
 	fmt.Println("  celang repl [--style=nama|path]         Membuka sesi Interactive REPL eksplisit")
-	fmt.Println("  celang run <file> [-- argumen...]       Menjalankan file kode (.ce) atau U-AST (.ast)")
+	fmt.Println("  celang run <file> [--ast] [-- args...]  Menjalankan kode (.ce/.ast) via Bytecode VM (default, tercepat) atau AST Evaluator (--ast)")
+	fmt.Println("  celang disasm <file.ce>                 Membongkar kode menjadi instruksi rakitan Bytecode")
 	fmt.Println("  celang format [-w] <file> [--style=...] Memformat kode (-w untuk langsung menimpa file)")
 	fmt.Println("  celang compile <file.ce> [-o out.ast]   Mengompilasi kode teks menjadi berkas U-AST JSON")
 	fmt.Println("  celang ast <file.ce>                    Mencetak pohon struktur U-AST JSON ke terminal")
@@ -173,7 +199,7 @@ func loadProgram(filePath string) (*uast.Program, string, error) {
 	return prog, sourceStr, nil
 }
 
-func runFile(filePath string, scriptArgs []string) {
+func runFile(filePath string, scriptArgs []string, useAST bool) {
 	prog, sourceStr, err := loadProgram(filePath)
 	if err != nil {
 		diag := empathy.NewSyntaxDiagnostic(err.Error(), 1, 1, sourceStr)
@@ -195,12 +221,48 @@ func runFile(filePath string, scriptArgs []string) {
 	env.Define("argumen", argsArray, false, "Array")
 	env.Define("args", argsArray, false, "Array")
 
-	result := evaluator.Eval(prog, env)
-	if result != nil && result.Type() == evaluator.ERROR_OBJ {
-		diag := empathy.NewRuntimeDiagnostic(result.(*evaluator.Error), sourceStr)
+	if useAST {
+		result := evaluator.Eval(prog, env)
+		if result != nil && result.Type() == evaluator.ERROR_OBJ {
+			diag := empathy.NewRuntimeDiagnostic(result.(*evaluator.Error), sourceStr)
+			fmt.Print(diag.Render())
+			os.Exit(1)
+		}
+		return
+	}
+
+	// Default: Run via Bytecode Compiler & Virtual Machine (VM)
+	comp := compiler.NewCompiler()
+	chunk, err := comp.Compile(prog)
+	if err != nil {
+		fmt.Printf("❌ Kesalahan kompilasi Bytecode: %v\n", err)
+		os.Exit(1)
+	}
+	virtualMachine := vm.NewWithEnv(chunk, env)
+	result, err := virtualMachine.Run()
+	if err != nil {
+		fmt.Printf("❌ Kesalahan Runtime VM: %v\n", err)
+		os.Exit(1)
+	}
+	_ = result
+}
+
+func disasmFile(filePath string) {
+	prog, sourceStr, err := loadProgram(filePath)
+	if err != nil {
+		diag := empathy.NewSyntaxDiagnostic(err.Error(), 1, 1, sourceStr)
 		fmt.Print(diag.Render())
 		os.Exit(1)
 	}
+
+	comp := compiler.NewCompiler()
+	chunk, err := comp.Compile(prog)
+	if err != nil {
+		fmt.Printf("❌ Gagal mengompilasi ke bytecode: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Print(chunk.Disassemble(filepath.Base(filePath)))
 }
 
 func compileFile(inputFile, outputFile string) {

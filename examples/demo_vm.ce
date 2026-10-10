@@ -1,0 +1,14 @@
+fungsi faktorial(n) {
+    jika n <= 1 {
+        kembalikan 1
+    }
+    kembalikan n * faktorial(n - 1)
+}
+
+buat hasil = faktorial(5)
+cetak("Hasil faktorial 5:", hasil)
+
+buat nama = ["Celang", "Bytecode", "VM"]
+untuk kata dalam nama {
+    cetak("->", kata)
+}
