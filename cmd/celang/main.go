@@ -4,29 +4,57 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"celang/pkg/empathy"
 	"celang/pkg/evaluator"
 	"celang/pkg/parser"
+	"celang/pkg/repl"
 	"celang/pkg/syntax"
 	"celang/pkg/uast"
 )
 
+const AppVersion = "1.0.0"
+
 func main() {
 	if len(os.Args) < 2 {
-		printHelp()
+		// Default: launch interactive REPL
+		if err := repl.Start(repl.Options{}); err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Kesalahan REPL: %v\n", err)
+			os.Exit(1)
+		}
 		return
 	}
 
 	command := os.Args[1]
 	switch command {
-	case "run":
-		if len(os.Args) < 3 {
-			fmt.Println("❌ Penggunaan: celang run <file.ce | file.ast>")
+	case "repl":
+		styleName := "indonesian"
+		for _, arg := range os.Args[2:] {
+			if strings.HasPrefix(arg, "--style=") {
+				styleName = strings.TrimPrefix(arg, "--style=")
+			}
+		}
+		if err := repl.Start(repl.Options{Style: styleName}); err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Kesalahan REPL: %v\n", err)
 			os.Exit(1)
 		}
-		runFile(os.Args[2])
+
+	case "run":
+		if len(os.Args) < 3 {
+			fmt.Println("❌ Penggunaan: celang run <file.ce | file.ast> [-- argumen1 argumen2 ...]")
+			os.Exit(1)
+		}
+		filePath := os.Args[2]
+		var scriptArgs []string
+		for i := 3; i < len(os.Args); i++ {
+			if os.Args[i] == "--" {
+				scriptArgs = os.Args[i+1:]
+				break
+			}
+		}
+		runFile(filePath, scriptArgs)
 
 	case "compile", "parse":
 		if len(os.Args) < 3 {
@@ -48,19 +76,47 @@ func main() {
 
 	case "format":
 		if len(os.Args) < 3 {
-			fmt.Println("❌ Penggunaan: celang format <file.ce | file.ast> [--style=nama_style | path/ke/style.style]")
+			fmt.Println("❌ Penggunaan: celang format [-w | --write] <file.ce> [--style=nama_style | path/ke/style.style]")
 			os.Exit(1)
 		}
-		inputFile := os.Args[2]
+		isWrite := false
 		styleName := "indonesian"
-		for i := 3; i < len(os.Args); i++ {
-			if strings.HasPrefix(os.Args[i], "--style=") {
-				styleName = strings.TrimPrefix(os.Args[i], "--style=")
+		filePath := ""
+
+		for _, arg := range os.Args[2:] {
+			if arg == "-w" || arg == "--write" {
+				isWrite = true
+			} else if strings.HasPrefix(arg, "--style=") {
+				styleName = strings.TrimPrefix(arg, "--style=")
+			} else if filePath == "" && !strings.HasPrefix(arg, "-") {
+				filePath = arg
 			}
 		}
-		formatFile(inputFile, styleName)
 
-	case "help", "--help", "-h":
+		if filePath == "" {
+			fmt.Println("❌ Mohon sertakan berkas kode yang ingin diformat.")
+			os.Exit(1)
+		}
+		formatFile(filePath, styleName, isWrite)
+
+	case "init":
+		projectName := "projek_celang"
+		if len(os.Args) >= 3 && !strings.HasPrefix(os.Args[2], "-") {
+			projectName = os.Args[2]
+		}
+		initProject(projectName)
+
+	case "ast", "uast":
+		if len(os.Args) < 3 {
+			fmt.Println("❌ Penggunaan: celang ast <file.ce>")
+			os.Exit(1)
+		}
+		dumpAST(os.Args[2])
+
+	case "versi", "version", "--version", "-v":
+		printVersion()
+
+	case "help", "bantuan", "--help", "-h":
 		printHelp()
 
 	default:
@@ -70,14 +126,24 @@ func main() {
 	}
 }
 
+func printVersion() {
+	fmt.Printf("🌟 Celang Runtime v%s (%s/%s)\n", AppVersion, runtime.GOOS, runtime.GOARCH)
+	fmt.Println("   Sistem Bahasa Pemrograman Human-Centric & Syntax-Styling")
+	fmt.Println("   Lisensi: MIT")
+}
+
 func printHelp() {
 	fmt.Println("🌟 Celang - Bahasa Pemrograman 'Syntax Styling' & Human-Centric")
 	fmt.Println("\nPerintah yang tersedia:")
-	fmt.Println("  celang run <file.ce | file.ast>           Menjalankan file kode teks (.ce) atau U-AST (.ast)")
-	fmt.Println("  celang compile <file.ce> [-o out.ast]     Mengubah kode teks menjadi file Universal AST (U-AST)")
-	fmt.Println("  celang format <file> [--style=nama|path]  Memformat/merender kode ke gaya sintaks tertentu")
-	fmt.Println("                                            (pilihan style: indonesian, javascript, pythonic, atau file .style)")
-	fmt.Println("  celang help                               Menampilkan bantuan ini")
+	fmt.Println("  celang                                  Masuk ke Interactive REPL (otomatis)")
+	fmt.Println("  celang repl [--style=nama|path]         Membuka sesi Interactive REPL eksplisit")
+	fmt.Println("  celang run <file> [-- argumen...]       Menjalankan file kode (.ce) atau U-AST (.ast)")
+	fmt.Println("  celang format [-w] <file> [--style=...] Memformat kode (-w untuk langsung menimpa file)")
+	fmt.Println("  celang compile <file.ce> [-o out.ast]   Mengompilasi kode teks menjadi berkas U-AST JSON")
+	fmt.Println("  celang ast <file.ce>                    Mencetak pohon struktur U-AST JSON ke terminal")
+	fmt.Println("  celang init [nama_proyek]               Menginisialisasi proyek baru (celang.mod & utama.ce)")
+	fmt.Println("  celang versi, --version, -v             Melihat nomor versi Celang")
+	fmt.Println("  celang bantuan, --help, -h              Menampilkan bantuan ini")
 }
 
 func loadProgram(filePath string) (*uast.Program, string, error) {
@@ -107,7 +173,7 @@ func loadProgram(filePath string) (*uast.Program, string, error) {
 	return prog, sourceStr, nil
 }
 
-func runFile(filePath string) {
+func runFile(filePath string, scriptArgs []string) {
 	prog, sourceStr, err := loadProgram(filePath)
 	if err != nil {
 		diag := empathy.NewSyntaxDiagnostic(err.Error(), 1, 1, sourceStr)
@@ -119,6 +185,15 @@ func runFile(filePath string) {
 	absPath, _ := filepath.Abs(filePath)
 	env.FilePath = absPath
 	evaluator.RegisterBuiltins(env, os.Stdout)
+
+	// Inject CLI arguments into global 'argumen' and 'args'
+	argElements := make([]evaluator.Object, len(scriptArgs))
+	for i, arg := range scriptArgs {
+		argElements[i] = &evaluator.String{Value: arg}
+	}
+	argsArray := &evaluator.Array{Elements: argElements}
+	env.Define("argumen", argsArray, false, "Array")
+	env.Define("args", argsArray, false, "Array")
 
 	result := evaluator.Eval(prog, env)
 	if result != nil && result.Type() == evaluator.ERROR_OBJ {
@@ -150,7 +225,7 @@ func compileFile(inputFile, outputFile string) {
 	fmt.Printf("✅ Berhasil mengompilasi '%s' -> '%s' (U-AST)\n", inputFile, outputFile)
 }
 
-func formatFile(filePath, styleName string) {
+func formatFile(filePath, styleName string, isWrite bool) {
 	prog, sourceStr, err := loadProgram(filePath)
 	if err != nil {
 		diag := empathy.NewSyntaxDiagnostic(err.Error(), 1, 1, sourceStr)
@@ -168,8 +243,82 @@ func formatFile(filePath, styleName string) {
 	formatter := syntax.NewFormatter(profile)
 	formatted := formatter.Format(prog)
 
-	fmt.Printf("--- Menampilkan Kode dengan Gaya: %s ---\n", profile.DisplayName)
-	fmt.Print(formatted)
+	if isWrite {
+		if err := os.WriteFile(filePath, []byte(formatted), 0644); err != nil {
+			fmt.Printf("❌ Gagal menimpa berkas '%s': %v\n", filePath, err)
+			os.Exit(1)
+		}
+		fmt.Printf("✅ Berkas '%s' berhasil diformat ulang secara langsung (gaya: %s)\n", filePath, profile.DisplayName)
+	} else {
+		fmt.Printf("--- Menampilkan Kode dengan Gaya: %s ---\n", profile.DisplayName)
+		fmt.Print(formatted)
+	}
+}
+
+func initProject(name string) {
+	targetDir := name
+	if targetDir != "." {
+		if err := os.MkdirAll(targetDir, 0755); err != nil {
+			fmt.Printf("❌ Gagal membuat direktori proyek '%s': %v\n", targetDir, err)
+			os.Exit(1)
+		}
+	}
+
+	modContent := fmt.Sprintf("modul %s\nversi 1.0.0\n", filepath.Base(name))
+	modPath := filepath.Join(targetDir, "celang.mod")
+	if err := os.WriteFile(modPath, []byte(modContent), 0644); err != nil {
+		fmt.Printf("❌ Gagal membuat file 'celang.mod': %v\n", err)
+		os.Exit(1)
+	}
+
+	mainContent := fmt.Sprintf(`// Entrypoint utama aplikasi Celang
+fungsi utama() {
+    cetak("Halo dari Celang! Selamat datang di %s 🚀")
+}
+
+utama()
+`, filepath.Base(name))
+	mainPath := filepath.Join(targetDir, "utama.ce")
+	if err := os.WriteFile(mainPath, []byte(mainContent), 0644); err != nil {
+		fmt.Printf("❌ Gagal membuat file 'utama.ce': %v\n", err)
+		os.Exit(1)
+	}
+
+	readmeContent := fmt.Sprintf(`# %s
+
+Aplikasi berbasis bahasa pemrograman [Celang](https://github.com/celang).
+
+## Cara Menjalankan
+`+"```bash\ncelang run utama.ce\n```\n", filepath.Base(name))
+	readmePath := filepath.Join(targetDir, "README.md")
+	_ = os.WriteFile(readmePath, []byte(readmeContent), 0644)
+
+	fmt.Printf("🎉 Proyek Celang '%s' berhasil diinisialisasi!\n", name)
+	fmt.Printf("   📁 Direktori : %s\n", targetDir)
+	fmt.Printf("   📄 Berkas    : celang.mod, utama.ce, README.md\n")
+	fmt.Println("\nJalankan proyekmu dengan:")
+	if targetDir != "." {
+		fmt.Printf("   cd %s && celang run utama.ce\n", targetDir)
+	} else {
+		fmt.Println("   celang run utama.ce")
+	}
+}
+
+func dumpAST(filePath string) {
+	prog, sourceStr, err := loadProgram(filePath)
+	if err != nil {
+		diag := empathy.NewSyntaxDiagnostic(err.Error(), 1, 1, sourceStr)
+		fmt.Print(diag.Render())
+		os.Exit(1)
+	}
+
+	jsonData, err := uast.ToJSON(prog, true)
+	if err != nil {
+		fmt.Printf("❌ Gagal mengonversi AST ke JSON: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Println(string(jsonData))
 }
 
 func detectPragmaStyle(sourceStr string) string {
@@ -192,4 +341,3 @@ func detectPragmaStyle(sourceStr string) string {
 	}
 	return ""
 }
-

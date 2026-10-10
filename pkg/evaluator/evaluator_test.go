@@ -810,3 +810,33 @@ func TestAudit_EdgeCasesAndCollisions(t *testing.T) {
 	}
 	_ = res4
 }
+
+func TestEvaluator_InputBuiltin(t *testing.T) {
+	inBuf := strings.NewReader("Kayasa\n")
+	var outBuf bytes.Buffer
+
+	env := evaluator.NewEnvironment()
+	evaluator.RegisterBuiltinsWithIO(env, inBuf, &outBuf)
+
+	inputCode := `
+	buat nama = masukan("Nama kamu? ")
+	buat salam = "Halo " + nama
+	salam
+	`
+	l := parser.NewLexer(inputCode)
+	p := parser.NewParser(l)
+	prog, err := p.ParseProgram()
+	if err != nil {
+		t.Fatalf("parser error: %v", err)
+	}
+
+	res := evaluator.Eval(prog, env)
+	str, ok := res.(*evaluator.String)
+	if !ok || str.Value != "Halo Kayasa" {
+		t.Fatalf("Expected 'Halo Kayasa', got %v", res.Inspect())
+	}
+
+	if outBuf.String() != "Nama kamu? " {
+		t.Fatalf("Expected prompt 'Nama kamu? ', got %q", outBuf.String())
+	}
+}

@@ -80,25 +80,27 @@ cetak(akun.saldo) // 150000
 
 ---
 
-### 5. 💻 REPL Interaktif (`celang repl` / `celang`)
+### 5. 💻 REPL Interaktif (`celang repl` / `celang`) (✅ Selesai)
 Menyediakan terminal interaktif baris perintah di mana programmer dapat:
 - Mengetik baris kode Celang dan langsung melihat output hasil evaluasinya.
 - Menguji pipa ekspresi (`|>`) secara instan.
 - Melihat konversi dialek sintaks (*Live Styling Preview*) langsung di terminal.
+- Menggunakan perintah meta REPL (`:lingkungan`, `:gaya`, `:ast`, `:bersih`, `:reset`).
 
 ```bash
 $ celang
-🌟 Celang REPL v1.0 (Ketik 'keluar' atau 'exit' untuk selesai)
+🌟 Celang REPL v1.0 (Ketik ':keluar' untuk selesai)
 celang> buat x = 10
-celang> x |> saring(...) |> cetak
+celang> x |> cetak()
 ```
 
 ---
 
-### 6. 🛠️ Tooling Formatter In-Place (`celang format -w`)
+### 6. 🛠️ Tooling Formatter In-Place (`celang format -w`) (✅ Selesai)
 Menambahkan flag `-w` / `--write` pada CLI pemformatan (mirip `gofmt -w` atau `prettier --write`):
 ```bash
 # Menimpa file di tempat dengan kode yang sudah terformat rapi
-celang format program.ce --style=indonesian -w
+celang format -w program.ce --style=indonesian
+celang format -w program.ce --style=./jawa.style
 ```
 Serta integrasi filter otomatis saat check-in ke sistem Git (*clean/smudge filter*).

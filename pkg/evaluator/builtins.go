@@ -1,6 +1,7 @@
 package evaluator
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"os"
@@ -8,6 +9,13 @@ import (
 )
 
 func RegisterBuiltins(env *Environment, out io.Writer) {
+	RegisterBuiltinsWithIO(env, os.Stdin, out)
+}
+
+func RegisterBuiltinsWithIO(env *Environment, in io.Reader, out io.Writer) {
+	if in == nil {
+		in = os.Stdin
+	}
 	if out == nil {
 		out = os.Stdout
 	}
@@ -27,6 +35,28 @@ func RegisterBuiltins(env *Environment, out io.Writer) {
 	}
 	env.Define("cetak", cetakFn, false, "function")
 	env.Define("print", cetakFn, false, "function")
+
+	// 'masukan' / 'input' prompts and reads a line from input
+	reader := bufio.NewReader(in)
+	masukanFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) > 0 {
+				if s, ok := args[0].(*String); ok {
+					fmt.Fprint(out, s.Value)
+				} else {
+					fmt.Fprint(out, args[0].Inspect())
+				}
+			}
+			line, err := reader.ReadString('\n')
+			if err != nil && len(line) == 0 {
+				return NULL
+			}
+			line = strings.TrimRight(line, "\r\n")
+			return &String{Value: line}
+		},
+	}
+	env.Define("masukan", masukanFn, false, "function")
+	env.Define("input", masukanFn, false, "function")
 
 	// 'panjang' / 'len' calculates length of strings or arrays
 	panjangFn := &Builtin{
