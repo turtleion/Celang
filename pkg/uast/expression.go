@@ -275,3 +275,59 @@ func (a *ArrayLiteral) UnmarshalJSON(data []byte) error {
 	a.Elements = elems
 	return nil
 }
+
+// MapProperty represents a key-value entry in a Map literal.
+type MapProperty struct {
+	Key   Expression `json:"key"`
+	Value Expression `json:"value"`
+}
+
+func (p *MapProperty) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		Key   json.RawMessage `json:"key"`
+		Value json.RawMessage `json:"value"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	keyExpr, err := UnmarshalExpressionJSON(raw.Key)
+	if err != nil {
+		return fmt.Errorf("MapProperty.key unmarshal error: %w", err)
+	}
+	valExpr, err := UnmarshalExpressionJSON(raw.Value)
+	if err != nil {
+		return fmt.Errorf("MapProperty.value unmarshal error: %w", err)
+	}
+	p.Key = keyExpr
+	p.Value = valExpr
+	return nil
+}
+
+// MapLiteral represents dictionary/hash map structures (e.g., {"kunci": "nilai", "poin" itu 100}).
+type MapLiteral struct {
+	NodeType   NodeType      `json:"type"`
+	Metadata   *NodeMetadata `json:"metadata,omitempty"`
+	Properties []MapProperty `json:"properties"`
+}
+
+func (m *MapLiteral) Type() NodeType          { return NodeTypeMapLiteral }
+func (m *MapLiteral) GetMetadata() *NodeMetadata { return m.Metadata }
+func (m *MapLiteral) expressionNode()         {}
+
+func (m *MapLiteral) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		NodeType   NodeType      `json:"type"`
+		Metadata   *NodeMetadata `json:"metadata,omitempty"`
+		Properties []MapProperty `json:"properties"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	if raw.Properties == nil {
+		raw.Properties = []MapProperty{}
+	}
+	m.NodeType = NodeTypeMapLiteral
+	m.Metadata = raw.Metadata
+	m.Properties = raw.Properties
+	return nil
+}

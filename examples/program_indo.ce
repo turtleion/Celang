@@ -1,0 +1,39 @@
+// Program Celang: Syntax Styling & Human-Centric
+buat nama = "Budi Santoso"
+buat gaji = 5000000
+gaji = 7500000
+gaji = 9500000
+
+buat info = {"posisi": "Engineer", "divisi" itu "Teknologi"}
+
+fungsi hitung_bonus(gaji_karyawan itu Angka, persen: Angka = 10) mengembalikan Angka {
+    kembalikan gaji_karyawan * persen / 100
+}
+
+cetak("Nama:", nama)
+cetak("Posisi:", info.posisi)
+cetak("Gaji saat ini:", gaji)
+cetak("Gaji sebelumnya:", gaji.sebelumnya)
+cetak("Gaji awal mula:", gaji.awal)
+cetak("Histori gaji:", gaji.histori)
+
+buat bonus = hitung_bonus(gaji, 15)
+cetak("Bonus:", bonus)
+
+jika (gaji >= 9000000) {
+    cetak("Status: Karyawan Senior")
+} selain jika (gaji >= 6000000) {
+    cetak("Status: Karyawan Menengah")
+} selain {
+    cetak("Status: Karyawan Junior")
+}
+
+buat hobi = ["Membaca", "Ngoding", "Musik"]
+untuk item dalam hobi {
+    cetak("Hobi:", item)
+}
+
+// Konkurensi alami
+sambil {
+    cetak("Tugas latar belakang selesai!")
+}

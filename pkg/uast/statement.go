@@ -287,6 +287,42 @@ func (f *ForStatement) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// ForEachStatement represents iterating through a collection (e.g. untuk item dalam daftar { ... }).
+type ForEachStatement struct {
+	NodeType NodeType        `json:"type"`
+	Metadata *NodeMetadata   `json:"metadata,omitempty"`
+	Item     string          `json:"item"`
+	Iterable Expression      `json:"iterable"`
+	Body     *BlockStatement `json:"body"`
+}
+
+func (f *ForEachStatement) Type() NodeType          { return NodeTypeForEachStatement }
+func (f *ForEachStatement) GetMetadata() *NodeMetadata { return f.Metadata }
+func (f *ForEachStatement) statementNode()          {}
+
+func (f *ForEachStatement) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		NodeType NodeType        `json:"type"`
+		Metadata *NodeMetadata   `json:"metadata,omitempty"`
+		Item     string          `json:"item"`
+		Iterable json.RawMessage `json:"iterable"`
+		Body     *BlockStatement `json:"body"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	iterableExpr, err := UnmarshalExpressionJSON(raw.Iterable)
+	if err != nil {
+		return fmt.Errorf("ForEachStatement.iterable unmarshal error: %w", err)
+	}
+	f.NodeType = NodeTypeForEachStatement
+	f.Metadata = raw.Metadata
+	f.Item = raw.Item
+	f.Iterable = iterableExpr
+	f.Body = raw.Body
+	return nil
+}
+
 // Parameter defines a function parameter with optional type hint and default value.
 type Parameter struct {
 	Name         string     `json:"name"`

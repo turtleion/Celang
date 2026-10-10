@@ -132,6 +132,37 @@ func Eval(node uast.Node, env *Environment) Object {
 		}
 		return result
 
+	case *uast.ForEachStatement:
+		iterVal := Eval(n.Iterable, env)
+		if isError(iterVal) {
+			return iterVal
+		}
+		var elements []Object
+		if arr, ok := iterVal.(*Array); ok {
+			elements = arr.Elements
+		} else if str, ok := iterVal.(*String); ok {
+			for _, r := range str.Value {
+				elements = append(elements, &String{Value: string(r)})
+			}
+		} else if mp, ok := iterVal.(*Map); ok {
+			for _, k := range mp.Order {
+				elements = append(elements, &String{Value: k})
+			}
+		} else {
+			return newError(n.GetMetadata(), fmt.Sprintf("Objek tipe %s tidak dapat diiterasi", iterVal.Type()), "Pastikan menggunakan Array, String, atau Map.")
+		}
+
+		forEnv := NewEnclosedEnvironment(env)
+		var result Object = NULL
+		for _, el := range elements {
+			forEnv.Define(n.Item, el, true, "")
+			result = Eval(n.Body, forEnv)
+			if result != nil && (result.Type() == RETURN_VALUE_OBJ || result.Type() == ERROR_OBJ) {
+				return result
+			}
+		}
+		return result
+
 	case *uast.FunctionDeclaration:
 		fn := &Function{
 			Name:       n.Name,
@@ -253,6 +284,13 @@ func Eval(node uast.Node, env *Environment) Object {
 				return newError(n.GetMetadata(), fmt.Sprintf("Indeks array %d di luar jangkauan (panjang: %d)", intIdx, len(arr.Elements)), "Gunakan indeks yang valid antara 0 hingga panjang array - 1.")
 			}
 		}
+		if mp, ok := obj.(*Map); ok {
+			key := n.Property
+			if val, exists := mp.Pairs[key]; exists {
+				return val
+			}
+			return NULL
+		}
 		return newError(n.GetMetadata(), fmt.Sprintf("Properti '%s' tidak ditemukan pada objek", n.Property), "Pastikan properti yang diakses valid.")
 
 	case *uast.BinaryExpression:
@@ -298,6 +336,31 @@ func Eval(node uast.Node, env *Environment) Object {
 			elems[i] = elVal
 		}
 		return &Array{Elements: elems}
+
+	case *uast.MapLiteral:
+		m := &Map{
+			Pairs: make(map[string]Object),
+			Order: make([]string, 0, len(n.Properties)),
+		}
+		for _, prop := range n.Properties {
+			keyVal := Eval(prop.Key, env)
+			if isError(keyVal) {
+				return keyVal
+			}
+			valVal := Eval(prop.Value, env)
+			if isError(valVal) {
+				return valVal
+			}
+			keyStr := keyVal.Inspect()
+			if strObj, ok := keyVal.(*String); ok {
+				keyStr = strObj.Value
+			}
+			if _, exists := m.Pairs[keyStr]; !exists {
+				m.Order = append(m.Order, keyStr)
+			}
+			m.Pairs[keyStr] = valVal
+		}
+		return m
 	}
 
 	return newError(node.GetMetadata(), fmt.Sprintf("Node AST tipe '%s' belum didukung oleh evaluator", node.Type()), "Pastikan node U-AST valid.")

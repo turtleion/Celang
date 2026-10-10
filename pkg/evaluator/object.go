@@ -21,6 +21,7 @@ const (
 	FUNCTION_OBJ     ObjectType = "FUNCTION"
 	BUILTIN_OBJ      ObjectType = "BUILTIN"
 	ARRAY_OBJ        ObjectType = "ARRAY"
+	MAP_OBJ          ObjectType = "MAP"
 )
 
 type Object interface {
@@ -133,4 +134,20 @@ func (a *Array) Inspect() string {
 		elements = append(elements, el.Inspect())
 	}
 	return fmt.Sprintf("[%s]", strings.Join(elements, ", "))
+}
+
+// Map represents a key-value dictionary.
+type Map struct {
+	Pairs map[string]Object
+	Order []string // maintains key order for readable inspection
+}
+
+func (m *Map) Type() ObjectType { return MAP_OBJ }
+func (m *Map) Inspect() string {
+	var pairs []string
+	for _, k := range m.Order {
+		v := m.Pairs[k]
+		pairs = append(pairs, fmt.Sprintf("%q: %s", k, v.Inspect()))
+	}
+	return fmt.Sprintf("{%s}", strings.Join(pairs, ", "))
 }

@@ -1,0 +1,1193 @@
+{
+  "type": "Program",
+  "version": "1.0",
+  "body": [
+    {
+      "type": "VariableDeclaration",
+      "metadata": {
+        "pos": {
+          "line": 2,
+          "column": 1
+        }
+      },
+      "name": "nama",
+      "value": {
+        "type": "Literal",
+        "metadata": {
+          "pos": {
+            "line": 2,
+            "column": 13
+          }
+        },
+        "kind": "string",
+        "raw": "\"Budi Santoso\"",
+        "value": "Budi Santoso"
+      },
+      "is_mutable": true
+    },
+    {
+      "type": "VariableDeclaration",
+      "metadata": {
+        "pos": {
+          "line": 3,
+          "column": 1
+        }
+      },
+      "name": "gaji",
+      "value": {
+        "type": "Literal",
+        "metadata": {
+          "pos": {
+            "line": 3,
+            "column": 13
+          }
+        },
+        "kind": "int",
+        "raw": "5000000",
+        "value": 5000000
+      },
+      "is_mutable": true
+    },
+    {
+      "type": "AssignmentStatement",
+      "metadata": {
+        "pos": {
+          "line": 4,
+          "column": 1
+        }
+      },
+      "target": {
+        "type": "Identifier",
+        "metadata": {
+          "pos": {
+            "line": 4,
+            "column": 1
+          }
+        },
+        "name": "gaji"
+      },
+      "operator": "=",
+      "value": {
+        "type": "Literal",
+        "metadata": {
+          "pos": {
+            "line": 4,
+            "column": 8
+          }
+        },
+        "kind": "int",
+        "raw": "7500000",
+        "value": 7500000
+      }
+    },
+    {
+      "type": "AssignmentStatement",
+      "metadata": {
+        "pos": {
+          "line": 5,
+          "column": 1
+        }
+      },
+      "target": {
+        "type": "Identifier",
+        "metadata": {
+          "pos": {
+            "line": 5,
+            "column": 1
+          }
+        },
+        "name": "gaji"
+      },
+      "operator": "=",
+      "value": {
+        "type": "Literal",
+        "metadata": {
+          "pos": {
+            "line": 5,
+            "column": 8
+          }
+        },
+        "kind": "int",
+        "raw": "9500000",
+        "value": 9500000
+      }
+    },
+    {
+      "type": "VariableDeclaration",
+      "metadata": {
+        "pos": {
+          "line": 7,
+          "column": 1
+        }
+      },
+      "name": "info",
+      "value": {
+        "type": "MapLiteral",
+        "metadata": {
+          "pos": {
+            "line": 7,
+            "column": 13
+          }
+        },
+        "properties": [
+          {
+            "key": {
+              "type": "Literal",
+              "metadata": {
+                "pos": {
+                  "line": 7,
+                  "column": 14
+                }
+              },
+              "kind": "string",
+              "raw": "\"posisi\"",
+              "value": "posisi"
+            },
+            "value": {
+              "type": "Literal",
+              "metadata": {
+                "pos": {
+                  "line": 7,
+                  "column": 24
+                }
+              },
+              "kind": "string",
+              "raw": "\"Engineer\"",
+              "value": "Engineer"
+            }
+          },
+          {
+            "key": {
+              "type": "Literal",
+              "metadata": {
+                "pos": {
+                  "line": 7,
+                  "column": 36
+                }
+              },
+              "kind": "string",
+              "raw": "\"divisi\"",
+              "value": "divisi"
+            },
+            "value": {
+              "type": "Literal",
+              "metadata": {
+                "pos": {
+                  "line": 7,
+                  "column": 49
+                }
+              },
+              "kind": "string",
+              "raw": "\"Teknologi\"",
+              "value": "Teknologi"
+            }
+          }
+        ]
+      },
+      "is_mutable": true
+    },
+    {
+      "type": "FunctionDeclaration",
+      "metadata": {
+        "pos": {
+          "line": 9,
+          "column": 1
+        }
+      },
+      "name": "hitung_bonus",
+      "parameters": [
+        {
+          "name": "gaji_karyawan",
+          "type_hint": "Angka"
+        },
+        {
+          "name": "persen",
+          "type_hint": "Angka",
+          "default_value": {
+            "type": "Literal",
+            "metadata": {
+              "pos": {
+                "line": 9,
+                "column": 62
+              }
+            },
+            "kind": "int",
+            "raw": "10",
+            "value": 10
+          }
+        }
+      ],
+      "body": {
+        "type": "BlockStatement",
+        "metadata": {
+          "pos": {
+            "line": 9,
+            "column": 86
+          }
+        },
+        "statements": [
+          {
+            "type": "ReturnStatement",
+            "metadata": {
+              "pos": {
+                "line": 10,
+                "column": 5
+              }
+            },
+            "value": {
+              "type": "BinaryExpression",
+              "metadata": {
+                "pos": {
+                  "line": 10,
+                  "column": 39
+                }
+              },
+              "operator": "/",
+              "left": {
+                "type": "BinaryExpression",
+                "metadata": {
+                  "pos": {
+                    "line": 10,
+                    "column": 30
+                  }
+                },
+                "operator": "*",
+                "left": {
+                  "type": "Identifier",
+                  "metadata": {
+                    "pos": {
+                      "line": 10,
+                      "column": 16
+                    }
+                  },
+                  "name": "gaji_karyawan"
+                },
+                "right": {
+                  "type": "Identifier",
+                  "metadata": {
+                    "pos": {
+                      "line": 10,
+                      "column": 32
+                    }
+                  },
+                  "name": "persen"
+                }
+              },
+              "right": {
+                "type": "Literal",
+                "metadata": {
+                  "pos": {
+                    "line": 10,
+                    "column": 41
+                  }
+                },
+                "kind": "int",
+                "raw": "100",
+                "value": 100
+              }
+            }
+          }
+        ]
+      },
+      "return_type": "Angka"
+    },
+    {
+      "type": "ExpressionStatement",
+      "metadata": {
+        "pos": {
+          "line": 13,
+          "column": 1
+        }
+      },
+      "expression": {
+        "type": "CallExpression",
+        "metadata": {
+          "pos": {
+            "line": 13,
+            "column": 6
+          }
+        },
+        "callee": {
+          "type": "Identifier",
+          "metadata": {
+            "pos": {
+              "line": 13,
+              "column": 1
+            }
+          },
+          "name": "cetak"
+        },
+        "arguments": [
+          {
+            "type": "Literal",
+            "metadata": {
+              "pos": {
+                "line": 13,
+                "column": 7
+              }
+            },
+            "kind": "string",
+            "raw": "\"Nama:\"",
+            "value": "Nama:"
+          },
+          {
+            "type": "Identifier",
+            "metadata": {
+              "pos": {
+                "line": 13,
+                "column": 16
+              }
+            },
+            "name": "nama"
+          }
+        ]
+      }
+    },
+    {
+      "type": "ExpressionStatement",
+      "metadata": {
+        "pos": {
+          "line": 14,
+          "column": 1
+        }
+      },
+      "expression": {
+        "type": "CallExpression",
+        "metadata": {
+          "pos": {
+            "line": 14,
+            "column": 6
+          }
+        },
+        "callee": {
+          "type": "Identifier",
+          "metadata": {
+            "pos": {
+              "line": 14,
+              "column": 1
+            }
+          },
+          "name": "cetak"
+        },
+        "arguments": [
+          {
+            "type": "Literal",
+            "metadata": {
+              "pos": {
+                "line": 14,
+                "column": 7
+              }
+            },
+            "kind": "string",
+            "raw": "\"Posisi:\"",
+            "value": "Posisi:"
+          },
+          {
+            "type": "MemberExpression",
+            "metadata": {
+              "pos": {
+                "line": 14,
+                "column": 22
+              }
+            },
+            "object": {
+              "type": "Identifier",
+              "metadata": {
+                "pos": {
+                  "line": 14,
+                  "column": 18
+                }
+              },
+              "name": "info"
+            },
+            "property": "posisi",
+            "computed": false
+          }
+        ]
+      }
+    },
+    {
+      "type": "ExpressionStatement",
+      "metadata": {
+        "pos": {
+          "line": 15,
+          "column": 1
+        }
+      },
+      "expression": {
+        "type": "CallExpression",
+        "metadata": {
+          "pos": {
+            "line": 15,
+            "column": 6
+          }
+        },
+        "callee": {
+          "type": "Identifier",
+          "metadata": {
+            "pos": {
+              "line": 15,
+              "column": 1
+            }
+          },
+          "name": "cetak"
+        },
+        "arguments": [
+          {
+            "type": "Literal",
+            "metadata": {
+              "pos": {
+                "line": 15,
+                "column": 7
+              }
+            },
+            "kind": "string",
+            "raw": "\"Gaji saat ini:\"",
+            "value": "Gaji saat ini:"
+          },
+          {
+            "type": "Identifier",
+            "metadata": {
+              "pos": {
+                "line": 15,
+                "column": 25
+              }
+            },
+            "name": "gaji"
+          }
+        ]
+      }
+    },
+    {
+      "type": "ExpressionStatement",
+      "metadata": {
+        "pos": {
+          "line": 16,
+          "column": 1
+        }
+      },
+      "expression": {
+        "type": "CallExpression",
+        "metadata": {
+          "pos": {
+            "line": 16,
+            "column": 6
+          }
+        },
+        "callee": {
+          "type": "Identifier",
+          "metadata": {
+            "pos": {
+              "line": 16,
+              "column": 1
+            }
+          },
+          "name": "cetak"
+        },
+        "arguments": [
+          {
+            "type": "Literal",
+            "metadata": {
+              "pos": {
+                "line": 16,
+                "column": 7
+              }
+            },
+            "kind": "string",
+            "raw": "\"Gaji sebelumnya:\"",
+            "value": "Gaji sebelumnya:"
+          },
+          {
+            "type": "MemberExpression",
+            "metadata": {
+              "pos": {
+                "line": 16,
+                "column": 31
+              }
+            },
+            "object": {
+              "type": "Identifier",
+              "metadata": {
+                "pos": {
+                  "line": 16,
+                  "column": 27
+                }
+              },
+              "name": "gaji"
+            },
+            "property": "sebelumnya",
+            "computed": false
+          }
+        ]
+      }
+    },
+    {
+      "type": "ExpressionStatement",
+      "metadata": {
+        "pos": {
+          "line": 17,
+          "column": 1
+        }
+      },
+      "expression": {
+        "type": "CallExpression",
+        "metadata": {
+          "pos": {
+            "line": 17,
+            "column": 6
+          }
+        },
+        "callee": {
+          "type": "Identifier",
+          "metadata": {
+            "pos": {
+              "line": 17,
+              "column": 1
+            }
+          },
+          "name": "cetak"
+        },
+        "arguments": [
+          {
+            "type": "Literal",
+            "metadata": {
+              "pos": {
+                "line": 17,
+                "column": 7
+              }
+            },
+            "kind": "string",
+            "raw": "\"Gaji awal mula:\"",
+            "value": "Gaji awal mula:"
+          },
+          {
+            "type": "MemberExpression",
+            "metadata": {
+              "pos": {
+                "line": 17,
+                "column": 30
+              }
+            },
+            "object": {
+              "type": "Identifier",
+              "metadata": {
+                "pos": {
+                  "line": 17,
+                  "column": 26
+                }
+              },
+              "name": "gaji"
+            },
+            "property": "awal",
+            "computed": false
+          }
+        ]
+      }
+    },
+    {
+      "type": "ExpressionStatement",
+      "metadata": {
+        "pos": {
+          "line": 18,
+          "column": 1
+        }
+      },
+      "expression": {
+        "type": "CallExpression",
+        "metadata": {
+          "pos": {
+            "line": 18,
+            "column": 6
+          }
+        },
+        "callee": {
+          "type": "Identifier",
+          "metadata": {
+            "pos": {
+              "line": 18,
+              "column": 1
+            }
+          },
+          "name": "cetak"
+        },
+        "arguments": [
+          {
+            "type": "Literal",
+            "metadata": {
+              "pos": {
+                "line": 18,
+                "column": 7
+              }
+            },
+            "kind": "string",
+            "raw": "\"Histori gaji:\"",
+            "value": "Histori gaji:"
+          },
+          {
+            "type": "MemberExpression",
+            "metadata": {
+              "pos": {
+                "line": 18,
+                "column": 28
+              }
+            },
+            "object": {
+              "type": "Identifier",
+              "metadata": {
+                "pos": {
+                  "line": 18,
+                  "column": 24
+                }
+              },
+              "name": "gaji"
+            },
+            "property": "histori",
+            "computed": false
+          }
+        ]
+      }
+    },
+    {
+      "type": "VariableDeclaration",
+      "metadata": {
+        "pos": {
+          "line": 20,
+          "column": 1
+        }
+      },
+      "name": "bonus",
+      "value": {
+        "type": "CallExpression",
+        "metadata": {
+          "pos": {
+            "line": 20,
+            "column": 26
+          }
+        },
+        "callee": {
+          "type": "Identifier",
+          "metadata": {
+            "pos": {
+              "line": 20,
+              "column": 14
+            }
+          },
+          "name": "hitung_bonus"
+        },
+        "arguments": [
+          {
+            "type": "Identifier",
+            "metadata": {
+              "pos": {
+                "line": 20,
+                "column": 27
+              }
+            },
+            "name": "gaji"
+          },
+          {
+            "type": "Literal",
+            "metadata": {
+              "pos": {
+                "line": 20,
+                "column": 33
+              }
+            },
+            "kind": "int",
+            "raw": "15",
+            "value": 15
+          }
+        ]
+      },
+      "is_mutable": true
+    },
+    {
+      "type": "ExpressionStatement",
+      "metadata": {
+        "pos": {
+          "line": 21,
+          "column": 1
+        }
+      },
+      "expression": {
+        "type": "CallExpression",
+        "metadata": {
+          "pos": {
+            "line": 21,
+            "column": 6
+          }
+        },
+        "callee": {
+          "type": "Identifier",
+          "metadata": {
+            "pos": {
+              "line": 21,
+              "column": 1
+            }
+          },
+          "name": "cetak"
+        },
+        "arguments": [
+          {
+            "type": "Literal",
+            "metadata": {
+              "pos": {
+                "line": 21,
+                "column": 7
+              }
+            },
+            "kind": "string",
+            "raw": "\"Bonus:\"",
+            "value": "Bonus:"
+          },
+          {
+            "type": "Identifier",
+            "metadata": {
+              "pos": {
+                "line": 21,
+                "column": 17
+              }
+            },
+            "name": "bonus"
+          }
+        ]
+      }
+    },
+    {
+      "type": "IfStatement",
+      "metadata": {
+        "pos": {
+          "line": 23,
+          "column": 1
+        }
+      },
+      "condition": {
+        "type": "BinaryExpression",
+        "metadata": {
+          "pos": {
+            "line": 23,
+            "column": 12
+          }
+        },
+        "operator": "\u003e=",
+        "left": {
+          "type": "Identifier",
+          "metadata": {
+            "pos": {
+              "line": 23,
+              "column": 7
+            }
+          },
+          "name": "gaji"
+        },
+        "right": {
+          "type": "Literal",
+          "metadata": {
+            "pos": {
+              "line": 23,
+              "column": 15
+            }
+          },
+          "kind": "int",
+          "raw": "9000000",
+          "value": 9000000
+        }
+      },
+      "consequent": {
+        "type": "BlockStatement",
+        "metadata": {
+          "pos": {
+            "line": 23,
+            "column": 24
+          }
+        },
+        "statements": [
+          {
+            "type": "ExpressionStatement",
+            "metadata": {
+              "pos": {
+                "line": 24,
+                "column": 5
+              }
+            },
+            "expression": {
+              "type": "CallExpression",
+              "metadata": {
+                "pos": {
+                  "line": 24,
+                  "column": 10
+                }
+              },
+              "callee": {
+                "type": "Identifier",
+                "metadata": {
+                  "pos": {
+                    "line": 24,
+                    "column": 5
+                  }
+                },
+                "name": "cetak"
+              },
+              "arguments": [
+                {
+                  "type": "Literal",
+                  "metadata": {
+                    "pos": {
+                      "line": 24,
+                      "column": 11
+                    }
+                  },
+                  "kind": "string",
+                  "raw": "\"Status: Karyawan Senior\"",
+                  "value": "Status: Karyawan Senior"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "alternate": {
+        "type": "IfStatement",
+        "metadata": {
+          "pos": {
+            "line": 25,
+            "column": 3
+          }
+        },
+        "condition": {
+          "type": "BinaryExpression",
+          "metadata": {
+            "pos": {
+              "line": 25,
+              "column": 21
+            }
+          },
+          "operator": "\u003e=",
+          "left": {
+            "type": "Identifier",
+            "metadata": {
+              "pos": {
+                "line": 25,
+                "column": 16
+              }
+            },
+            "name": "gaji"
+          },
+          "right": {
+            "type": "Literal",
+            "metadata": {
+              "pos": {
+                "line": 25,
+                "column": 24
+              }
+            },
+            "kind": "int",
+            "raw": "6000000",
+            "value": 6000000
+          }
+        },
+        "consequent": {
+          "type": "BlockStatement",
+          "metadata": {
+            "pos": {
+              "line": 25,
+              "column": 33
+            }
+          },
+          "statements": [
+            {
+              "type": "ExpressionStatement",
+              "metadata": {
+                "pos": {
+                  "line": 26,
+                  "column": 5
+                }
+              },
+              "expression": {
+                "type": "CallExpression",
+                "metadata": {
+                  "pos": {
+                    "line": 26,
+                    "column": 10
+                  }
+                },
+                "callee": {
+                  "type": "Identifier",
+                  "metadata": {
+                    "pos": {
+                      "line": 26,
+                      "column": 5
+                    }
+                  },
+                  "name": "cetak"
+                },
+                "arguments": [
+                  {
+                    "type": "Literal",
+                    "metadata": {
+                      "pos": {
+                        "line": 26,
+                        "column": 11
+                      }
+                    },
+                    "kind": "string",
+                    "raw": "\"Status: Karyawan Menengah\"",
+                    "value": "Status: Karyawan Menengah"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "alternate": {
+          "type": "BlockStatement",
+          "metadata": {
+            "pos": {
+              "line": 27,
+              "column": 10
+            }
+          },
+          "statements": [
+            {
+              "type": "ExpressionStatement",
+              "metadata": {
+                "pos": {
+                  "line": 28,
+                  "column": 5
+                }
+              },
+              "expression": {
+                "type": "CallExpression",
+                "metadata": {
+                  "pos": {
+                    "line": 28,
+                    "column": 10
+                  }
+                },
+                "callee": {
+                  "type": "Identifier",
+                  "metadata": {
+                    "pos": {
+                      "line": 28,
+                      "column": 5
+                    }
+                  },
+                  "name": "cetak"
+                },
+                "arguments": [
+                  {
+                    "type": "Literal",
+                    "metadata": {
+                      "pos": {
+                        "line": 28,
+                        "column": 11
+                      }
+                    },
+                    "kind": "string",
+                    "raw": "\"Status: Karyawan Junior\"",
+                    "value": "Status: Karyawan Junior"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "VariableDeclaration",
+      "metadata": {
+        "pos": {
+          "line": 31,
+          "column": 1
+        }
+      },
+      "name": "hobi",
+      "value": {
+        "type": "ArrayLiteral",
+        "metadata": {
+          "pos": {
+            "line": 31,
+            "column": 13
+          }
+        },
+        "elements": [
+          {
+            "type": "Literal",
+            "metadata": {
+              "pos": {
+                "line": 31,
+                "column": 14
+              }
+            },
+            "kind": "string",
+            "raw": "\"Membaca\"",
+            "value": "Membaca"
+          },
+          {
+            "type": "Literal",
+            "metadata": {
+              "pos": {
+                "line": 31,
+                "column": 25
+              }
+            },
+            "kind": "string",
+            "raw": "\"Ngoding\"",
+            "value": "Ngoding"
+          },
+          {
+            "type": "Literal",
+            "metadata": {
+              "pos": {
+                "line": 31,
+                "column": 36
+              }
+            },
+            "kind": "string",
+            "raw": "\"Musik\"",
+            "value": "Musik"
+          }
+        ]
+      },
+      "is_mutable": true
+    },
+    {
+      "type": "ForEachStatement",
+      "metadata": {
+        "pos": {
+          "line": 32,
+          "column": 1
+        }
+      },
+      "item": "item",
+      "iterable": {
+        "type": "Identifier",
+        "metadata": {
+          "pos": {
+            "line": 32,
+            "column": 18
+          }
+        },
+        "name": "hobi"
+      },
+      "body": {
+        "type": "BlockStatement",
+        "metadata": {
+          "pos": {
+            "line": 32,
+            "column": 23
+          }
+        },
+        "statements": [
+          {
+            "type": "ExpressionStatement",
+            "metadata": {
+              "pos": {
+                "line": 33,
+                "column": 5
+              }
+            },
+            "expression": {
+              "type": "CallExpression",
+              "metadata": {
+                "pos": {
+                  "line": 33,
+                  "column": 10
+                }
+              },
+              "callee": {
+                "type": "Identifier",
+                "metadata": {
+                  "pos": {
+                    "line": 33,
+                    "column": 5
+                  }
+                },
+                "name": "cetak"
+              },
+              "arguments": [
+                {
+                  "type": "Literal",
+                  "metadata": {
+                    "pos": {
+                      "line": 33,
+                      "column": 11
+                    }
+                  },
+                  "kind": "string",
+                  "raw": "\"Hobi:\"",
+                  "value": "Hobi:"
+                },
+                {
+                  "type": "Identifier",
+                  "metadata": {
+                    "pos": {
+                      "line": 33,
+                      "column": 20
+                    }
+                  },
+                  "name": "item"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "ConcurrencyStatement",
+      "metadata": {
+        "pos": {
+          "line": 37,
+          "column": 1
+        }
+      },
+      "mode": "sambil",
+      "tasks": [
+        {
+          "type": "ExpressionStatement",
+          "metadata": {
+            "pos": {
+              "line": 38,
+              "column": 5
+            }
+          },
+          "expression": {
+            "type": "CallExpression",
+            "metadata": {
+              "pos": {
+                "line": 38,
+                "column": 10
+              }
+            },
+            "callee": {
+              "type": "Identifier",
+              "metadata": {
+                "pos": {
+                  "line": 38,
+                  "column": 5
+                }
+              },
+              "name": "cetak"
+            },
+            "arguments": [
+              {
+                "type": "Literal",
+                "metadata": {
+                  "pos": {
+                    "line": 38,
+                    "column": 11
+                  }
+                },
+                "kind": "string",
+                "raw": "\"Tugas latar belakang selesai!\"",
+                "value": "Tugas latar belakang selesai!"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -3,8 +3,11 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"celang/pkg/evaluator"
+	"celang/pkg/parser"
+	"celang/pkg/syntax"
 	"celang/pkg/uast"
 )
 
@@ -18,12 +21,46 @@ func main() {
 	switch command {
 	case "run":
 		if len(os.Args) < 3 {
-			fmt.Println("❌ Penggunaan: celang run <path-ke-file.ast>")
+			fmt.Println("❌ Penggunaan: celang run <file.ce | file.ast>")
 			os.Exit(1)
 		}
 		runFile(os.Args[2])
+
+	case "compile", "parse":
+		if len(os.Args) < 3 {
+			fmt.Println("❌ Penggunaan: celang compile <file.ce> [-o output.ast]")
+			os.Exit(1)
+		}
+		inputFile := os.Args[2]
+		outputFile := ""
+		for i := 3; i < len(os.Args); i++ {
+			if os.Args[i] == "-o" && i+1 < len(os.Args) {
+				outputFile = os.Args[i+1]
+				break
+			}
+		}
+		if outputFile == "" {
+			outputFile = strings.TrimSuffix(inputFile, ".ce") + ".ast"
+		}
+		compileFile(inputFile, outputFile)
+
+	case "format":
+		if len(os.Args) < 3 {
+			fmt.Println("❌ Penggunaan: celang format <file.ce | file.ast> [--style=indonesian|pythonic|classic]")
+			os.Exit(1)
+		}
+		inputFile := os.Args[2]
+		styleName := "indonesian"
+		for i := 3; i < len(os.Args); i++ {
+			if strings.HasPrefix(os.Args[i], "--style=") {
+				styleName = strings.TrimPrefix(os.Args[i], "--style=")
+			}
+		}
+		formatFile(inputFile, styleName)
+
 	case "help", "--help", "-h":
 		printHelp()
+
 	default:
 		fmt.Printf("Perintah tidak dikenal: '%s'\n", command)
 		printHelp()
@@ -32,22 +69,44 @@ func main() {
 }
 
 func printHelp() {
-	fmt.Println("Celang - Bahasa Pemrograman 'Syntax Styling' & Human-Centric")
+	fmt.Println("🌟 Celang - Bahasa Pemrograman 'Syntax Styling' & Human-Centric")
 	fmt.Println("\nPerintah yang tersedia:")
-	fmt.Println("  celang run <file.ast>    Menjalankan file Universal AST (U-AST JSON)")
-	fmt.Println("  celang help              Menampilkan bantuan ini")
+	fmt.Println("  celang run <file.ce | file.ast>           Menjalankan file kode teks (.ce) atau U-AST (.ast)")
+	fmt.Println("  celang compile <file.ce> [-o out.ast]     Mengubah kode teks menjadi file Universal AST (U-AST)")
+	fmt.Println("  celang format <file> [--style=nama]       Memformat/merender kode ke gaya sintaks tertentu")
+	fmt.Println("                                            (pilihan style: indonesian, pythonic, classic)")
+	fmt.Println("  celang help                               Menampilkan bantuan ini")
+}
+
+func loadProgram(filePath string) (*uast.Program, error) {
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("gagal membaca file: %w", err)
+	}
+
+	// If file ends with .ast or .json, attempt JSON deserialize
+	if strings.HasSuffix(filePath, ".ast") || strings.HasSuffix(filePath, ".json") {
+		prog, err := uast.FromJSON(data)
+		if err == nil {
+			return prog, nil
+		}
+	}
+
+	// Otherwise, parse as source text
+	l := parser.NewLexer(string(data))
+	p := parser.NewParser(l)
+	prog, err := p.ParseProgram()
+	if err != nil {
+		return nil, fmt.Errorf("parsing gagal: %w", err)
+	}
+
+	return prog, nil
 }
 
 func runFile(filePath string) {
-	data, err := os.ReadFile(filePath)
+	prog, err := loadProgram(filePath)
 	if err != nil {
-		fmt.Printf("❌ Gagal membaca file '%s': %v\n", filePath, err)
-		os.Exit(1)
-	}
-
-	prog, err := uast.FromJSON(data)
-	if err != nil {
-		fmt.Printf("❌ Format U-AST tidak valid: %v\n", err)
+		fmt.Printf("❌ %v\n", err)
 		os.Exit(1)
 	}
 
@@ -59,4 +118,40 @@ func runFile(filePath string) {
 		fmt.Println("\n❌ " + result.Inspect())
 		os.Exit(1)
 	}
+}
+
+func compileFile(inputFile, outputFile string) {
+	prog, err := loadProgram(inputFile)
+	if err != nil {
+		fmt.Printf("❌ %v\n", err)
+		os.Exit(1)
+	}
+
+	jsonData, err := uast.ToJSON(prog, true)
+	if err != nil {
+		fmt.Printf("❌ Gagal serialisasi ke U-AST: %v\n", err)
+		os.Exit(1)
+	}
+
+	if err := os.WriteFile(outputFile, jsonData, 0644); err != nil {
+		fmt.Printf("❌ Gagal menulis file output '%s': %v\n", outputFile, err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("✅ Berhasil mengompilasi '%s' -> '%s' (U-AST)\n", inputFile, outputFile)
+}
+
+func formatFile(filePath, styleName string) {
+	prog, err := loadProgram(filePath)
+	if err != nil {
+		fmt.Printf("❌ %v\n", err)
+		os.Exit(1)
+	}
+
+	profile := syntax.GetProfile(styleName)
+	formatter := syntax.NewFormatter(profile)
+	formatted := formatter.Format(prog)
+
+	fmt.Printf("--- Menampilkan Kode dengan Gaya: %s ---\n", profile.DisplayName)
+	fmt.Print(formatted)
 }

@@ -15,6 +15,7 @@ const (
 	NodeTypeIfStatement          NodeType = "IfStatement"
 	NodeTypeWhileStatement       NodeType = "WhileStatement"
 	NodeTypeForStatement         NodeType = "ForStatement"
+	NodeTypeForEachStatement     NodeType = "ForEachStatement"
 	NodeTypeFunctionDeclaration  NodeType = "FunctionDeclaration"
 	NodeTypeReturnStatement      NodeType = "ReturnStatement"
 	NodeTypeConcurrencyStatement NodeType = "ConcurrencyStatement"
@@ -27,6 +28,7 @@ const (
 	NodeTypeCallExpression   NodeType = "CallExpression"
 	NodeTypeMemberExpression NodeType = "MemberExpression"
 	NodeTypeArrayLiteral     NodeType = "ArrayLiteral"
+	NodeTypeMapLiteral       NodeType = "MapLiteral"
 )
 
 // Position captures source location information for LSP, tooling, and error reporting.

@@ -86,6 +86,13 @@ func UnmarshalExpressionJSON(data []byte) (Expression, error) {
 		}
 		return &arr, nil
 
+	case NodeTypeMapLiteral:
+		var m MapLiteral
+		if err := json.Unmarshal(data, &m); err != nil {
+			return nil, err
+		}
+		return &m, nil
+
 	default:
 		return nil, fmt.Errorf("unrecognized expression type: '%s'", detector.Type)
 	}
@@ -152,6 +159,13 @@ func UnmarshalStatementJSON(data []byte) (Statement, error) {
 			return nil, err
 		}
 		return &forStmt, nil
+
+	case NodeTypeForEachStatement:
+		var forEachStmt ForEachStatement
+		if err := json.Unmarshal(data, &forEachStmt); err != nil {
+			return nil, err
+		}
+		return &forEachStmt, nil
 
 	case NodeTypeFunctionDeclaration:
 		var fnDecl FunctionDeclaration
@@ -295,6 +309,23 @@ func NewArrayLiteral(elements ...Expression) *ArrayLiteral {
 	}
 }
 
+func NewMapLiteral(properties ...MapProperty) *MapLiteral {
+	if properties == nil {
+		properties = []MapProperty{}
+	}
+	return &MapLiteral{
+		NodeType:   NodeTypeMapLiteral,
+		Properties: properties,
+	}
+}
+
+func NewMapProperty(key, value Expression) MapProperty {
+	return MapProperty{
+		Key:   key,
+		Value: value,
+	}
+}
+
 func NewVarDecl(name string, val Expression, isMutable bool, typeHint string) *VariableDeclaration {
 	return &VariableDeclaration{
 		NodeType:  NodeTypeVariableDeclaration,
@@ -355,6 +386,15 @@ func NewFor(init Statement, cond Expression, update Statement, body *BlockStatem
 		Condition: cond,
 		Update:    update,
 		Body:      body,
+	}
+}
+
+func NewForEach(item string, iterable Expression, body *BlockStatement) *ForEachStatement {
+	return &ForEachStatement{
+		NodeType: NodeTypeForEachStatement,
+		Item:     item,
+		Iterable: iterable,
+		Body:     body,
 	}
 }
 

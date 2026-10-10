@@ -2,44 +2,62 @@
 
 Celang adalah bahasa pemrograman eksperimental berbasis **Syntax Styling (Sintaks Dinamis)** dan pendekatan **Human-Centric**. Semua kode disimpan dalam format data Universal AST (U-AST), bukan teks statis. Teks kode hanyalah "gaya visual/styling" yang dapat diubah sesuai preferensi programmer.
 
-## 🚀 Implementasi Fase 1: Fondasi Arsitektur Inti
+---
 
-### 1.1 Universal AST (U-AST) (`pkg/uast`)
-- **Struktur Node, Statement, Expression, dan Block** dalam interface Go yang bersih.
-- **Dukungan Metadata & Serialisasi JSON Dua Arah**: U-AST dapat disimpan, dibaca, dan diserialisasi ke JSON tanpa kehilangan detail tipe konkret.
-- Node yang didukung:
-  - `Literal` (`int`, `float`, `string`, `bool`, `null`)
-  - `Identifier`, `BinaryExpression`, `UnaryExpression`, `CallExpression`, `MemberExpression`, `ArrayLiteral`
-  - `VariableDeclaration`, `AssignmentStatement`, `BlockStatement`, `IfStatement`, `WhileStatement`, `ForStatement`, `FunctionDeclaration`, `ReturnStatement`, `ConcurrencyStatement`
+## 🚀 Fitur & Komponen yang Telah Diimplementasikan
 
-### 1.2 Core Evaluator / Interpreter (`pkg/evaluator`)
-- **Tree-Walking Interpreter** di Go.
-- **Tipe Data Internal**: `INTEGER`, `FLOAT`, `BOOLEAN`, `STRING`, `NULL`, `ARRAY`, `FUNCTION`, `BUILTIN`.
-- **Time-Travel Variables**: Setiap variabel dalam `Environment` menyimpan timeline riwayat nilainya (`History []Object`). Properti bawaan seperti `.sebelumnya`, `.awal`, dan `.histori` dapat langsung diakses.
+### 1. Fondasi Arsitektur Inti (Fase 1)
+- **Universal AST (U-AST)** (`pkg/uast`):
+  - Interface `Node`, `Statement`, `Expression`, serta serialisasi polimorfik JSON lossless dua arah.
+  - Node: `Literal`, `Identifier`, `BinaryExpression`, `UnaryExpression`, `CallExpression`, `MemberExpression`, `ArrayLiteral`, `MapLiteral`, `VariableDeclaration`, `AssignmentStatement`, `BlockStatement`, `IfStatement`, `WhileStatement`, `ForStatement`, `ForEachStatement`, `FunctionDeclaration`, `ReturnStatement`, `ConcurrencyStatement`.
+- **Core Tree-Walking Evaluator** (`pkg/evaluator`):
+  - Model objek: `Integer`, `Float`, `String`, `Boolean`, `Null`, `Array`, `Map`, `Function`, `Builtin`, `Error`.
+  - **Time-Travel Variables**: Pelacakan riwayat mutasi variabel (`.sebelumnya`, `.awal`, `.histori`).
+  - **Smart Fallback System**: Type coercion cerdas berbasis regex (misal: `"Rp 150000" - 25000` -> `125000`).
+  - **Natural Concurrency**: `sambil` (goroutine latar belakang) dan `bersamaan` (sinkronisasi paralel).
 
-### 1.3 Smart Fallback System (Tipe Adaptif) (`pkg/evaluator/coercion.go`)
-- **Type Coercion Engine**: Mengekstrak nilai numerik dari string secara cerdas (misal: `"100" - 20` -> `80`, `"Rp 150000" - 25000` -> `125000`).
-- Tetap mempertahankan penggabungan string yang natural (misal: `"Total: " + 50` -> `"Total: 50"`).
-
-### Groundwork Fase 3: Natural Concurrency
-- `ConcurrencyStatement` bawaan dengan mode:
-  - `sambil` (eksekusi di Goroutine latar belakang).
-  - `bersamaan` (eksekusi paralel terkoordinasi dengan `sync.WaitGroup`).
+### 2. Mesin "Syntax Styling" & Two-Way Parser (Fase 2)
+- **Style Profiles** (`pkg/syntax/profile.go`):
+  - **Bahasa Indonesia (Default)**: `buat`, `konstanta`, `jika ... selain jika ... selain`, `selama`, `untuk ... dalam`, `fungsi`, `kembalikan`, `sambil`, `bersamaan`.
+  - **Pythonic Style**: `x = val`, `def`, `return`, `if ... elif ... else`, `for ... in`, `async`.
+  - **C / JavaScript Style**: `let`, `const`, `fn`, `return`, `if ... else if ... else`.
+- **Forward Parser (Teks -> U-AST)** (`pkg/parser`):
+  - Lexer dan recursive-descent/Pratt parser yang mengubah teks kode Celang menjadi struktur data U-AST.
+- **Reverse Parser / Formatter (U-AST -> Teks)** (`pkg/syntax/formatter.go`):
+  - Mengubah U-AST kembali menjadi teks kode dalam profil gaya mana pun secara instan (*on-the-fly syntax restyling*).
 
 ---
 
-## 🛠️ Menjalankan dan Menguji
+## 🛠️ Panduan Penggunaan CLI
 
-### 1. Jalankan Unit Test
+### 1. Menjalankan Unit Test
 ```bash
 go test -v ./...
 ```
 
-### 2. Jalankan Program Contoh U-AST
+### 2. Menjalankan Berkas Kode Teks Celang (`.ce`)
 ```bash
-# Contoh 1: Time-Travel Variables (.sebelumnya, .awal, .histori)
-go run ./cmd/celang run examples/timetravel.ast
+go run ./cmd/celang run examples/program_indo.ce
+```
 
-# Contoh 2: Smart Fallback Adaptive Coercion
-go run ./cmd/celang run examples/smart_fallback.ast
+### 3. Mengompilasi Kode Teks ke Berkas Data U-AST (`.ast`)
+```bash
+go run ./cmd/celang compile examples/program_indo.ce -o examples/program_indo.ast
+```
+
+### 4. Menjalankan Berkas U-AST Langsung
+```bash
+go run ./cmd/celang run examples/program_indo.ast
+```
+
+### 5. Syntax Styling: Mengubah Tampilan Kode Antar Gaya
+```bash
+# Render kode dalam gaya Pythonic:
+go run ./cmd/celang format examples/program_indo.ce --style=pythonic
+
+# Render kode dalam gaya C / JavaScript:
+go run ./cmd/celang format examples/program_indo.ce --style=classic
+
+# Render kembali ke gaya Bahasa Indonesia:
+go run ./cmd/celang format examples/program_indo.ast --style=indonesian
 ```
