@@ -269,3 +269,55 @@ func TestParser_PipelineAndFunctionExpression(t *testing.T) {
 	}
 }
 
+func TestParser_StyleBlockStatement(t *testing.T) {
+	input := `
+	buat nama_pengguna = "Budi"
+
+	gaya "javascript" {
+		let status_login = true
+		function cek_akses(user) {
+			return user === "Budi" && status_login
+		}
+		let diizinkan = cek_akses(nama_pengguna)
+	}
+
+	gaya "pythonic" {
+		def hitung_bonus(skor): {
+			return skor * 2
+		}
+		total_skor = hitung_bonus(50)
+	}
+	`
+
+	l := parser.NewLexer(input)
+	p := parser.NewParser(l)
+	prog, err := p.ParseProgram()
+	if err != nil {
+		t.Fatalf("Parser error: %v", err)
+	}
+
+	if len(prog.Body) != 3 {
+		t.Fatalf("Expected 3 statements, got %d", len(prog.Body))
+	}
+
+	block1, ok := prog.Body[1].(*uast.StyleBlockStatement)
+	if !ok {
+		t.Fatalf("Expected StyleBlockStatement at index 1, got %T", prog.Body[1])
+	}
+	if block1.StyleName != "javascript" {
+		t.Fatalf("Expected StyleName 'javascript', got %q", block1.StyleName)
+	}
+	if len(block1.Body.Statements) != 3 {
+		t.Fatalf("Expected 3 statements inside javascript block, got %d", len(block1.Body.Statements))
+	}
+
+	block2, ok := prog.Body[2].(*uast.StyleBlockStatement)
+	if !ok {
+		t.Fatalf("Expected StyleBlockStatement at index 2, got %T", prog.Body[2])
+	}
+	if block2.StyleName != "pythonic" {
+		t.Fatalf("Expected StyleName 'pythonic', got %q", block2.StyleName)
+	}
+}
+
+

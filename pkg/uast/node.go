@@ -26,6 +26,7 @@ const (
 	NodeTypeTryCatchStatement    NodeType = "TryCatchStatement"
 	NodeTypeCatchClause          NodeType = "CatchClause"
 	NodeTypeThrowStatement       NodeType = "ThrowStatement"
+	NodeTypeStyleBlockStatement  NodeType = "StyleBlockStatement"
 
 	// Expressions
 	NodeTypeLiteral          NodeType = "Literal"

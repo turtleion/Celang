@@ -227,6 +227,8 @@ func (p *Parser) parseStatement() uast.Statement {
 		return p.parseTryCatchStatement()
 	case THROW:
 		return p.parseThrowStatement()
+	case STYLE_BLOCK:
+		return p.parseStyleBlockStatement()
 	default:
 		// Check for assignment: target = expr or target += expr, or *ptr = expr
 		if (p.curTokenIs(IDENT) && (p.peekTokenIs(ASSIGN) || p.peekTokenIs(PLUS_ASSIGN) || p.peekTokenIs(MINUS_ASSIGN))) ||
@@ -531,6 +533,35 @@ func (p *Parser) parseThrowStatement() *uast.ThrowStatement {
 	}
 }
 
+func (p *Parser) parseStyleBlockStatement() *uast.StyleBlockStatement {
+	meta := p.currentMetadata()
+	p.nextToken() // eat 'gaya' / 'style' / 'dialek'
+
+	if !p.curTokenIs(STRING) {
+		p.addError(fmt.Sprintf("Diharapkan nama gaya berupa teks (string), menerima '%s'", p.curToken.Literal))
+		return nil
+	}
+	styleName := p.curToken.Literal
+
+	if p.peekTokenIs(COLON) {
+		p.nextToken() // optional colon
+	}
+
+	if !p.expectPeek(LBRACE) {
+		return nil
+	}
+
+	body := p.parseBlockStatement()
+
+	return &uast.StyleBlockStatement{
+		NodeType:  uast.NodeTypeStyleBlockStatement,
+		Metadata:  meta,
+		StyleName: styleName,
+		Body:      body,
+	}
+}
+
+
 func (p *Parser) parseVariableDeclaration(isMutable bool) *uast.VariableDeclaration {
 	meta := p.currentMetadata()
 	p.nextToken() // eat VAR_DECL or CONST_DECL
@@ -721,6 +752,10 @@ func (p *Parser) parseIfStatement() *uast.IfStatement {
 		p.nextToken()
 	}
 
+	if p.peekTokenIs(COLON) {
+		p.nextToken()
+	}
+
 	if !p.expectPeek(LBRACE) {
 		return nil
 	}
@@ -738,6 +773,9 @@ func (p *Parser) parseIfStatement() *uast.IfStatement {
 			p.nextToken()
 			alternate = p.parseIfStatement()
 		} else {
+			if p.peekTokenIs(COLON) {
+				p.nextToken()
+			}
 			if !p.expectPeek(LBRACE) {
 				return nil
 			}
@@ -772,6 +810,10 @@ func (p *Parser) parseWhileStatement() *uast.WhileStatement {
 		}
 	}
 
+	if p.peekTokenIs(COLON) {
+		p.nextToken()
+	}
+
 	if !p.expectPeek(LBRACE) {
 		return nil
 	}
@@ -803,6 +845,10 @@ func (p *Parser) parseForEachStatement() *uast.ForEachStatement {
 
 	p.nextToken() // move to iterable expression
 	iterable := p.parseExpression(LOWEST)
+
+	if p.peekTokenIs(COLON) {
+		p.nextToken()
+	}
 
 	if !p.expectPeek(LBRACE) {
 		return nil
@@ -840,6 +886,10 @@ func (p *Parser) parseFunctionDeclaration() *uast.FunctionDeclaration {
 		p.nextToken() // eat 'mengembalikan' or '->'
 		p.nextToken()
 		returnType = p.parseTypeHint()
+	}
+
+	if p.peekTokenIs(COLON) {
+		p.nextToken()
 	}
 
 	if !p.expectPeek(LBRACE) {
@@ -1153,6 +1203,10 @@ func (p *Parser) parseFunctionExpression() uast.Expression {
 		p.nextToken() // eat 'mengembalikan' or '->'
 		p.nextToken()
 		returnType = p.parseTypeHint()
+	}
+
+	if p.peekTokenIs(COLON) {
+		p.nextToken()
 	}
 
 	if !p.expectPeek(LBRACE) {

@@ -250,6 +250,14 @@ func UnmarshalStatementJSON(data []byte) (Statement, error) {
 		throwStmt.NodeType = NodeTypeThrowStatement
 		return &throwStmt, nil
 
+	case NodeTypeStyleBlockStatement:
+		var styleBlock StyleBlockStatement
+		if err := json.Unmarshal(data, &styleBlock); err != nil {
+			return nil, err
+		}
+		styleBlock.NodeType = NodeTypeStyleBlockStatement
+		return &styleBlock, nil
+
 	default:
 		return nil, fmt.Errorf("unrecognized statement type: '%s'", detector.Type)
 	}
@@ -552,4 +560,13 @@ func NewFuncExpr(params []Parameter, body *BlockStatement, retType string) *Func
 		ReturnType: retType,
 	}
 }
+
+func NewStyleBlock(styleName string, body *BlockStatement) *StyleBlockStatement {
+	return &StyleBlockStatement{
+		NodeType:  NodeTypeStyleBlockStatement,
+		StyleName: styleName,
+		Body:      body,
+	}
+}
+
 

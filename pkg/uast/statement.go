@@ -603,3 +603,33 @@ func (t *ThrowStatement) UnmarshalJSON(data []byte) error {
 	t.Argument = argExpr
 	return nil
 }
+
+// StyleBlockStatement represents an in-code dialect switch (gaya "..." { ... }).
+type StyleBlockStatement struct {
+	NodeType  NodeType        `json:"type"`
+	Metadata  *NodeMetadata   `json:"metadata,omitempty"`
+	StyleName string          `json:"style_name"`
+	Body      *BlockStatement `json:"body"`
+}
+
+func (s *StyleBlockStatement) Type() NodeType          { return NodeTypeStyleBlockStatement }
+func (s *StyleBlockStatement) GetMetadata() *NodeMetadata { return s.Metadata }
+func (s *StyleBlockStatement) statementNode()          {}
+
+func (s *StyleBlockStatement) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		NodeType  NodeType        `json:"type"`
+		Metadata  *NodeMetadata   `json:"metadata,omitempty"`
+		StyleName string          `json:"style_name"`
+		Body      *BlockStatement `json:"body"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	s.NodeType = NodeTypeStyleBlockStatement
+	s.Metadata = raw.Metadata
+	s.StyleName = raw.StyleName
+	s.Body = raw.Body
+	return nil
+}
+

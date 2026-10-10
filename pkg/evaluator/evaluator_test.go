@@ -491,4 +491,60 @@ func TestEvaluator_PipelineOperator(t *testing.T) {
 	}
 }
 
+func TestEvaluator_StyleBlockScopingAndExecution(t *testing.T) {
+	// Program:
+	// buat nama_pengguna = "Budi"
+	// gaya "javascript" {
+	//     let status_login = true
+	//     function cek_akses(user) {
+	//         return user == "Budi" && status_login
+	//     }
+	//     let diizinkan = cek_akses(nama_pengguna)
+	// }
+	// buat hasil_akses = diizinkan
+	env := evaluator.NewEnvironment()
+	prog := uast.NewProgram(
+		uast.NewVarDecl("nama_pengguna", uast.NewStringLiteral("Budi"), false, "string"),
+		uast.NewStyleBlock(
+			"javascript",
+			uast.NewBlock(
+				uast.NewVarDecl("status_login", uast.NewBoolLiteral(true), true, "bool"),
+				uast.NewFuncDecl(
+					"cek_akses",
+					[]uast.Parameter{{Name: "user"}},
+					uast.NewBlock(
+						uast.NewReturn(
+							uast.NewBinaryExpr(
+								uast.NewBinaryExpr(uast.NewIdentifier("user"), "==", uast.NewStringLiteral("Budi")),
+								"&&",
+								uast.NewIdentifier("status_login"),
+							),
+						),
+					),
+					"bool",
+				),
+				uast.NewVarDecl(
+					"diizinkan",
+					uast.NewCallExpr(uast.NewIdentifier("cek_akses"), uast.NewIdentifier("nama_pengguna")),
+					true,
+					"bool",
+				),
+			),
+		),
+		uast.NewVarDecl("hasil_akses", uast.NewIdentifier("diizinkan"), false, "bool"),
+	)
+
+	evaluator.Eval(prog, env)
+	hasilVal, ok := env.Get("hasil_akses")
+	if !ok || hasilVal.(*evaluator.Boolean).Value != true {
+		t.Fatalf("Expected hasil_akses=true from javascript style block, got %+v", hasilVal)
+	}
+
+	fnVal, ok := env.Get("cek_akses")
+	if !ok || fnVal.Type() != evaluator.FUNCTION_OBJ {
+		t.Fatalf("Expected cek_akses function to exist in global environment, got %+v", fnVal)
+	}
+}
+
+
 

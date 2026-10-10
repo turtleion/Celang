@@ -1,0 +1,35 @@
+// @gaya: indonesian
+
+// 1. Kode Utama dalam Gaya Indonesia
+buat nama_pengguna = "Budi"
+cetak("Nama Pengguna:", nama_pengguna)
+
+// 2. Blok dengan Gaya JavaScript (In-Code Styling Block)
+gaya "javascript" {
+    let status_login = true
+    function cek_akses(user) {
+        return user === "Budi" && status_login
+    }
+    let diizinkan = cek_akses(nama_pengguna)
+}
+
+// 3. Kembali ke Konteks Global (Variabel & Fungsi dari Blok Tetap Tersedia)
+jika (diizinkan) {
+    cetak("Akses Diberikan: Selamat datang,", nama_pengguna)
+} selain {
+    cetak("Akses Ditolak!")
+}
+
+// 4. Blok dengan Gaya Pythonic
+gaya "pythonic" {
+    def hitung_proyeksi(pokok, bunga, tahun): {
+        total = pokok
+        for t in rentang(1, tahun): {
+            total = total + (total * bunga / 100)
+        }
+        return total
+    }
+    saldo_akhir = hitung_proyeksi(1000000, 10, 3)
+}
+
+cetak("Saldo Proyeksi Akhir:", saldo_akhir)

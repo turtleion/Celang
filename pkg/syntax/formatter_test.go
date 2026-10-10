@@ -6,6 +6,7 @@ import (
 
 	"celang/pkg/parser"
 	"celang/pkg/syntax"
+	"celang/pkg/uast"
 )
 
 func TestFormatter_StyleTransformations(t *testing.T) {
@@ -107,3 +108,27 @@ func TestFormatter_StyleTransformations(t *testing.T) {
 		}
 	}
 }
+
+func TestFormatter_StyleBlockStatement(t *testing.T) {
+	prog := uast.NewProgram(
+		uast.NewVarDecl("nama", uast.NewStringLiteral("Budi"), true, "string"),
+		uast.NewStyleBlock(
+			"javascript",
+			uast.NewBlock(
+				uast.NewVarDecl("skor", uast.NewIntLiteral(100), true, "int"),
+				uast.NewFuncDecl("tambah", []uast.Parameter{{Name: "a"}}, uast.NewBlock(uast.NewReturn(uast.NewIdentifier("a"))), "int"),
+			),
+		),
+	)
+
+	indoFormatter := syntax.NewFormatter(syntax.IndonesianProfile())
+	text := indoFormatter.Format(prog)
+
+	if !strings.Contains(text, "gaya \"javascript\" {") ||
+		!strings.Contains(text, "let skor : int = 100") ||
+		!strings.Contains(text, "function tambah(a)") {
+		t.Fatalf("Expected nested javascript style in block:\n%s", text)
+	}
+}
+
+

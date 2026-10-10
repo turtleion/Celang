@@ -158,6 +158,12 @@ func formatFile(filePath, styleName string) {
 		os.Exit(1)
 	}
 
+	if styleName == "indonesian" {
+		if pragma := detectPragmaStyle(sourceStr); pragma != "" {
+			styleName = pragma
+		}
+	}
+
 	profile := syntax.GetProfile(styleName)
 	formatter := syntax.NewFormatter(profile)
 	formatted := formatter.Format(prog)
@@ -165,3 +171,25 @@ func formatFile(filePath, styleName string) {
 	fmt.Printf("--- Menampilkan Kode dengan Gaya: %s ---\n", profile.DisplayName)
 	fmt.Print(formatted)
 }
+
+func detectPragmaStyle(sourceStr string) string {
+	lines := strings.Split(sourceStr, "\n")
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+		if strings.HasPrefix(trimmed, "// @gaya:") || strings.HasPrefix(trimmed, "// @style:") ||
+			strings.HasPrefix(trimmed, "# @gaya:") || strings.HasPrefix(trimmed, "# @style:") {
+			parts := strings.SplitN(trimmed, ":", 2)
+			if len(parts) == 2 {
+				return strings.TrimSpace(parts[1])
+			}
+		}
+		if !strings.HasPrefix(trimmed, "//") && !strings.HasPrefix(trimmed, "#") {
+			break
+		}
+	}
+	return ""
+}
+

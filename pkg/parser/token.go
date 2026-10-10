@@ -90,6 +90,9 @@ const (
 	CATCH   TokenType = "CATCH"   // tangkap, catch, except
 	FINALLY TokenType = "FINALLY" // akhirnya, finally
 	THROW   TokenType = "THROW"   // lempar, throw, raise
+
+	// In-Code Styling
+	STYLE_BLOCK TokenType = "STYLE_BLOCK" // gaya, style, dialek
 )
 
 type Token struct {

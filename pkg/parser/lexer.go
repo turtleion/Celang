@@ -78,6 +78,9 @@ var keywords = map[string]TokenType{
 	"lempar":       THROW,
 	"throw":        THROW,
 	"raise":        THROW,
+	"gaya":         STYLE_BLOCK,
+	"style":        STYLE_BLOCK,
+	"dialek":       STYLE_BLOCK,
 }
 
 type Lexer struct {
@@ -128,6 +131,9 @@ func (l *Lexer) NextToken() Token {
 	case '=':
 		if l.peekChar() == '=' {
 			l.readChar()
+			if l.peekChar() == '=' {
+				l.readChar()
+			}
 			tok = Token{Type: EQ, Literal: "==", Line: tok.Line, Column: tok.Column}
 		} else {
 			tok = Token{Type: ASSIGN, Literal: "=", Line: tok.Line, Column: tok.Column}
@@ -158,6 +164,9 @@ func (l *Lexer) NextToken() Token {
 	case '!':
 		if l.peekChar() == '=' {
 			l.readChar()
+			if l.peekChar() == '=' {
+				l.readChar()
+			}
 			tok = Token{Type: NOT_EQ, Literal: "!=", Line: tok.Line, Column: tok.Column}
 		} else {
 			tok = Token{Type: BANG, Literal: "!", Line: tok.Line, Column: tok.Column}

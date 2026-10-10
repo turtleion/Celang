@@ -444,6 +444,29 @@ func (f *Formatter) formatStatement(stmt uast.Statement, indent int) string {
 		sb.WriteString(prefix)
 		sb.WriteString("}")
 		return sb.String()
+
+	case *uast.StyleBlockStatement:
+		var sb strings.Builder
+		keyword := "gaya"
+		if f.profile.Name == "classic" || f.profile.Name == "javascript" {
+			keyword = "style"
+		}
+		sb.WriteString(prefix)
+		sb.WriteString(fmt.Sprintf("%s %q {\n", keyword, s.StyleName))
+
+		innerProfile := GetProfile(s.StyleName)
+		innerFormatter := NewFormatter(innerProfile)
+
+		if s.Body != nil {
+			for _, child := range s.Body.Statements {
+				sb.WriteString(innerFormatter.formatStatement(child, indent+1))
+				sb.WriteString("\n")
+			}
+		}
+
+		sb.WriteString(prefix)
+		sb.WriteString("}")
+		return sb.String()
 	}
 
 	return prefix

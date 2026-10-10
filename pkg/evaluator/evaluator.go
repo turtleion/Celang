@@ -64,10 +64,15 @@ func Eval(node uast.Node, env *Environment) Object {
 					return val
 				}
 			}
+			if _, exists := env.Get(target.Name); !exists && n.Operator == "=" {
+				env.Define(target.Name, val, true, "")
+				return val
+			}
 			if err := env.Assign(target.Name, val); err != nil {
 				return newError(n.GetMetadata(), err.Error(), "Pastikan variabel ini dideklarasikan dengan 'mutable: true'.")
 			}
 			return val
+
 		case *uast.UnaryExpression:
 			if target.Operator == "*" {
 				ptrObj := Eval(target.Argument, env)
@@ -315,6 +320,18 @@ func Eval(node uast.Node, env *Environment) Object {
 			}
 		}
 
+		return result
+
+	case *uast.StyleBlockStatement:
+		var result Object = NULL
+		if n.Body != nil {
+			for _, stmt := range n.Body.Statements {
+				result = Eval(stmt, env)
+				if result != nil && (result.Type() == RETURN_VALUE_OBJ || result.Type() == ERROR_OBJ) {
+					return result
+				}
+			}
+		}
 		return result
 
 	case *uast.ReturnStatement:
