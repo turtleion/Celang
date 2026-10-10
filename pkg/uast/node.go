@@ -23,6 +23,9 @@ const (
 	NodeTypeConcurrencyStatement NodeType = "ConcurrencyStatement"
 	NodeTypeImportDeclaration    NodeType = "ImportDeclaration"
 	NodeTypeVisibilityStatement  NodeType = "VisibilityStatement"
+	NodeTypeTryCatchStatement    NodeType = "TryCatchStatement"
+	NodeTypeCatchClause          NodeType = "CatchClause"
+	NodeTypeThrowStatement       NodeType = "ThrowStatement"
 
 	// Expressions
 	NodeTypeLiteral          NodeType = "Literal"

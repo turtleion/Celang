@@ -83,6 +83,12 @@ const (
 	IMPORT TokenType = "IMPORT" // ambil, impor, import
 	FROM   TokenType = "FROM"   // dari, from
 	AS     TokenType = "AS"     // sebagai, as
+
+	// Error Handling
+	TRY     TokenType = "TRY"     // coba, try
+	CATCH   TokenType = "CATCH"   // tangkap, catch, except
+	FINALLY TokenType = "FINALLY" // akhirnya, finally
+	THROW   TokenType = "THROW"   // lempar, throw, raise
 )
 
 type Token struct {

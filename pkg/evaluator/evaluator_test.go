@@ -274,3 +274,103 @@ func TestEvaluator_SwitchStatement(t *testing.T) {
 		t.Fatalf("Expected hasil='pengelola', got %+v", hasilVal)
 	}
 }
+
+func TestEvaluator_TryCatchAndThrow(t *testing.T) {
+	// Program 1: Catch runtime division-by-zero error and run finally
+	// buat hasil = ""
+	// coba {
+	//     buat x = 10 / 0
+	// } tangkap (err) {
+	//     hasil = "tertangkap: " + err
+	// } akhirnya {
+	//     hasil = hasil + " [akhir]"
+	// }
+	env := evaluator.NewEnvironment()
+	prog1 := uast.NewProgram(
+		uast.NewVarDecl("hasil", uast.NewStringLiteral(""), true, "string"),
+		uast.NewTryCatch(
+			uast.NewBlock(
+				uast.NewVarDecl("x", uast.NewBinaryExpr(uast.NewIntLiteral(10), "/", uast.NewIntLiteral(0)), false, "int"),
+			),
+			uast.NewCatchClause(
+				"err",
+				uast.NewBlock(
+					uast.NewAssign(uast.NewIdentifier("hasil"), "=", uast.NewBinaryExpr(uast.NewStringLiteral("tertangkap: "), "+", uast.NewIdentifier("err"))),
+				),
+			),
+			uast.NewBlock(
+				uast.NewAssign(uast.NewIdentifier("hasil"), "=", uast.NewBinaryExpr(uast.NewIdentifier("hasil"), "+", uast.NewStringLiteral(" [akhir]"))),
+			),
+		),
+	)
+
+	evaluator.Eval(prog1, env)
+	hasilVal, ok := env.Get("hasil")
+	if !ok {
+		t.Fatalf("Expected hasil to exist")
+	}
+	expected := "tertangkap: Pembagian dengan nol (zero division) [akhir]"
+	if str, ok := hasilVal.(*evaluator.String); !ok || str.Value != expected {
+		t.Fatalf("Expected %q, got %+v", expected, hasilVal)
+	}
+
+	// Program 2: Throw custom error
+	// coba {
+	//     lempar "Ada galat kustom"
+	// } tangkap (e) {
+	//     hasil = e
+	// }
+	prog2 := uast.NewProgram(
+		uast.NewTryCatch(
+			uast.NewBlock(
+				uast.NewThrow(uast.NewStringLiteral("Ada galat kustom")),
+			),
+			uast.NewCatchClause(
+				"e",
+				uast.NewBlock(
+					uast.NewAssign(uast.NewIdentifier("hasil"), "=", uast.NewIdentifier("e")),
+				),
+			),
+			nil,
+		),
+	)
+
+	evaluator.Eval(prog2, env)
+	hasilVal2, ok := env.Get("hasil")
+	if !ok || hasilVal2.(*evaluator.String).Value != "Ada galat kustom" {
+		t.Fatalf("Expected hasil='Ada galat kustom', got %+v", hasilVal2)
+	}
+
+	// Program 3: No error in try, finally still executes
+	// hasil = "awal"
+	// coba {
+	//     hasil = "sukses"
+	// } tangkap (e) {
+	//     hasil = "gagal"
+	// } akhirnya {
+	//     hasil = hasil + " selesai"
+	// }
+	prog3 := uast.NewProgram(
+		uast.NewTryCatch(
+			uast.NewBlock(
+				uast.NewAssign(uast.NewIdentifier("hasil"), "=", uast.NewStringLiteral("sukses")),
+			),
+			uast.NewCatchClause(
+				"e",
+				uast.NewBlock(
+					uast.NewAssign(uast.NewIdentifier("hasil"), "=", uast.NewStringLiteral("gagal")),
+				),
+			),
+			uast.NewBlock(
+				uast.NewAssign(uast.NewIdentifier("hasil"), "=", uast.NewBinaryExpr(uast.NewIdentifier("hasil"), "+", uast.NewStringLiteral(" selesai"))),
+			),
+		),
+	)
+
+	evaluator.Eval(prog3, env)
+	hasilVal3, ok := env.Get("hasil")
+	if !ok || hasilVal3.(*evaluator.String).Value != "sukses selesai" {
+		t.Fatalf("Expected hasil='sukses selesai', got %+v", hasilVal3)
+	}
+}
+

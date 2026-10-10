@@ -68,6 +68,16 @@ var keywords = map[string]TokenType{
 	"sebagai":      AS,
 	"as":           AS,
 	"export":       VIS_PUBLIC,
+	"coba":         TRY,
+	"try":          TRY,
+	"tangkap":      CATCH,
+	"catch":        CATCH,
+	"except":       CATCH,
+	"akhirnya":     FINALLY,
+	"finally":      FINALLY,
+	"lempar":       THROW,
+	"throw":        THROW,
+	"raise":        THROW,
 }
 
 type Lexer struct {

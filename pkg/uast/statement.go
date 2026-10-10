@@ -549,3 +549,57 @@ type VisibilityStatement struct {
 func (v *VisibilityStatement) Type() NodeType          { return NodeTypeVisibilityStatement }
 func (v *VisibilityStatement) GetMetadata() *NodeMetadata { return v.Metadata }
 func (v *VisibilityStatement) statementNode()          {}
+
+// CatchClause represents an exception handler block (tangkap (param) { ... }).
+type CatchClause struct {
+	NodeType NodeType        `json:"type"`
+	Param    string          `json:"param"`
+	Body     *BlockStatement `json:"body"`
+}
+
+func (c *CatchClause) Type() NodeType          { return NodeTypeCatchClause }
+func (c *CatchClause) GetMetadata() *NodeMetadata { return nil }
+func (c *CatchClause) statementNode()          {}
+
+// TryCatchStatement represents structured error handling (coba { ... } tangkap (...) { ... } akhirnya { ... }).
+type TryCatchStatement struct {
+	NodeType  NodeType        `json:"type"`
+	Metadata  *NodeMetadata   `json:"metadata,omitempty"`
+	Block     *BlockStatement `json:"block"`
+	Handler   *CatchClause    `json:"handler,omitempty"`
+	Finalizer *BlockStatement `json:"finalizer,omitempty"`
+}
+
+func (t *TryCatchStatement) Type() NodeType          { return NodeTypeTryCatchStatement }
+func (t *TryCatchStatement) GetMetadata() *NodeMetadata { return t.Metadata }
+func (t *TryCatchStatement) statementNode()          {}
+
+// ThrowStatement represents explicitly raising a runtime error (lempar expr).
+type ThrowStatement struct {
+	NodeType NodeType      `json:"type"`
+	Metadata *NodeMetadata `json:"metadata,omitempty"`
+	Argument Expression    `json:"argument"`
+}
+
+func (t *ThrowStatement) Type() NodeType          { return NodeTypeThrowStatement }
+func (t *ThrowStatement) GetMetadata() *NodeMetadata { return t.Metadata }
+func (t *ThrowStatement) statementNode()          {}
+
+func (t *ThrowStatement) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		NodeType NodeType        `json:"type"`
+		Metadata *NodeMetadata   `json:"metadata,omitempty"`
+		Argument json.RawMessage `json:"argument"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	argExpr, err := UnmarshalExpressionJSON(raw.Argument)
+	if err != nil {
+		return fmt.Errorf("ThrowStatement.argument unmarshal error: %w", err)
+	}
+	t.NodeType = NodeTypeThrowStatement
+	t.Metadata = raw.Metadata
+	t.Argument = argExpr
+	return nil
+}

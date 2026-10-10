@@ -219,6 +219,10 @@ func (p *Parser) parseStatement() uast.Statement {
 		return p.parseImportStatement()
 	case FROM:
 		return p.parsePythonicImportStatement()
+	case TRY:
+		return p.parseTryCatchStatement()
+	case THROW:
+		return p.parseThrowStatement()
 	default:
 		// Check for assignment: target = expr or target += expr, or *ptr = expr
 		if (p.curTokenIs(IDENT) && (p.peekTokenIs(ASSIGN) || p.peekTokenIs(PLUS_ASSIGN) || p.peekTokenIs(MINUS_ASSIGN))) ||
@@ -446,6 +450,80 @@ func (p *Parser) parsePythonicImportStatement() *uast.ImportDeclaration {
 		Metadata:   meta,
 		Source:     source,
 		Specifiers: specifiers,
+	}
+}
+
+func (p *Parser) parseTryCatchStatement() *uast.TryCatchStatement {
+	meta := p.currentMetadata()
+	p.nextToken() // move to '{'
+
+	if !p.curTokenIs(LBRACE) {
+		p.addError("Diharapkan '{' setelah keyword 'coba' / 'try'")
+		return nil
+	}
+
+	block := p.parseBlockStatement()
+
+	var handler *uast.CatchClause
+	if p.peekTokenIs(CATCH) {
+		p.nextToken() // move to 'tangkap' / 'catch' / 'except'
+		param := ""
+		if p.peekTokenIs(LPAREN) {
+			p.nextToken() // eat '('
+			if p.peekTokenIs(IDENT) {
+				p.nextToken()
+				param = p.curToken.Literal
+			}
+			if !p.expectPeek(RPAREN) {
+				return nil
+			}
+		} else if p.peekTokenIs(IDENT) {
+			p.nextToken()
+			param = p.curToken.Literal
+			if p.peekTokenIs(COLON) {
+				p.nextToken() // optional ':' for pythonic
+			}
+		}
+
+		if !p.expectPeek(LBRACE) {
+			return nil
+		}
+		catchBody := p.parseBlockStatement()
+		handler = &uast.CatchClause{
+			NodeType: uast.NodeTypeCatchClause,
+			Param:    param,
+			Body:     catchBody,
+		}
+	}
+
+	var finalizer *uast.BlockStatement
+	if p.peekTokenIs(FINALLY) {
+		p.nextToken() // move to 'akhirnya' / 'finally'
+		if !p.expectPeek(LBRACE) {
+			return nil
+		}
+		finalizer = p.parseBlockStatement()
+	}
+
+	return &uast.TryCatchStatement{
+		NodeType:  uast.NodeTypeTryCatchStatement,
+		Metadata:  meta,
+		Block:     block,
+		Handler:   handler,
+		Finalizer: finalizer,
+	}
+}
+
+func (p *Parser) parseThrowStatement() *uast.ThrowStatement {
+	meta := p.currentMetadata()
+	p.nextToken() // eat 'lempar' / 'throw' / 'raise'
+
+	arg := p.parseExpression(LOWEST)
+
+	return &uast.ThrowStatement{
+		NodeType: uast.NodeTypeThrowStatement,
+		Metadata: meta,
+		Argument: arg,
 	}
 }
 

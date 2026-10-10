@@ -274,6 +274,49 @@ func Eval(node uast.Node, env *Environment) Object {
 		}
 		return NULL
 
+	case *uast.ThrowStatement:
+		val := Eval(n.Argument, env)
+		if isError(val) {
+			return val
+		}
+		msg := val.Inspect()
+		if s, ok := val.(*String); ok {
+			msg = s.Value
+		}
+		return newError(n.GetMetadata(), msg, "")
+
+	case *uast.TryCatchStatement:
+		var result Object = NULL
+		blockRes := Eval(n.Block, env)
+
+		if isError(blockRes) {
+			if n.Handler != nil {
+				catchEnv := NewEnclosedEnvironment(env)
+				if n.Handler.Param != "" {
+					errMsg := blockRes.Inspect()
+					if errObj, ok := blockRes.(*Error); ok {
+						errMsg = errObj.Message
+					}
+					catchEnv.Define(n.Handler.Param, &String{Value: errMsg}, true, "String")
+				}
+				handlerRes := Eval(n.Handler.Body, catchEnv)
+				result = handlerRes
+			} else {
+				result = blockRes
+			}
+		} else {
+			result = blockRes
+		}
+
+		if n.Finalizer != nil {
+			finRes := Eval(n.Finalizer, env)
+			if isError(finRes) || (finRes != nil && finRes.Type() == RETURN_VALUE_OBJ) {
+				return finRes
+			}
+		}
+
+		return result
+
 	case *uast.ReturnStatement:
 		var val Object = NULL
 		if n.Value != nil {

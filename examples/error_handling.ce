@@ -1,0 +1,18 @@
+fungsi bagi_aman(a itu Angka, b: Angka) {
+    jika b == 0 {
+        lempar "Tidak bisa membagi dengan angka nol!"
+    }
+    kembalikan a / b
+}
+
+coba {
+    buat hasil = bagi_aman(100, 2)
+    cetak("Hasil pembagian valid:", hasil)
+
+    buat hasil_salah = bagi_aman(50, 0)
+    cetak("Ini tidak akan dicetak:", hasil_salah)
+} tangkap (galat) {
+    cetak("Tertangkap pesan kesalahan:", galat)
+} akhirnya {
+    cetak("Blok akhirnya selalu dieksekusi!")
+}

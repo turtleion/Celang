@@ -374,6 +374,76 @@ func (f *Formatter) formatStatement(stmt uast.Statement, indent int) string {
 			}
 		}
 		return sb.String()
+
+	case *uast.ThrowStatement:
+		throwKeyword := "lempar"
+		switch f.profile.Name {
+		case "javascript":
+			throwKeyword = "throw"
+		case "pythonic":
+			throwKeyword = "raise"
+		}
+		return fmt.Sprintf("%s%s %s", prefix, throwKeyword, f.formatExpression(s.Argument))
+
+	case *uast.TryCatchStatement:
+		var sb strings.Builder
+		tryKeyword := "coba"
+		catchKeyword := "tangkap"
+		finallyKeyword := "akhirnya"
+		switch f.profile.Name {
+		case "javascript":
+			tryKeyword = "try"
+			catchKeyword = "catch"
+			finallyKeyword = "finally"
+		case "pythonic":
+			tryKeyword = "try"
+			catchKeyword = "except"
+			finallyKeyword = "finally"
+		}
+
+		sb.WriteString(prefix)
+		sb.WriteString(tryKeyword)
+		sb.WriteString(" {\n")
+
+		if s.Block != nil {
+			for _, child := range s.Block.Statements {
+				sb.WriteString(f.formatStatement(child, indent+1))
+				sb.WriteString("\n")
+			}
+		}
+
+		if s.Handler != nil {
+			sb.WriteString(prefix)
+			sb.WriteString("} ")
+			sb.WriteString(catchKeyword)
+			if s.Handler.Param != "" {
+				sb.WriteString(" (")
+				sb.WriteString(s.Handler.Param)
+				sb.WriteString(")")
+			}
+			sb.WriteString(" {\n")
+			if s.Handler.Body != nil {
+				for _, child := range s.Handler.Body.Statements {
+					sb.WriteString(f.formatStatement(child, indent+1))
+					sb.WriteString("\n")
+				}
+			}
+		}
+
+		if s.Finalizer != nil {
+			sb.WriteString(prefix)
+			sb.WriteString("} ")
+			sb.WriteString(finallyKeyword)
+			sb.WriteString(" {\n")
+			for _, child := range s.Finalizer.Statements {
+				sb.WriteString(f.formatStatement(child, indent+1))
+				sb.WriteString("\n")
+			}
+		}
+
+		sb.WriteString(prefix)
+		sb.WriteString("}")
+		return sb.String()
 	}
 
 	return prefix

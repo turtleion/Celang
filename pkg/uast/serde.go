@@ -212,6 +212,30 @@ func UnmarshalStatementJSON(data []byte) (Statement, error) {
 		vis.NodeType = NodeTypeVisibilityStatement
 		return &vis, nil
 
+	case NodeTypeTryCatchStatement:
+		var tryStmt TryCatchStatement
+		if err := json.Unmarshal(data, &tryStmt); err != nil {
+			return nil, err
+		}
+		tryStmt.NodeType = NodeTypeTryCatchStatement
+		return &tryStmt, nil
+
+	case NodeTypeCatchClause:
+		var catch CatchClause
+		if err := json.Unmarshal(data, &catch); err != nil {
+			return nil, err
+		}
+		catch.NodeType = NodeTypeCatchClause
+		return &catch, nil
+
+	case NodeTypeThrowStatement:
+		var throwStmt ThrowStatement
+		if err := json.Unmarshal(data, &throwStmt); err != nil {
+			return nil, err
+		}
+		throwStmt.NodeType = NodeTypeThrowStatement
+		return &throwStmt, nil
+
 	default:
 		return nil, fmt.Errorf("unrecognized statement type: '%s'", detector.Type)
 	}
@@ -471,5 +495,29 @@ func NewConcurrencyStmt(mode string, tasks ...Statement) *ConcurrencyStatement {
 		NodeType: NodeTypeConcurrencyStatement,
 		Mode:     mode,
 		Tasks:    tasks,
+	}
+}
+
+func NewCatchClause(param string, body *BlockStatement) *CatchClause {
+	return &CatchClause{
+		NodeType: NodeTypeCatchClause,
+		Param:    param,
+		Body:     body,
+	}
+}
+
+func NewTryCatch(block *BlockStatement, handler *CatchClause, finalizer *BlockStatement) *TryCatchStatement {
+	return &TryCatchStatement{
+		NodeType:  NodeTypeTryCatchStatement,
+		Block:     block,
+		Handler:   handler,
+		Finalizer: finalizer,
+	}
+}
+
+func NewThrow(arg Expression) *ThrowStatement {
+	return &ThrowStatement{
+		NodeType: NodeTypeThrowStatement,
+		Argument: arg,
 	}
 }

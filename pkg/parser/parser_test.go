@@ -182,3 +182,35 @@ func TestParser_VisibilityAndImports(t *testing.T) {
 		t.Fatalf("Expected 9 statements, got %d", len(prog.Body))
 	}
 }
+
+func TestParser_TryCatchAndThrow(t *testing.T) {
+	input := `
+	coba {
+		buat hasil = 100 / 0
+		lempar "Terjadi masalah"
+	} tangkap (kesalahan) {
+		cetak(kesalahan)
+	} akhirnya {
+		cetak("Selesai")
+	}
+
+	try {
+		throw "Error in JS"
+	} catch (err) {
+		cetak(err)
+	} finally {
+		cetak("Done")
+	}
+	`
+
+	l := parser.NewLexer(input)
+	p := parser.NewParser(l)
+	prog, err := p.ParseProgram()
+	if err != nil {
+		t.Fatalf("Parser error: %v", err)
+	}
+
+	if len(prog.Body) != 2 {
+		t.Fatalf("Expected 2 try-catch statements, got %d", len(prog.Body))
+	}
+}
