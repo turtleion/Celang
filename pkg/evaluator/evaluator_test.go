@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"celang/pkg/evaluator"
+	"celang/pkg/parser"
 	"celang/pkg/uast"
 )
 
@@ -545,6 +546,177 @@ func TestEvaluator_StyleBlockScopingAndExecution(t *testing.T) {
 		t.Fatalf("Expected cek_akses function to exist in global environment, got %+v", fnVal)
 	}
 }
+
+func TestEvaluator_StringInterpolation(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{
+			input: `
+			buat nama = "Budi"
+			buat umur = 25
+			"Halo {nama}, umur {umur} tahun!"
+			`,
+			expected: "Halo Budi, umur 25 tahun!",
+		},
+		{
+			input: `
+			buat harga = 50000
+			"Total belanja: Rp {harga * 2}"
+			`,
+			expected: "Total belanja: Rp 100000",
+		},
+		{
+			input: `
+			buat status = "aktif"
+			` + "`" + `User status: ${status}` + "`" + `
+			`,
+			expected: "User status: aktif",
+		},
+		{
+			input: `
+			"Teks biasa tanpa kurung"
+			`,
+			expected: "Teks biasa tanpa kurung",
+		},
+	}
+
+	for _, tt := range tests {
+		l := parser.NewLexer(tt.input)
+		p := parser.NewParser(l)
+		prog, err := p.ParseProgram()
+		if err != nil {
+			t.Fatalf("parser error: %v", err)
+		}
+		env := evaluator.NewEnvironment()
+		res := evaluator.Eval(prog, env)
+		strVal, ok := res.(*evaluator.String)
+		if !ok || strVal.Value != tt.expected {
+			t.Errorf("expected %q, got %q", tt.expected, res.Inspect())
+		}
+	}
+}
+
+func TestEvaluator_Destructuring(t *testing.T) {
+	// 1. Array destructuring declaration
+	inputArrayDecl := `
+	buat [x, y, z] = [10, 20, 30]
+	[x, y, z]
+	`
+	l := parser.NewLexer(inputArrayDecl)
+	p := parser.NewParser(l)
+	prog, _ := p.ParseProgram()
+	env := evaluator.NewEnvironment()
+	res := evaluator.Eval(prog, env)
+	arr := res.(*evaluator.Array)
+	if arr.Elements[0].(*evaluator.Integer).Value != 10 ||
+		arr.Elements[1].(*evaluator.Integer).Value != 20 ||
+		arr.Elements[2].(*evaluator.Integer).Value != 30 {
+		t.Fatalf("array destructuring declaration failed: %s", res.Inspect())
+	}
+
+	// 2. Map destructuring declaration with aliases
+	inputMapDecl := `
+	buat profil = { "nama": "Andi", "peran": "Admin" }
+	buat { nama, peran: p } = profil
+	[nama, p]
+	`
+	l = parser.NewLexer(inputMapDecl)
+	p = parser.NewParser(l)
+	prog, _ = p.ParseProgram()
+	env = evaluator.NewEnvironment()
+	res = evaluator.Eval(prog, env)
+	arr = res.(*evaluator.Array)
+	if arr.Elements[0].(*evaluator.String).Value != "Andi" ||
+		arr.Elements[1].(*evaluator.String).Value != "Admin" {
+		t.Fatalf("map destructuring declaration failed: %s", res.Inspect())
+	}
+
+	// 3. Destructuring assignments
+	inputAssign := `
+	buat a = 0
+	buat b = 0
+	[a, b] = [100, 200]
+	[a, b]
+	`
+	l = parser.NewLexer(inputAssign)
+	p = parser.NewParser(l)
+	prog, _ = p.ParseProgram()
+	env = evaluator.NewEnvironment()
+	res = evaluator.Eval(prog, env)
+	arr = res.(*evaluator.Array)
+	if arr.Elements[0].(*evaluator.Integer).Value != 100 ||
+		arr.Elements[1].(*evaluator.Integer).Value != 200 {
+		t.Fatalf("destructuring assignment failed: %s", res.Inspect())
+	}
+}
+
+func TestEvaluator_Structs(t *testing.T) {
+	input := `
+	bentuk RekeningBank {
+		pemilik: Teks,
+		saldo itu Angka = 0,
+
+		fungsi setor(jumlah: Angka) {
+			diri.saldo += jumlah
+			kembalikan diri.saldo
+		}
+
+		fungsi tarik(jumlah: Angka) {
+			jika jumlah > diri.saldo {
+				lempar "Saldo tidak cukup!"
+			}
+			diri.saldo -= jumlah
+			kembalikan diri.saldo
+		}
+	}
+
+	buat akun = RekeningBank("Budi", 50000)
+	buat s1 = akun.saldo
+	buat s2 = akun.setor(25000)
+	buat s3 = akun.tarik(10000)
+	akun.saldo += 5000
+	buat s4 = akun.saldo
+
+	[s1, s2, s3, s4, akun.pemilik]
+	`
+
+	l := parser.NewLexer(input)
+	p := parser.NewParser(l)
+	prog, err := p.ParseProgram()
+	if err != nil {
+		t.Fatalf("parser error: %v", err)
+	}
+	env := evaluator.NewEnvironment()
+	res := evaluator.Eval(prog, env)
+	arr, ok := res.(*evaluator.Array)
+	if !ok {
+		t.Fatalf("expected array result, got %s", res.Inspect())
+	}
+
+	// s1 = 50000
+	if arr.Elements[0].(*evaluator.Integer).Value != 50000 {
+		t.Errorf("expected initial saldo 50000, got %s", arr.Elements[0].Inspect())
+	}
+	// s2 = 75000
+	if arr.Elements[1].(*evaluator.Integer).Value != 75000 {
+		t.Errorf("expected after setor 75000, got %s", arr.Elements[1].Inspect())
+	}
+	// s3 = 65000
+	if arr.Elements[2].(*evaluator.Integer).Value != 65000 {
+		t.Errorf("expected after tarik 65000, got %s", arr.Elements[2].Inspect())
+	}
+	// s4 = 70000 (after akun.saldo += 5000)
+	if arr.Elements[3].(*evaluator.Integer).Value != 70000 {
+		t.Errorf("expected after direct mutation 70000, got %s", arr.Elements[3].Inspect())
+	}
+	// pemilik = "Budi"
+	if arr.Elements[4].(*evaluator.String).Value != "Budi" {
+		t.Errorf("expected pemilik 'Budi', got %s", arr.Elements[4].Inspect())
+	}
+}
+
 
 
 

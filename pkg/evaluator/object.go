@@ -22,7 +22,9 @@ const (
 	BUILTIN_OBJ      ObjectType = "BUILTIN"
 	ARRAY_OBJ        ObjectType = "ARRAY"
 	MAP_OBJ          ObjectType = "MAP"
-	POINTER_OBJ      ObjectType = "POINTER"
+	POINTER_OBJ         ObjectType = "POINTER"
+	STRUCT_DEF_OBJ      ObjectType = "STRUCT_DEF"
+	STRUCT_INSTANCE_OBJ ObjectType = "STRUCT_INSTANCE"
 )
 
 type Object interface {
@@ -166,4 +168,35 @@ func (p *Pointer) Inspect() string {
 		valStr = val.Inspect()
 	}
 	return fmt.Sprintf("&%s (-> %s)", p.VarName, valStr)
+}
+
+// StructDefinition represents the blueprint of a custom data type (bentuk).
+type StructDefinition struct {
+	Name    string
+	Fields  []uast.StructField
+	Methods map[string]*Function
+	Env     *Environment
+}
+
+func (s *StructDefinition) Type() ObjectType { return STRUCT_DEF_OBJ }
+func (s *StructDefinition) Inspect() string  { return fmt.Sprintf("bentuk %s", s.Name) }
+
+// StructInstance represents an instantiated struct object with fields and methods.
+type StructInstance struct {
+	Def    *StructDefinition
+	Fields map[string]Object
+	Env    *Environment
+}
+
+func (s *StructInstance) Type() ObjectType { return STRUCT_INSTANCE_OBJ }
+func (s *StructInstance) Inspect() string {
+	var parts []string
+	for _, f := range s.Def.Fields {
+		val := s.Fields[f.Name]
+		if val == nil {
+			val = &Null{}
+		}
+		parts = append(parts, fmt.Sprintf("%s: %s", f.Name, val.Inspect()))
+	}
+	return fmt.Sprintf("%s{%s}", s.Def.Name, strings.Join(parts, ", "))
 }

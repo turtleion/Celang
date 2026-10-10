@@ -229,11 +229,11 @@ func (p *Parser) parseStatement() uast.Statement {
 		return p.parseThrowStatement()
 	case STYLE_BLOCK:
 		return p.parseStyleBlockStatement()
+	case STRUCT_DECL:
+		return p.parseStructDeclaration()
 	default:
-		// Check for assignment: target = expr or target += expr, or *ptr = expr
-		if (p.curTokenIs(IDENT) && (p.peekTokenIs(ASSIGN) || p.peekTokenIs(PLUS_ASSIGN) || p.peekTokenIs(MINUS_ASSIGN))) ||
-			(p.curTokenIs(ASTERISK) && p.peekTokenIs(IDENT)) {
-			return p.parseAssignmentStatement()
+		if p.curTokenIs(IDENT) && p.curToken.Literal == "tipe" && p.peekTokenIs(IDENT) {
+			return p.parseStructDeclaration()
 		}
 		return p.parseExpressionStatement()
 	}
@@ -302,14 +302,18 @@ func (p *Parser) parseVisibilityOrExportStatement() uast.Statement {
 	switch p.curToken.Type {
 	case VAR_DECL:
 		decl := p.parseVariableDeclaration(true)
-		if decl != nil {
-			decl.Visibility = vis
+		if d, ok := decl.(*uast.DestructureDeclaration); ok {
+			d.Visibility = vis
+		} else if v, ok := decl.(*uast.VariableDeclaration); ok {
+			v.Visibility = vis
 		}
 		return decl
 	case CONST_DECL:
 		decl := p.parseVariableDeclaration(false)
-		if decl != nil {
-			decl.Visibility = vis
+		if d, ok := decl.(*uast.DestructureDeclaration); ok {
+			d.Visibility = vis
+		} else if v, ok := decl.(*uast.VariableDeclaration); ok {
+			v.Visibility = vis
 		}
 		return decl
 	case FUNC:
@@ -318,6 +322,12 @@ func (p *Parser) parseVisibilityOrExportStatement() uast.Statement {
 			fn.Visibility = vis
 		}
 		return fn
+	case STRUCT_DECL:
+		s := p.parseStructDeclaration()
+		if s != nil {
+			s.Visibility = vis
+		}
+		return s
 	default:
 		p.addError(fmt.Sprintf("Modifier visibilitas tidak dapat diterapkan pada '%s'", p.curToken.Literal))
 		return nil
@@ -562,9 +572,73 @@ func (p *Parser) parseStyleBlockStatement() *uast.StyleBlockStatement {
 }
 
 
-func (p *Parser) parseVariableDeclaration(isMutable bool) *uast.VariableDeclaration {
+func (p *Parser) parseVariableDeclaration(isMutable bool) uast.Statement {
 	meta := p.currentMetadata()
 	p.nextToken() // eat VAR_DECL or CONST_DECL
+
+	// 1. Array destructuring: buat [x, y] = koordinat
+	if p.curTokenIs(LBRACKET) {
+		p.nextToken() // eat '['
+		var bindings []uast.DestructureBinding
+		for !p.curTokenIs(RBRACKET) && !p.curTokenIs(EOF) {
+			if p.curTokenIs(IDENT) {
+				bindings = append(bindings, uast.DestructureBinding{Target: p.curToken.Literal})
+			}
+			if p.peekTokenIs(COMMA) {
+				p.nextToken()
+			}
+			p.nextToken()
+		}
+		if !p.expectPeek(ASSIGN) {
+			return nil
+		}
+		p.nextToken() // move to value
+		value := p.parseExpression(LOWEST)
+		return &uast.DestructureDeclaration{
+			NodeType:  uast.NodeTypeDestructureDeclaration,
+			Metadata:  meta,
+			Kind:      uast.DestructureArray,
+			Bindings:  bindings,
+			Value:     value,
+			IsMutable: isMutable,
+		}
+	}
+
+	// 2. Map destructuring: buat { nama, peran } = profil
+	if p.curTokenIs(LBRACE) {
+		p.nextToken() // eat '{'
+		var bindings []uast.DestructureBinding
+		for !p.curTokenIs(RBRACE) && !p.curTokenIs(EOF) {
+			if p.curTokenIs(IDENT) {
+				srcKey := p.curToken.Literal
+				target := srcKey
+				if p.peekTokenIs(COLON) || p.peekTokenIs(AS) {
+					p.nextToken() // eat ':' or 'sebagai'
+					if p.expectPeek(IDENT) {
+						target = p.curToken.Literal
+					}
+				}
+				bindings = append(bindings, uast.DestructureBinding{SourceKey: srcKey, Target: target})
+			}
+			if p.peekTokenIs(COMMA) {
+				p.nextToken()
+			}
+			p.nextToken()
+		}
+		if !p.expectPeek(ASSIGN) {
+			return nil
+		}
+		p.nextToken() // move to value
+		value := p.parseExpression(LOWEST)
+		return &uast.DestructureDeclaration{
+			NodeType:  uast.NodeTypeDestructureDeclaration,
+			Metadata:  meta,
+			Kind:      uast.DestructureMap,
+			Bindings:  bindings,
+			Value:     value,
+			IsMutable: isMutable,
+		}
+	}
 
 	if !p.curTokenIs(IDENT) {
 		p.addError(fmt.Sprintf("Diharapkan nama variabel (identifier), menerima '%s'", p.curToken.Literal))
@@ -595,6 +669,126 @@ func (p *Parser) parseVariableDeclaration(isMutable bool) *uast.VariableDeclarat
 		Value:     value,
 		IsMutable: isMutable,
 		TypeHint:  typeHint,
+	}
+}
+
+func (p *Parser) parseStructDeclaration() *uast.StructDeclaration {
+	meta := p.currentMetadata()
+	p.nextToken() // eat 'bentuk' / 'struct' / 'tipe'
+
+	if !p.curTokenIs(IDENT) {
+		p.addError(fmt.Sprintf("Diharapkan nama bentuk (struct), menerima '%s'", p.curToken.Literal))
+		return nil
+	}
+
+	name := p.curToken.Literal
+
+	if !p.expectPeek(LBRACE) {
+		return nil
+	}
+	p.nextToken() // enter '{'
+
+	var fields []uast.StructField
+	var methods []uast.StructMethod
+
+	for !p.curTokenIs(RBRACE) && !p.curTokenIs(EOF) {
+		if p.curTokenIs(SEMICOLON) || p.curTokenIs(COMMA) {
+			p.nextToken()
+			continue
+		}
+
+		if p.curTokenIs(FUNC) {
+			p.nextToken() // eat 'fungsi'
+			if !p.curTokenIs(IDENT) {
+				p.addError("Diharapkan nama fungsi pada bentuk")
+				return nil
+			}
+			methodName := p.curToken.Literal
+			if !p.expectPeek(LPAREN) {
+				return nil
+			}
+			params := p.parseFunctionParameters()
+			retType := ""
+			if p.peekTokenIs(RETURN_TYPE) || p.peekTokenIs(ARROW) || p.peekTokenIs(COLON) {
+				p.nextToken()
+				p.nextToken()
+				retType = p.parseTypeHint()
+			}
+			if !p.expectPeek(LBRACE) {
+				return nil
+			}
+			body := p.parseBlockStatement()
+			methods = append(methods, uast.StructMethod{
+				Name:       methodName,
+				Parameters: params,
+				ReturnType: retType,
+				Body:       body,
+			})
+			p.nextToken()
+			continue
+		}
+
+		if p.curTokenIs(IDENT) {
+			if p.peekTokenIs(LPAREN) {
+				// Method without 'fungsi' keyword: setor(jumlah) { ... }
+				methodName := p.curToken.Literal
+				p.nextToken() // move to LPAREN
+				params := p.parseFunctionParameters()
+				retType := ""
+				if p.peekTokenIs(RETURN_TYPE) || p.peekTokenIs(ARROW) || p.peekTokenIs(COLON) {
+					p.nextToken()
+					p.nextToken()
+					retType = p.parseTypeHint()
+				}
+				if !p.expectPeek(LBRACE) {
+					return nil
+				}
+				body := p.parseBlockStatement()
+				methods = append(methods, uast.StructMethod{
+					Name:       methodName,
+					Parameters: params,
+					ReturnType: retType,
+					Body:       body,
+				})
+				p.nextToken()
+				continue
+			}
+
+			// Struct field: nama: Teks, saldo itu Angka = 0, dll.
+			fieldName := p.curToken.Literal
+			typeHint := ""
+			var defVal uast.Expression
+
+			if p.peekTokenIs(COLON) || p.peekTokenIs(TYPE_ASSIGN) {
+				p.nextToken() // eat ':' or 'itu'
+				p.nextToken()
+				typeHint = p.parseTypeHint()
+			}
+
+			if p.peekTokenIs(ASSIGN) {
+				p.nextToken() // eat '='
+				p.nextToken() // move to default expr
+				defVal = p.parseExpression(LOWEST)
+			}
+
+			fields = append(fields, uast.StructField{
+				Name:         fieldName,
+				TypeHint:     typeHint,
+				DefaultValue: defVal,
+			})
+			p.nextToken()
+			continue
+		}
+
+		p.nextToken()
+	}
+
+	return &uast.StructDeclaration{
+		NodeType: uast.NodeTypeStructDeclaration,
+		Metadata: meta,
+		Name:     name,
+		Fields:   fields,
+		Methods:  methods,
 	}
 }
 
@@ -1032,9 +1226,68 @@ func (p *Parser) parseBlockStatement() *uast.BlockStatement {
 	return block
 }
 
-func (p *Parser) parseExpressionStatement() *uast.ExpressionStatement {
+func (p *Parser) parseExpressionStatement() uast.Statement {
 	meta := p.currentMetadata()
 	expr := p.parseExpression(LOWEST)
+
+	if p.peekTokenIs(ASSIGN) || p.peekTokenIs(PLUS_ASSIGN) || p.peekTokenIs(MINUS_ASSIGN) {
+		p.nextToken() // move to operator (=, +=, -=)
+		operator := p.curToken.Literal
+
+		p.nextToken() // move to right-hand value
+		val := p.parseExpression(LOWEST)
+
+		// Check if target is an ArrayLiteral -> convert to DestructureAssignment!
+		if arrLit, ok := expr.(*uast.ArrayLiteral); ok && operator == "=" {
+			var bindings []uast.DestructureBinding
+			for _, el := range arrLit.Elements {
+				if id, ok := el.(*uast.Identifier); ok {
+					bindings = append(bindings, uast.DestructureBinding{Target: id.Name})
+				}
+			}
+			return &uast.DestructureAssignment{
+				NodeType: uast.NodeTypeDestructureAssignment,
+				Metadata: meta,
+				Kind:     uast.DestructureArray,
+				Bindings: bindings,
+				Value:    val,
+			}
+		}
+
+		// Check if target is a MapLiteral -> convert to DestructureAssignment!
+		if mapLit, ok := expr.(*uast.MapLiteral); ok && operator == "=" {
+			var bindings []uast.DestructureBinding
+			for _, prop := range mapLit.Properties {
+				keyStr := ""
+				if id, ok := prop.Key.(*uast.Identifier); ok {
+					keyStr = id.Name
+				} else if lit, ok := prop.Key.(*uast.Literal); ok {
+					keyStr = fmt.Sprintf("%v", lit.Value)
+				}
+				target := keyStr
+				if id, ok := prop.Value.(*uast.Identifier); ok {
+					target = id.Name
+				}
+				bindings = append(bindings, uast.DestructureBinding{SourceKey: keyStr, Target: target})
+			}
+			return &uast.DestructureAssignment{
+				NodeType: uast.NodeTypeDestructureAssignment,
+				Metadata: meta,
+				Kind:     uast.DestructureMap,
+				Bindings: bindings,
+				Value:    val,
+			}
+		}
+
+		return &uast.AssignmentStatement{
+			NodeType: uast.NodeTypeAssignmentStatement,
+			Metadata: meta,
+			Target:   expr,
+			Operator: operator,
+			Value:    val,
+		}
+	}
+
 	return &uast.ExpressionStatement{
 		NodeType:   uast.NodeTypeExpressionStatement,
 		Metadata:   meta,
@@ -1108,12 +1361,135 @@ func (p *Parser) parseFloatLiteral() uast.Expression {
 }
 
 func (p *Parser) parseStringLiteral() uast.Expression {
+	return p.parseInterpolationOrLiteral(p.curToken.Literal, p.currentMetadata())
+}
+
+func (p *Parser) parseInterpolationOrLiteral(rawStr string, meta *uast.NodeMetadata) uast.Expression {
+	if !strings.Contains(rawStr, "{") {
+		return &uast.Literal{
+			NodeType: uast.NodeTypeLiteral,
+			Metadata: meta,
+			Kind:     uast.LiteralKindString,
+			Raw:      strconv.Quote(rawStr),
+			Value:    rawStr,
+		}
+	}
+
+	var parts []uast.Expression
+	var currentLit strings.Builder
+	i := 0
+	hasInterpolation := false
+
+	for i < len(rawStr) {
+		// Handle escape sequences: \{ or \${
+		if rawStr[i] == '\\' && i+1 < len(rawStr) {
+			if rawStr[i+1] == '{' {
+				currentLit.WriteByte('{')
+				i += 2
+				continue
+			}
+			if rawStr[i+1] == '$' && i+2 < len(rawStr) && rawStr[i+2] == '{' {
+				currentLit.WriteString("${")
+				i += 3
+				continue
+			}
+			currentLit.WriteByte('\\')
+			currentLit.WriteByte(rawStr[i+1])
+			i += 2
+			continue
+		}
+
+		// Check for ${expr} or {expr}
+		isJSInterp := rawStr[i] == '$' && i+1 < len(rawStr) && rawStr[i+1] == '{'
+		isIDInterp := rawStr[i] == '{'
+
+		if isJSInterp || isIDInterp {
+			startExpr := i + 1
+			if isJSInterp {
+				startExpr = i + 2
+			}
+
+			// Find matching '}'
+			braceDepth := 1
+			endExpr := -1
+			inSubQuote := byte(0)
+
+			for j := startExpr; j < len(rawStr); j++ {
+				if inSubQuote != 0 {
+					if rawStr[j] == '\\' {
+						j++
+					} else if rawStr[j] == inSubQuote {
+						inSubQuote = 0
+					}
+					continue
+				}
+				if rawStr[j] == '"' || rawStr[j] == '\'' || rawStr[j] == '`' {
+					inSubQuote = rawStr[j]
+					continue
+				}
+				if rawStr[j] == '{' {
+					braceDepth++
+				} else if rawStr[j] == '}' {
+					braceDepth--
+					if braceDepth == 0 {
+						endExpr = j
+						break
+					}
+				}
+			}
+
+			if endExpr != -1 {
+				exprStr := strings.TrimSpace(rawStr[startExpr:endExpr])
+				subLex := NewLexer(exprStr)
+				subParser := NewParser(subLex)
+				subExpr := subParser.parseExpression(LOWEST)
+
+				if subExpr != nil && len(subParser.errors) == 0 && subParser.peekToken.Type == EOF {
+					hasInterpolation = true
+					if currentLit.Len() > 0 {
+						parts = append(parts, &uast.Literal{
+							NodeType: uast.NodeTypeLiteral,
+							Metadata: meta,
+							Kind:     uast.LiteralKindString,
+							Raw:      strconv.Quote(currentLit.String()),
+							Value:    currentLit.String(),
+						})
+						currentLit.Reset()
+					}
+					parts = append(parts, subExpr)
+					i = endExpr + 1
+					continue
+				}
+			}
+		}
+
+		currentLit.WriteByte(rawStr[i])
+		i++
+	}
+
+	if hasInterpolation {
+		if currentLit.Len() > 0 {
+			parts = append(parts, &uast.Literal{
+				NodeType: uast.NodeTypeLiteral,
+				Metadata: meta,
+				Kind:     uast.LiteralKindString,
+				Raw:      strconv.Quote(currentLit.String()),
+				Value:    currentLit.String(),
+			})
+		}
+		return &uast.TemplateLiteral{
+			NodeType: uast.NodeTypeTemplateLiteral,
+			Metadata: meta,
+			Parts:    parts,
+		}
+	}
+
 	return &uast.Literal{
 		NodeType: uast.NodeTypeLiteral,
-		Metadata: p.currentMetadata(),
+		Metadata: meta,
 		Kind:     uast.LiteralKindString,
-		Raw:      strconv.Quote(p.curToken.Literal),
-		Value:    p.curToken.Literal,
+		Raw:      strconv.Quote(currentLit.String()),
+		Value:    currentLit.String(),
 	}
 }
 

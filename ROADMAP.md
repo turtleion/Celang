@@ -23,7 +23,7 @@ Modul-modul inti yang terikat langsung ke sistem operasi melalui backend runtime
 
 ---
 
-### 2. ✨ String Interpolation (Penyisipan Teks Alami)
+### 2. ✨ String Interpolation (✅ Selesai)
 Menggantikan penggabungan string bertingkat (`"Halo " + nama + ", umur " + umur`) dengan sintaks templat yang bersih dan ekspresif.
 
 #### Contoh Sintaks:
@@ -40,7 +40,7 @@ let pesan = `Halo ${nama}, sisa saldo kamu: Rp ${saldo}.`
 
 ---
 
-### 3. 🧩 Destructuring Assignment (Pembongkaran Nilai)
+### 3. 🧩 Destructuring Assignment (✅ Selesai)
 Memungkinkan pemecahan elemen array atau properti map langsung ke variabel mandiri dalam satu baris deklarasi.
 
 #### Contoh Pembongkaran Array:
@@ -59,7 +59,7 @@ buat { nama, peran } = profil
 
 ---
 
-### 4. 🏗️ Tipe Data Kustom / Struct (`bentuk` / `tipe`)
+### 4. 🏗️ Tipe Data Kustom / Struct (`bentuk` / `struct` / `tipe`) (✅ Selesai)
 Mendukung pendefinisian cetak biru objek dengan tipe properti yang jelas serta kemampuan menyematkan fungsi (method).
 
 #### Contoh Sintaks:

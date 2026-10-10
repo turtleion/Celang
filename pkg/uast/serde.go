@@ -107,6 +107,13 @@ func UnmarshalExpressionJSON(data []byte) (Expression, error) {
 		}
 		return &fnExpr, nil
 
+	case NodeTypeTemplateLiteral:
+		var templ TemplateLiteral
+		if err := json.Unmarshal(data, &templ); err != nil {
+			return nil, err
+		}
+		return &templ, nil
+
 	default:
 		return nil, fmt.Errorf("unrecognized expression type: '%s'", detector.Type)
 	}
@@ -257,6 +264,30 @@ func UnmarshalStatementJSON(data []byte) (Statement, error) {
 		}
 		styleBlock.NodeType = NodeTypeStyleBlockStatement
 		return &styleBlock, nil
+
+	case NodeTypeDestructureDeclaration:
+		var decl DestructureDeclaration
+		if err := json.Unmarshal(data, &decl); err != nil {
+			return nil, err
+		}
+		decl.NodeType = NodeTypeDestructureDeclaration
+		return &decl, nil
+
+	case NodeTypeDestructureAssignment:
+		var asgn DestructureAssignment
+		if err := json.Unmarshal(data, &asgn); err != nil {
+			return nil, err
+		}
+		asgn.NodeType = NodeTypeDestructureAssignment
+		return &asgn, nil
+
+	case NodeTypeStructDeclaration:
+		var sDecl StructDeclaration
+		if err := json.Unmarshal(data, &sDecl); err != nil {
+			return nil, err
+		}
+		sDecl.NodeType = NodeTypeStructDeclaration
+		return &sDecl, nil
 
 	default:
 		return nil, fmt.Errorf("unrecognized statement type: '%s'", detector.Type)

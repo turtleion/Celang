@@ -1,0 +1,77 @@
+// Demo Fitur Lanjutan Celang:
+// 1. Bentuk (Struct) & Metode
+// 2. String Interpolation ({expr} & ${expr})
+// 3. Destructuring (Array & Map)
+
+cetak("==================================================")
+cetak("✨ DEMO FITUR: STRUCT, INTERPOLATION, DESTRUCTURING")
+cetak("==================================================")
+
+// --- 1. Bentuk / Struct ---
+cetak("\n[1] BENTUK / STRUCT:")
+bentuk RekeningBank {
+    pemilik: Teks,
+    saldo itu Angka = 0,
+
+    fungsi setor(jumlah: Angka) {
+        diri.saldo += jumlah
+        kembalikan diri.saldo
+    }
+
+    fungsi tarik(jumlah: Angka) {
+        jika jumlah > diri.saldo {
+            lempar "Saldo tidak mencukupi untuk penarikan!"
+        }
+        diri.saldo -= jumlah
+        kembalikan diri.saldo
+    }
+}
+
+buat akunBudi = RekeningBank("Budi Santoso", 100000)
+cetak("Akun awal:", akunBudi)
+akunBudi.setor(50000)
+cetak("Setelah setor 50.000 -> Saldo:", akunBudi.saldo)
+akunBudi.tarik(20000)
+cetak("Setelah tarik 20.000 -> Saldo:", akunBudi.saldo)
+
+// --- 2. String Interpolation ---
+cetak("\n[2] STRING INTERPOLATION:")
+buat namaPengguna = akunBudi.pemilik
+buat sisaSaldo = akunBudi.saldo
+
+// Gaya Indonesia dengan tanda kutip ganda dan {ekspresi}:
+buat pesanId = "Halo {namaPengguna}, sisa saldo rekening kamu adalah Rp {sisaSaldo}."
+cetak("Gaya ID :", pesanId)
+
+// Ekspresi aritmatika langsung di dalam interpolasi:
+buat pesanHitung = "Jika saldo digandakan (x2): Rp {sisaSaldo * 2}!"
+cetak("Hitungan:", pesanHitung)
+
+// Gaya JavaScript dengan backtick dan ${ekspresi}:
+buat level = "VIP Platinum"
+buat pesanJS = `Selamat {namaPengguna}, status kamu: ${level}.`
+cetak("Gaya JS :", pesanJS)
+
+// --- 3. Destrukturisasi (Destructuring) ---
+cetak("\n[3] DESTRUKTURISASI (DESTRUCTURING):")
+
+// a. Destrukturisasi Array
+buat koordinat = [120, 250, 480]
+buat [titikX, titikY, titikZ] = koordinat
+cetak("Array Destructure -> X:", titikX, "Y:", titikY, "Z:", titikZ)
+
+// Penugasan destrukturisasi array ulang
+[titikX, titikY] = [999, 888]
+cetak("Reassign Array   -> X:", titikX, "Y:", titikY)
+
+// b. Destrukturisasi Map / Object
+buat dataPegawai = {
+    "nama": "Siti Rahma",
+    "divisi": "Teknologi",
+    "gaji": 15000000
+}
+
+buat { nama, divisi, gaji: nominalGaji } = dataPegawai
+cetak("Map Destructure   -> Nama:", nama, "| Divisi:", divisi, "| Gaji:", nominalGaji)
+
+cetak("\n✅ Seluruh fitur (Bentuk, String Interpolation, Destructuring) sukses dijalankan!")

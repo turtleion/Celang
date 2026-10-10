@@ -27,6 +27,9 @@ const (
 	NodeTypeCatchClause          NodeType = "CatchClause"
 	NodeTypeThrowStatement       NodeType = "ThrowStatement"
 	NodeTypeStyleBlockStatement  NodeType = "StyleBlockStatement"
+	NodeTypeDestructureDeclaration NodeType = "DestructureDeclaration"
+	NodeTypeDestructureAssignment  NodeType = "DestructureAssignment"
+	NodeTypeStructDeclaration      NodeType = "StructDeclaration"
 
 	// Expressions
 	NodeTypeLiteral          NodeType = "Literal"
@@ -39,6 +42,7 @@ const (
 	NodeTypeMapLiteral          NodeType = "MapLiteral"
 	NodeTypePipelineExpression  NodeType = "PipelineExpression"
 	NodeTypeFunctionExpression  NodeType = "FunctionExpression"
+	NodeTypeTemplateLiteral     NodeType = "TemplateLiteral"
 )
 
 // Position captures source location information for LSP, tooling, and error reporting.

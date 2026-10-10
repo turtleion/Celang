@@ -320,4 +320,125 @@ func TestParser_StyleBlockStatement(t *testing.T) {
 	}
 }
 
+func TestParser_StringInterpolation(t *testing.T) {
+	input := `
+	buat pesan1 = "Halo {nama}, saldo: Rp {saldo}."
+	buat pesan2 = ` + "`" + `Total: ${harga * 2}` + "`" + `
+	buat pesan3 = "Teks tanpa kurung"
+	`
+
+	l := parser.NewLexer(input)
+	p := parser.NewParser(l)
+	prog, err := p.ParseProgram()
+	if err != nil {
+		t.Fatalf("Parser error: %v", err)
+	}
+
+	if len(prog.Body) != 3 {
+		t.Fatalf("Expected 3 statements, got %d", len(prog.Body))
+	}
+
+	decl1 := prog.Body[0].(*uast.VariableDeclaration)
+	templ1, ok := decl1.Value.(*uast.TemplateLiteral)
+	if !ok {
+		t.Fatalf("Expected TemplateLiteral for pesan1, got %T", decl1.Value)
+	}
+	if len(templ1.Parts) != 5 {
+		t.Fatalf("Expected 5 parts in templ1, got %d", len(templ1.Parts))
+	}
+
+	decl2 := prog.Body[1].(*uast.VariableDeclaration)
+	templ2, ok := decl2.Value.(*uast.TemplateLiteral)
+	if !ok {
+		t.Fatalf("Expected TemplateLiteral for pesan2, got %T", decl2.Value)
+	}
+	if len(templ2.Parts) != 2 {
+		t.Fatalf("Expected 2 parts in templ2, got %d", len(templ2.Parts))
+	}
+
+	decl3 := prog.Body[2].(*uast.VariableDeclaration)
+	if _, ok := decl3.Value.(*uast.Literal); !ok {
+		t.Fatalf("Expected plain Literal for pesan3, got %T", decl3.Value)
+	}
+}
+
+func TestParser_Destructuring(t *testing.T) {
+	input := `
+	buat [x, y] = [10, 20]
+	buat { nama, peran: p } = profil
+	[a, b] = koordinat
+	`
+
+	l := parser.NewLexer(input)
+	p := parser.NewParser(l)
+	prog, err := p.ParseProgram()
+	if err != nil {
+		t.Fatalf("Parser error: %v", err)
+	}
+
+	if len(prog.Body) != 3 {
+		t.Fatalf("Expected 3 statements, got %d", len(prog.Body))
+	}
+
+	d1, ok := prog.Body[0].(*uast.DestructureDeclaration)
+	if !ok || d1.Kind != uast.DestructureArray || len(d1.Bindings) != 2 {
+		t.Fatalf("Expected Array DestructureDeclaration, got %#v", prog.Body[0])
+	}
+
+	d2, ok := prog.Body[1].(*uast.DestructureDeclaration)
+	if !ok || d2.Kind != uast.DestructureMap || len(d2.Bindings) != 2 {
+		t.Fatalf("Expected Map DestructureDeclaration, got %#v", prog.Body[1])
+	}
+	if d2.Bindings[1].SourceKey != "peran" || d2.Bindings[1].Target != "p" {
+		t.Fatalf("Expected peran: p alias binding, got %#v", d2.Bindings[1])
+	}
+
+	d3, ok := prog.Body[2].(*uast.DestructureAssignment)
+	if !ok || d3.Kind != uast.DestructureArray || len(d3.Bindings) != 2 {
+		t.Fatalf("Expected Array DestructureAssignment, got %#v", prog.Body[2])
+	}
+}
+
+func TestParser_StructDeclaration(t *testing.T) {
+	input := `
+	bentuk RekeningBank {
+		pemilik: Teks,
+		saldo itu Angka = 0,
+
+		fungsi setor(jumlah: Angka) {
+			diri.saldo += jumlah
+		}
+	}
+	`
+
+	l := parser.NewLexer(input)
+	p := parser.NewParser(l)
+	prog, err := p.ParseProgram()
+	if err != nil {
+		t.Fatalf("Parser error: %v", err)
+	}
+
+	if len(prog.Body) != 1 {
+		t.Fatalf("Expected 1 statement, got %d", len(prog.Body))
+	}
+
+	s, ok := prog.Body[0].(*uast.StructDeclaration)
+	if !ok {
+		t.Fatalf("Expected StructDeclaration, got %T", prog.Body[0])
+	}
+	if s.Name != "RekeningBank" {
+		t.Errorf("Expected struct name RekeningBank, got %s", s.Name)
+	}
+	if len(s.Fields) != 2 {
+		t.Errorf("Expected 2 fields, got %d", len(s.Fields))
+	}
+	if len(s.Methods) != 1 {
+		t.Errorf("Expected 1 method, got %d", len(s.Methods))
+	}
+	if s.Methods[0].Name != "setor" {
+		t.Errorf("Expected method name setor, got %s", s.Methods[0].Name)
+	}
+}
+
+
 

@@ -93,6 +93,9 @@ const (
 
 	// In-Code Styling
 	STYLE_BLOCK TokenType = "STYLE_BLOCK" // gaya, style, dialek
+
+	// Data Structures / Structs
+	STRUCT_DECL TokenType = "STRUCT_DECL" // bentuk, struct, tipe
 )
 
 type Token struct {

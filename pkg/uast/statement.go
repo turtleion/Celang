@@ -633,3 +633,144 @@ func (s *StyleBlockStatement) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+type DestructureKind string
+
+const (
+	DestructureArray DestructureKind = "array"
+	DestructureMap   DestructureKind = "map"
+)
+
+type DestructureBinding struct {
+	SourceKey string `json:"source_key,omitempty"` // For map destructuring (e.g. "nama")
+	Target    string `json:"target"`               // Variable to bind (e.g. "nama" or "n")
+}
+
+// DestructureDeclaration represents: buat [x, y] = arr or buat { a, b: alias } = obj
+type DestructureDeclaration struct {
+	NodeType   NodeType             `json:"type"`
+	Metadata   *NodeMetadata        `json:"metadata,omitempty"`
+	Kind       DestructureKind      `json:"kind"`
+	Bindings   []DestructureBinding `json:"bindings"`
+	Value      Expression           `json:"value"`
+	IsMutable  bool                 `json:"is_mutable"`
+	Visibility *Visibility          `json:"visibility,omitempty"`
+}
+
+func (d *DestructureDeclaration) Type() NodeType          { return NodeTypeDestructureDeclaration }
+func (d *DestructureDeclaration) GetMetadata() *NodeMetadata { return d.Metadata }
+func (d *DestructureDeclaration) statementNode()          {}
+
+func (d *DestructureDeclaration) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		NodeType   NodeType             `json:"type"`
+		Metadata   *NodeMetadata        `json:"metadata,omitempty"`
+		Kind       DestructureKind      `json:"kind"`
+		Bindings   []DestructureBinding `json:"bindings"`
+		Value      json.RawMessage      `json:"value"`
+		IsMutable  bool                 `json:"is_mutable"`
+		Visibility *Visibility          `json:"visibility,omitempty"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	valExpr, err := UnmarshalExpressionJSON(raw.Value)
+	if err != nil {
+		return fmt.Errorf("DestructureDeclaration.value unmarshal error: %w", err)
+	}
+	d.NodeType = NodeTypeDestructureDeclaration
+	d.Metadata = raw.Metadata
+	d.Kind = raw.Kind
+	d.Bindings = raw.Bindings
+	d.Value = valExpr
+	d.IsMutable = raw.IsMutable
+	d.Visibility = raw.Visibility
+	return nil
+}
+
+// DestructureAssignment represents: [x, y] = arr or { a, b } = obj
+type DestructureAssignment struct {
+	NodeType NodeType             `json:"type"`
+	Metadata *NodeMetadata        `json:"metadata,omitempty"`
+	Kind     DestructureKind      `json:"kind"`
+	Bindings []DestructureBinding `json:"bindings"`
+	Value    Expression           `json:"value"`
+}
+
+func (d *DestructureAssignment) Type() NodeType          { return NodeTypeDestructureAssignment }
+func (d *DestructureAssignment) GetMetadata() *NodeMetadata { return d.Metadata }
+func (d *DestructureAssignment) statementNode()          {}
+
+func (d *DestructureAssignment) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		NodeType NodeType             `json:"type"`
+		Metadata *NodeMetadata        `json:"metadata,omitempty"`
+		Kind     DestructureKind      `json:"kind"`
+		Bindings []DestructureBinding `json:"bindings"`
+		Value    json.RawMessage      `json:"value"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	valExpr, err := UnmarshalExpressionJSON(raw.Value)
+	if err != nil {
+		return fmt.Errorf("DestructureAssignment.value unmarshal error: %w", err)
+	}
+	d.NodeType = NodeTypeDestructureAssignment
+	d.Metadata = raw.Metadata
+	d.Kind = raw.Kind
+	d.Bindings = raw.Bindings
+	d.Value = valExpr
+	return nil
+}
+
+// StructField represents a field defined within a struct / bentuk.
+type StructField struct {
+	Name         string     `json:"name"`
+	TypeHint     string     `json:"type_hint,omitempty"`
+	DefaultValue Expression `json:"default_value,omitempty"`
+}
+
+func (f *StructField) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		Name         string          `json:"name"`
+		TypeHint     string          `json:"type_hint,omitempty"`
+		DefaultValue json.RawMessage `json:"default_value,omitempty"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	f.Name = raw.Name
+	f.TypeHint = raw.TypeHint
+	if len(raw.DefaultValue) > 0 && string(raw.DefaultValue) != "null" {
+		defVal, err := UnmarshalExpressionJSON(raw.DefaultValue)
+		if err != nil {
+			return fmt.Errorf("StructField.default_value unmarshal error: %w", err)
+		}
+		f.DefaultValue = defVal
+	}
+	return nil
+}
+
+// StructMethod represents a method defined inside a struct / bentuk.
+type StructMethod struct {
+	Name       string          `json:"name"`
+	Parameters []Parameter     `json:"parameters"`
+	ReturnType string          `json:"return_type,omitempty"`
+	Body       *BlockStatement `json:"body"`
+}
+
+// StructDeclaration represents: bentuk RekeningBank { ... } or struct Point { ... }
+type StructDeclaration struct {
+	NodeType   NodeType        `json:"type"`
+	Metadata   *NodeMetadata   `json:"metadata,omitempty"`
+	Name       string          `json:"name"`
+	Fields     []StructField   `json:"fields"`
+	Methods    []StructMethod  `json:"methods"`
+	Visibility *Visibility     `json:"visibility,omitempty"`
+}
+
+func (s *StructDeclaration) Type() NodeType          { return NodeTypeStructDeclaration }
+func (s *StructDeclaration) GetMetadata() *NodeMetadata { return s.Metadata }
+func (s *StructDeclaration) statementNode()          {}
+
+

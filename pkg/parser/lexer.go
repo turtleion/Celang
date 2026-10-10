@@ -81,6 +81,8 @@ var keywords = map[string]TokenType{
 	"gaya":         STYLE_BLOCK,
 	"style":        STYLE_BLOCK,
 	"dialek":       STYLE_BLOCK,
+	"bentuk":       STRUCT_DECL,
+	"struct":       STRUCT_DECL,
 }
 
 type Lexer struct {
@@ -222,7 +224,7 @@ func (l *Lexer) NextToken() Token {
 		tok = Token{Type: RBRACKET, Literal: "]", Line: tok.Line, Column: tok.Column}
 	case '.':
 		tok = Token{Type: DOT, Literal: ".", Line: tok.Line, Column: tok.Column}
-	case '"', '\'':
+	case '"', '\'', '`':
 		tok.Type = STRING
 		tok.Literal = l.readString(l.ch)
 		return tok
@@ -350,6 +352,8 @@ func (l *Lexer) readString(delimiter byte) string {
 				sb.WriteByte('"')
 			case '\'':
 				sb.WriteByte('\'')
+			case '`':
+				sb.WriteByte('`')
 			case '\\':
 				sb.WriteByte('\\')
 			default:

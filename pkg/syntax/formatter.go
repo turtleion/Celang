@@ -467,6 +467,116 @@ func (f *Formatter) formatStatement(stmt uast.Statement, indent int) string {
 		sb.WriteString(prefix)
 		sb.WriteString("}")
 		return sb.String()
+
+	case *uast.DestructureDeclaration:
+		var sb strings.Builder
+		sb.WriteString(prefix)
+		sb.WriteString(f.formatVisibility(s.Visibility))
+		if s.IsMutable {
+			if f.profile.VarDecl != "" {
+				sb.WriteString(f.profile.VarDecl)
+				sb.WriteString(" ")
+			}
+		} else {
+			if f.profile.ConstDecl != "" {
+				sb.WriteString(f.profile.ConstDecl)
+				sb.WriteString(" ")
+			}
+		}
+		if s.Kind == uast.DestructureArray {
+			var targets []string
+			for _, b := range s.Bindings {
+				targets = append(targets, b.Target)
+			}
+			sb.WriteString(fmt.Sprintf("[%s]", strings.Join(targets, ", ")))
+		} else {
+			var pairs []string
+			for _, b := range s.Bindings {
+				if b.SourceKey != "" && b.SourceKey != b.Target {
+					pairs = append(pairs, fmt.Sprintf("%s: %s", b.SourceKey, b.Target))
+				} else {
+					pairs = append(pairs, b.Target)
+				}
+			}
+			sb.WriteString(fmt.Sprintf("{ %s }", strings.Join(pairs, ", ")))
+		}
+		if s.Value != nil {
+			sb.WriteString(" = ")
+			sb.WriteString(f.formatExpression(s.Value))
+		}
+		return sb.String()
+
+	case *uast.DestructureAssignment:
+		var sb strings.Builder
+		sb.WriteString(prefix)
+		if s.Kind == uast.DestructureArray {
+			var targets []string
+			for _, b := range s.Bindings {
+				targets = append(targets, b.Target)
+			}
+			sb.WriteString(fmt.Sprintf("[%s]", strings.Join(targets, ", ")))
+		} else {
+			var pairs []string
+			for _, b := range s.Bindings {
+				if b.SourceKey != "" && b.SourceKey != b.Target {
+					pairs = append(pairs, fmt.Sprintf("%s: %s", b.SourceKey, b.Target))
+				} else {
+					pairs = append(pairs, b.Target)
+				}
+			}
+			sb.WriteString(fmt.Sprintf("{ %s }", strings.Join(pairs, ", ")))
+		}
+		if s.Value != nil {
+			sb.WriteString(" = ")
+			sb.WriteString(f.formatExpression(s.Value))
+		}
+		return sb.String()
+
+	case *uast.StructDeclaration:
+		var sb strings.Builder
+		sb.WriteString(prefix)
+		sb.WriteString(f.formatVisibility(s.Visibility))
+		structKeyword := "bentuk"
+		if f.profile.Name == "javascript" || f.profile.Name == "classic" {
+			structKeyword = "struct"
+		}
+		sb.WriteString(fmt.Sprintf("%s %s {\n", structKeyword, s.Name))
+		for _, field := range s.Fields {
+			sb.WriteString(strings.Repeat(" ", (indent+1)*f.profile.IndentWidth))
+			sb.WriteString(field.Name)
+			if field.TypeHint != "" {
+				sb.WriteString(fmt.Sprintf(": %s", field.TypeHint))
+			}
+			if field.DefaultValue != nil {
+				sb.WriteString(fmt.Sprintf(" = %s", f.formatExpression(field.DefaultValue)))
+			}
+			sb.WriteString("\n")
+		}
+		for _, method := range s.Methods {
+			sb.WriteString(strings.Repeat(" ", (indent+1)*f.profile.IndentWidth))
+			sb.WriteString(fmt.Sprintf("fungsi %s(", method.Name))
+			var params []string
+			for _, p := range method.Parameters {
+				pStr := p.Name
+				if p.TypeHint != "" {
+					pStr += ": " + p.TypeHint
+				}
+				params = append(params, pStr)
+			}
+			sb.WriteString(strings.Join(params, ", "))
+			sb.WriteString(") {\n")
+			if method.Body != nil {
+				for _, child := range method.Body.Statements {
+					sb.WriteString(f.formatStatement(child, indent+2))
+					sb.WriteString("\n")
+				}
+			}
+			sb.WriteString(strings.Repeat(" ", (indent+1)*f.profile.IndentWidth))
+			sb.WriteString("}\n")
+		}
+		sb.WriteString(prefix)
+		sb.WriteString("}")
+		return sb.String()
 	}
 
 	return prefix
@@ -599,6 +709,32 @@ func (f *Formatter) formatExpression(expr uast.Expression) string {
 			}
 		}
 		sb.WriteString("}")
+		return sb.String()
+
+	case *uast.TemplateLiteral:
+		var sb strings.Builder
+		isBacktick := f.profile.Name == "javascript"
+		if isBacktick {
+			sb.WriteByte('`')
+		} else {
+			sb.WriteByte('"')
+		}
+		for _, part := range e.Parts {
+			if lit, ok := part.(*uast.Literal); ok && lit.Kind == uast.LiteralKindString {
+				sb.WriteString(fmt.Sprintf("%v", lit.Value))
+			} else {
+				if isBacktick {
+					sb.WriteString(fmt.Sprintf("${%s}", f.formatExpression(part)))
+				} else {
+					sb.WriteString(fmt.Sprintf("{%s}", f.formatExpression(part)))
+				}
+			}
+		}
+		if isBacktick {
+			sb.WriteByte('`')
+		} else {
+			sb.WriteByte('"')
+		}
 		return sb.String()
 	}
 

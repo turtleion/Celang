@@ -401,3 +401,37 @@ func (f *FunctionExpression) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// TemplateLiteral represents an interpolated string composed of literal string parts and expressions.
+type TemplateLiteral struct {
+	NodeType NodeType      `json:"type"`
+	Metadata *NodeMetadata `json:"metadata,omitempty"`
+	Parts    []Expression  `json:"parts"`
+}
+
+func (t *TemplateLiteral) Type() NodeType          { return NodeTypeTemplateLiteral }
+func (t *TemplateLiteral) GetMetadata() *NodeMetadata { return t.Metadata }
+func (t *TemplateLiteral) expressionNode()         {}
+
+func (t *TemplateLiteral) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		NodeType NodeType          `json:"type"`
+		Metadata *NodeMetadata     `json:"metadata,omitempty"`
+		Parts    []json.RawMessage `json:"parts"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	t.NodeType = NodeTypeTemplateLiteral
+	t.Metadata = raw.Metadata
+	t.Parts = make([]Expression, len(raw.Parts))
+	for i, rawPart := range raw.Parts {
+		expr, err := UnmarshalExpressionJSON(rawPart)
+		if err != nil {
+			return fmt.Errorf("TemplateLiteral part %d unmarshal error: %w", i, err)
+		}
+		t.Parts[i] = expr
+	}
+	return nil
+}
+
+

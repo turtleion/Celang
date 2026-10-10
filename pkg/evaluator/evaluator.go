@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 
 	"celang/pkg/uast"
@@ -45,6 +46,101 @@ func Eval(node uast.Node, env *Environment) Object {
 			return newError(n.GetMetadata(), err.Error(), "Gunakan nama variabel yang berbeda.")
 		}
 		return val
+
+	case *uast.DestructureDeclaration:
+		val := Eval(n.Value, env)
+		if isError(val) {
+			return val
+		}
+		switch n.Kind {
+		case uast.DestructureArray:
+			arr, isArr := val.(*Array)
+			for i, b := range n.Bindings {
+				var item Object = NULL
+				if isArr && i < len(arr.Elements) {
+					item = arr.Elements[i]
+				}
+				if _, err := env.DefineWithVisibility(b.Target, item, n.IsMutable, "", n.Visibility); err != nil {
+					return newError(n.GetMetadata(), err.Error(), "")
+				}
+			}
+		case uast.DestructureMap:
+			mp, isMap := val.(*Map)
+			for _, b := range n.Bindings {
+				var item Object = NULL
+				if isMap {
+					if v, ok := mp.Pairs[b.SourceKey]; ok {
+						item = v
+					}
+				}
+				if _, err := env.DefineWithVisibility(b.Target, item, n.IsMutable, "", n.Visibility); err != nil {
+					return newError(n.GetMetadata(), err.Error(), "")
+				}
+			}
+		}
+		return val
+
+	case *uast.DestructureAssignment:
+		val := Eval(n.Value, env)
+		if isError(val) {
+			return val
+		}
+		switch n.Kind {
+		case uast.DestructureArray:
+			arr, isArr := val.(*Array)
+			for i, b := range n.Bindings {
+				var item Object = NULL
+				if isArr && i < len(arr.Elements) {
+					item = arr.Elements[i]
+				}
+				if _, exists := env.Get(b.Target); !exists {
+					env.Define(b.Target, item, true, "")
+				} else {
+					if err := env.Assign(b.Target, item); err != nil {
+						return newError(n.GetMetadata(), err.Error(), "")
+					}
+				}
+			}
+		case uast.DestructureMap:
+			mp, isMap := val.(*Map)
+			for _, b := range n.Bindings {
+				var item Object = NULL
+				if isMap {
+					if v, ok := mp.Pairs[b.SourceKey]; ok {
+						item = v
+					}
+				}
+				if _, exists := env.Get(b.Target); !exists {
+					env.Define(b.Target, item, true, "")
+				} else {
+					if err := env.Assign(b.Target, item); err != nil {
+						return newError(n.GetMetadata(), err.Error(), "")
+					}
+				}
+			}
+		}
+		return val
+
+	case *uast.StructDeclaration:
+		methods := make(map[string]*Function)
+		for _, m := range n.Methods {
+			methods[m.Name] = &Function{
+				Name:       m.Name,
+				Parameters: m.Parameters,
+				Body:       m.Body,
+				Env:        env,
+			}
+		}
+		structDef := &StructDefinition{
+			Name:    n.Name,
+			Fields:  n.Fields,
+			Methods: methods,
+			Env:     env,
+		}
+		if _, err := env.DefineWithVisibility(n.Name, structDef, false, "bentuk", n.Visibility); err != nil {
+			return newError(n.GetMetadata(), err.Error(), "")
+		}
+		return structDef
 
 	case *uast.AssignmentStatement:
 		val := Eval(n.Value, env)
@@ -90,6 +186,84 @@ func Eval(node uast.Node, env *Environment) Object {
 				return val
 			}
 			return newError(n.GetMetadata(), "Target assignment tidak valid", "Assignment hanya dapat dilakukan ke variabel atau elemen pointer.")
+
+		case *uast.MemberExpression:
+			obj := Eval(target.Object, env)
+			if isError(obj) {
+				return obj
+			}
+			prop := target.Property
+			if inst, ok := obj.(*StructInstance); ok {
+				if n.Operator != "=" && len(n.Operator) > 1 && n.Operator[len(n.Operator)-1] == '=' {
+					baseOp := n.Operator[:len(n.Operator)-1]
+					curVal := inst.Fields[prop]
+					if curVal == nil {
+						curVal = NULL
+					}
+					val = evalBinaryOp(baseOp, curVal, val, n.GetMetadata())
+					if isError(val) {
+						return val
+					}
+				}
+				inst.Fields[prop] = val
+				return val
+			}
+			if mp, ok := obj.(*Map); ok {
+				if n.Operator != "=" && len(n.Operator) > 1 && n.Operator[len(n.Operator)-1] == '=' {
+					baseOp := n.Operator[:len(n.Operator)-1]
+					curVal := mp.Pairs[prop]
+					if curVal == nil {
+						curVal = NULL
+					}
+					val = evalBinaryOp(baseOp, curVal, val, n.GetMetadata())
+					if isError(val) {
+						return val
+					}
+				}
+				mp.Pairs[prop] = val
+				found := false
+				for _, k := range mp.Order {
+					if k == prop {
+						found = true
+						break
+					}
+				}
+				if !found {
+					mp.Order = append(mp.Order, prop)
+				}
+				return val
+			}
+			if arr, ok := obj.(*Array); ok {
+				var intIdx int64
+				var hasInt bool
+				if parsed, err := strconv.ParseInt(prop, 10, 64); err == nil {
+					intIdx = parsed
+					hasInt = true
+				} else {
+					idxObj := Eval(uast.NewIdentifier(prop), env)
+					if iVal, _, isInt, ok := CoerceToNumeric(idxObj); ok && isInt {
+						intIdx = iVal
+						hasInt = true
+					}
+				}
+				if hasInt {
+					if intIdx >= 0 && int(intIdx) < len(arr.Elements) {
+						if n.Operator != "=" && len(n.Operator) > 1 && n.Operator[len(n.Operator)-1] == '=' {
+							baseOp := n.Operator[:len(n.Operator)-1]
+							curVal := arr.Elements[intIdx]
+							val = evalBinaryOp(baseOp, curVal, val, n.GetMetadata())
+							if isError(val) {
+								return val
+							}
+						}
+						arr.Elements[intIdx] = val
+						return val
+					}
+					return newError(n.GetMetadata(), fmt.Sprintf("Indeks array %d di luar jangkauan (panjang: %d)", intIdx, len(arr.Elements)), "")
+				}
+			}
+			return newError(n.GetMetadata(), fmt.Sprintf("Target properti '%s' tidak dapat ditugaskan", prop), "")
+
 		default:
 			return newError(n.GetMetadata(), "Target assignment tidak valid", "Assignment hanya dapat dilakukan ke variabel atau elemen objek.")
 		}
@@ -403,6 +577,21 @@ func Eval(node uast.Node, env *Environment) Object {
 		}
 		return NULL
 
+	case *uast.TemplateLiteral:
+		var sb strings.Builder
+		for _, part := range n.Parts {
+			res := Eval(part, env)
+			if isError(res) {
+				return res
+			}
+			if s, ok := res.(*String); ok {
+				sb.WriteString(s.Value)
+			} else {
+				sb.WriteString(res.Inspect())
+			}
+		}
+		return &String{Value: sb.String()}
+
 	case *uast.Identifier:
 		val, ok := env.Get(n.Name)
 		if !ok {
@@ -463,6 +652,25 @@ func Eval(node uast.Node, env *Environment) Object {
 				return val
 			}
 			return NULL
+		}
+		if inst, ok := obj.(*StructInstance); ok {
+			prop := n.Property
+			if val, exists := inst.Fields[prop]; exists {
+				return val
+			}
+			if method, exists := inst.Def.Methods[prop]; exists {
+				boundEnv := NewEnclosedEnvironment(method.Env)
+				boundEnv.Define("diri", inst, false, inst.Def.Name)
+				boundEnv.Define("this", inst, false, inst.Def.Name)
+				boundEnv.Define("self", inst, false, inst.Def.Name)
+				return &Function{
+					Name:       method.Name,
+					Parameters: method.Parameters,
+					Body:       method.Body,
+					Env:        boundEnv,
+				}
+			}
+			return newError(n.GetMetadata(), fmt.Sprintf("Properti atau fungsi '%s' tidak ditemukan pada bentuk '%s'", prop, inst.Def.Name), "Pastikan nama field atau fungsi dieja dengan benar.")
 		}
 		return newError(n.GetMetadata(), fmt.Sprintf("Properti '%s' tidak ditemukan pada objek", n.Property), "Pastikan properti yang diakses valid.")
 
@@ -825,6 +1033,40 @@ func applyFunction(callee Object, args []Object, meta *uast.NodeMetadata) Object
 			return ret.Value
 		}
 		return res
+	case *StructDefinition:
+		instEnv := NewEnclosedEnvironment(fn.Env)
+		instance := &StructInstance{
+			Def:    fn,
+			Fields: make(map[string]Object),
+			Env:    instEnv,
+		}
+		instEnv.Define("diri", instance, false, fn.Name)
+		instEnv.Define("this", instance, false, fn.Name)
+		instEnv.Define("self", instance, false, fn.Name)
+
+		if len(args) == 1 && args[0].Type() == MAP_OBJ {
+			mp := args[0].(*Map)
+			for _, f := range fn.Fields {
+				if v, ok := mp.Pairs[f.Name]; ok {
+					instance.Fields[f.Name] = v
+				} else if f.DefaultValue != nil {
+					instance.Fields[f.Name] = Eval(f.DefaultValue, instEnv)
+				} else {
+					instance.Fields[f.Name] = NULL
+				}
+			}
+		} else {
+			for i, f := range fn.Fields {
+				if i < len(args) {
+					instance.Fields[f.Name] = args[i]
+				} else if f.DefaultValue != nil {
+					instance.Fields[f.Name] = Eval(f.DefaultValue, instEnv)
+				} else {
+					instance.Fields[f.Name] = NULL
+				}
+			}
+		}
+		return instance
 	default:
 		return newError(meta, fmt.Sprintf("Objek bukan fungsi: %s", callee.Type()), "Pastikan Anda memanggil fungsi yang sah.")
 	}
