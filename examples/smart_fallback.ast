@@ -1,0 +1,92 @@
+{
+  "type": "Program",
+  "version": "1.0",
+  "body": [
+    {
+      "type": "VariableDeclaration",
+      "name": "tagihan",
+      "value": {
+        "type": "Literal",
+        "kind": "string",
+        "raw": "\"Rp 150000\"",
+        "value": "Rp 150000"
+      },
+      "is_mutable": false,
+      "type_hint": "string"
+    },
+    {
+      "type": "VariableDeclaration",
+      "name": "diskon",
+      "value": {
+        "type": "Literal",
+        "kind": "int",
+        "raw": "25000",
+        "value": 25000
+      },
+      "is_mutable": false,
+      "type_hint": "int"
+    },
+    {
+      "type": "VariableDeclaration",
+      "name": "totalBayar",
+      "value": {
+        "type": "BinaryExpression",
+        "operator": "-",
+        "left": {
+          "type": "Identifier",
+          "name": "tagihan"
+        },
+        "right": {
+          "type": "Identifier",
+          "name": "diskon"
+        }
+      },
+      "is_mutable": false,
+      "type_hint": "int"
+    },
+    {
+      "type": "ExpressionStatement",
+      "expression": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "cetak"
+        },
+        "arguments": [
+          {
+            "type": "Literal",
+            "kind": "string",
+            "raw": "\"Tagihan Asli:\"",
+            "value": "Tagihan Asli:"
+          },
+          {
+            "type": "Identifier",
+            "name": "tagihan"
+          }
+        ]
+      }
+    },
+    {
+      "type": "ExpressionStatement",
+      "expression": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "cetak"
+        },
+        "arguments": [
+          {
+            "type": "Literal",
+            "kind": "string",
+            "raw": "\"Total Setelah Diskon (Adaptive Coercion):\"",
+            "value": "Total Setelah Diskon (Adaptive Coercion):"
+          },
+          {
+            "type": "Identifier",
+            "name": "totalBayar"
+          }
+        ]
+      }
+    }
+  ]
+}

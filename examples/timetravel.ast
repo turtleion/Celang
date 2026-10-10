@@ -1,0 +1,146 @@
+{
+  "type": "Program",
+  "version": "1.0",
+  "body": [
+    {
+      "type": "VariableDeclaration",
+      "name": "gaji",
+      "value": {
+        "type": "Literal",
+        "kind": "int",
+        "raw": "5000000",
+        "value": 5000000
+      },
+      "is_mutable": true,
+      "type_hint": "int"
+    },
+    {
+      "type": "AssignmentStatement",
+      "target": {
+        "type": "Identifier",
+        "name": "gaji"
+      },
+      "operator": "=",
+      "value": {
+        "type": "Literal",
+        "kind": "int",
+        "raw": "7500000",
+        "value": 7500000
+      }
+    },
+    {
+      "type": "AssignmentStatement",
+      "target": {
+        "type": "Identifier",
+        "name": "gaji"
+      },
+      "operator": "=",
+      "value": {
+        "type": "Literal",
+        "kind": "int",
+        "raw": "10000000",
+        "value": 10000000
+      }
+    },
+    {
+      "type": "ExpressionStatement",
+      "expression": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "cetak"
+        },
+        "arguments": [
+          {
+            "type": "Literal",
+            "kind": "string",
+            "raw": "\"Gaji saat ini:\"",
+            "value": "Gaji saat ini:"
+          },
+          {
+            "type": "Identifier",
+            "name": "gaji"
+          }
+        ]
+      }
+    },
+    {
+      "type": "ExpressionStatement",
+      "expression": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "cetak"
+        },
+        "arguments": [
+          {
+            "type": "Literal",
+            "kind": "string",
+            "raw": "\"Gaji sebelumnya:\"",
+            "value": "Gaji sebelumnya:"
+          },
+          {
+            "type": "MemberExpression",
+            "object": {
+              "type": "Identifier",
+              "name": "gaji"
+            },
+            "property": "sebelumnya"
+          }
+        ]
+      }
+    },
+    {
+      "type": "ExpressionStatement",
+      "expression": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "cetak"
+        },
+        "arguments": [
+          {
+            "type": "Literal",
+            "kind": "string",
+            "raw": "\"Gaji awal:\"",
+            "value": "Gaji awal:"
+          },
+          {
+            "type": "MemberExpression",
+            "object": {
+              "type": "Identifier",
+              "name": "gaji"
+            },
+            "property": "awal"
+          }
+        ]
+      }
+    },
+    {
+      "type": "ExpressionStatement",
+      "expression": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "cetak"
+        },
+        "arguments": [
+          {
+            "type": "Literal",
+            "kind": "string",
+            "raw": "\"Histori gaji:\"",
+            "value": "Histori gaji:"
+          },
+          {
+            "type": "MemberExpression",
+            "object": {
+              "type": "Identifier",
+              "name": "gaji"
+            },
+            "property": "histori"
+          }
+        ]
+      }
+    }
+  ]
+}
