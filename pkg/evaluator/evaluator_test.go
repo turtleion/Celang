@@ -840,3 +840,63 @@ func TestEvaluator_InputBuiltin(t *testing.T) {
 		t.Fatalf("Expected prompt 'Nama kamu? ', got %q", outBuf.String())
 	}
 }
+
+func TestEvaluator_TimeTravelMemoryBounded(t *testing.T) {
+	env := evaluator.NewEnvironment()
+	evaluator.RegisterBuiltins(env, nil)
+
+	// Mutate variable 1,000 times in a loop
+	code := `
+	buat hitungan = 0
+	selama hitungan < 1000 {
+		hitungan = hitungan + 1
+	}
+	[hitungan.awal, hitungan.sebelumnya, hitungan, hitungan.histori]
+	`
+	l := parser.NewLexer(code)
+	p := parser.NewParser(l)
+	prog, err := p.ParseProgram()
+	if err != nil {
+		t.Fatalf("parser error: %v", err)
+	}
+
+	res := evaluator.Eval(prog, env)
+	arr, ok := res.(*evaluator.Array)
+	if !ok || len(arr.Elements) != 4 {
+		t.Fatalf("Expected 4 elements, got %v", res.Inspect())
+	}
+
+	// 1. Initial value (hitungan.awal) must stay 0
+	initVal, ok := arr.Elements[0].(*evaluator.Integer)
+	if !ok || initVal.Value != 0 {
+		t.Errorf("Expected hitungan.awal = 0, got %v", arr.Elements[0].Inspect())
+	}
+
+	// 2. Previous value (hitungan.sebelumnya) must be 999
+	prevVal, ok := arr.Elements[1].(*evaluator.Integer)
+	if !ok || prevVal.Value != 999 {
+		t.Errorf("Expected hitungan.sebelumnya = 999, got %v", arr.Elements[1].Inspect())
+	}
+
+	// 3. Current value must be 1000
+	currVal, ok := arr.Elements[2].(*evaluator.Integer)
+	if !ok || currVal.Value != 1000 {
+		t.Errorf("Expected hitungan = 1000, got %v", arr.Elements[2].Inspect())
+	}
+
+	// 4. History size must be bounded by DefaultHistoryCapacity (50)
+	histArr, ok := arr.Elements[3].(*evaluator.Array)
+	if !ok {
+		t.Fatalf("Expected array for hitungan.histori, got %v", arr.Elements[3].Inspect())
+	}
+	if len(histArr.Elements) != evaluator.DefaultHistoryCapacity {
+		t.Errorf("Expected history bounded to %d elements, got %d", evaluator.DefaultHistoryCapacity, len(histArr.Elements))
+	}
+
+	// 5. Verify the sliding window content: last element must be 1000, first element must be 1000 - 50 + 1 = 951
+	firstHistVal := histArr.Elements[0].(*evaluator.Integer).Value
+	lastHistVal := histArr.Elements[len(histArr.Elements)-1].(*evaluator.Integer).Value
+	if lastHistVal != 1000 || firstHistVal != 951 {
+		t.Errorf("Expected history window from 951 to 1000, got %d to %d", firstHistVal, lastHistVal)
+	}
+}
