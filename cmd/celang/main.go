@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"celang/pkg/empathy"
@@ -115,6 +116,8 @@ func runFile(filePath string) {
 	}
 
 	env := evaluator.NewEnvironment()
+	absPath, _ := filepath.Abs(filePath)
+	env.FilePath = absPath
 	evaluator.RegisterBuiltins(env, os.Stdout)
 
 	result := evaluator.Eval(prog, env)

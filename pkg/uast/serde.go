@@ -196,6 +196,22 @@ func UnmarshalStatementJSON(data []byte) (Statement, error) {
 		}
 		return &concStmt, nil
 
+	case NodeTypeImportDeclaration:
+		var imp ImportDeclaration
+		if err := json.Unmarshal(data, &imp); err != nil {
+			return nil, err
+		}
+		imp.NodeType = NodeTypeImportDeclaration
+		return &imp, nil
+
+	case NodeTypeVisibilityStatement:
+		var vis VisibilityStatement
+		if err := json.Unmarshal(data, &vis); err != nil {
+			return nil, err
+		}
+		vis.NodeType = NodeTypeVisibilityStatement
+		return &vis, nil
+
 	default:
 		return nil, fmt.Errorf("unrecognized statement type: '%s'", detector.Type)
 	}

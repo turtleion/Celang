@@ -21,6 +21,8 @@ const (
 	NodeTypeFunctionDeclaration  NodeType = "FunctionDeclaration"
 	NodeTypeReturnStatement      NodeType = "ReturnStatement"
 	NodeTypeConcurrencyStatement NodeType = "ConcurrencyStatement"
+	NodeTypeImportDeclaration    NodeType = "ImportDeclaration"
+	NodeTypeVisibilityStatement  NodeType = "VisibilityStatement"
 
 	// Expressions
 	NodeTypeLiteral          NodeType = "Literal"
@@ -66,4 +68,20 @@ type Statement interface {
 type Expression interface {
 	Node
 	expressionNode()
+}
+
+// VisibilityKind defines the scope of access for a symbol.
+type VisibilityKind string
+
+const (
+	VisibilityPrivate   VisibilityKind = "private"   // privat! (default: file-scoped)
+	VisibilityModule    VisibilityKind = "module"    // privat-modul! (module-scoped)
+	VisibilityPublic    VisibilityKind = "public"    // publik! (unrestricted)
+	VisibilityAllowlist VisibilityKind = "allowlist" // privat-["./target"]! (specific targets)
+)
+
+// Visibility defines the access control attached to a declaration or export.
+type Visibility struct {
+	Kind    VisibilityKind `json:"kind"`
+	Targets []string       `json:"targets,omitempty"` // For allowlist: relative file paths or module names
 }

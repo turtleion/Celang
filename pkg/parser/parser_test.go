@@ -154,3 +154,31 @@ func TestParser_FunctionExecution(t *testing.T) {
 		t.Fatalf("Expected hasil=120, got %+v", hasilVal)
 	}
 }
+
+func TestParser_VisibilityAndImports(t *testing.T) {
+	input := `
+	publik! buat nama = "Kayasa"
+	privat-modul! fungsi komunikasikan(ip: Teks) mengembalikan Kebenaran {
+		kembalikan benar
+	}
+	privat-["./program5.ce"]! buat umur = 25
+	publik! { nama, umur }
+
+	ambil { nama } dari "./program1.ce"
+	ambil * sebagai math dari "./matematika.ce"
+	ambil { tambah sebagai penjumlahan } dari "./matematika.ce"
+	import { perkalian } from "./kalkulator.ce"
+	from "./util.ce" import cetak_baris, cetak_kolom as kolom
+	`
+
+	l := parser.NewLexer(input)
+	p := parser.NewParser(l)
+	prog, err := p.ParseProgram()
+	if err != nil {
+		t.Fatalf("Parser returned error: %v", err)
+	}
+
+	if len(prog.Body) != 9 {
+		t.Fatalf("Expected 9 statements, got %d", len(prog.Body))
+	}
+}

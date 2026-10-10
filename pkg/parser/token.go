@@ -72,6 +72,17 @@ const (
 	RETURN_TYPE TokenType = "RETURN_TYPE" // mengembalikan
 	MAKA        TokenType = "MAKA"        // maka
 	SELESAI     TokenType = "SELESAI"     // selesai
+
+	// Visibility
+	VIS_PUBLIC    TokenType = "VIS_PUBLIC"    // publik!, export
+	VIS_MODULE    TokenType = "VIS_MODULE"    // privat-modul!
+	VIS_PRIVATE   TokenType = "VIS_PRIVATE"   // privat!
+	VIS_ALLOWLIST TokenType = "VIS_ALLOWLIST" // privat-
+
+	// Modules & Imports
+	IMPORT TokenType = "IMPORT" // ambil, impor, import
+	FROM   TokenType = "FROM"   // dari, from
+	AS     TokenType = "AS"     // sebagai, as
 )
 
 type Token struct {

@@ -213,6 +213,12 @@ func (p *Parser) parseStatement() uast.Statement {
 		return p.parseConcurrencyStatement("bersamaan")
 	case SWITCH:
 		return p.parseSwitchStatement()
+	case VIS_PUBLIC, VIS_MODULE, VIS_PRIVATE, VIS_ALLOWLIST:
+		return p.parseVisibilityOrExportStatement()
+	case IMPORT:
+		return p.parseImportStatement()
+	case FROM:
+		return p.parsePythonicImportStatement()
 	default:
 		// Check for assignment: target = expr or target += expr, or *ptr = expr
 		if (p.curTokenIs(IDENT) && (p.peekTokenIs(ASSIGN) || p.peekTokenIs(PLUS_ASSIGN) || p.peekTokenIs(MINUS_ASSIGN))) ||
@@ -220,6 +226,226 @@ func (p *Parser) parseStatement() uast.Statement {
 			return p.parseAssignmentStatement()
 		}
 		return p.parseExpressionStatement()
+	}
+}
+
+func (p *Parser) parseVisibilityOrExportStatement() uast.Statement {
+	meta := p.currentMetadata()
+	var vis *uast.Visibility
+
+	switch p.curToken.Type {
+	case VIS_PUBLIC:
+		vis = &uast.Visibility{Kind: uast.VisibilityPublic}
+		p.nextToken()
+	case VIS_MODULE:
+		vis = &uast.Visibility{Kind: uast.VisibilityModule}
+		p.nextToken()
+	case VIS_PRIVATE:
+		vis = &uast.Visibility{Kind: uast.VisibilityPrivate}
+		p.nextToken()
+	case VIS_ALLOWLIST:
+		p.nextToken() // move to '['
+		if !p.curTokenIs(LBRACKET) {
+			p.addError("Diharapkan '[' setelah 'privat-'")
+			return nil
+		}
+		p.nextToken() // move inside bracket
+		targets := []string{}
+		for !p.curTokenIs(RBRACKET) && !p.curTokenIs(EOF) {
+			if p.curTokenIs(STRING) || p.curTokenIs(IDENT) {
+				targets = append(targets, p.curToken.Literal)
+			}
+			if p.peekTokenIs(COMMA) {
+				p.nextToken()
+			}
+			p.nextToken()
+		}
+		if p.peekTokenIs(BANG) {
+			p.nextToken() // eat '!'
+		}
+		p.nextToken() // move to next token after ']' or '!'
+		vis = &uast.Visibility{Kind: uast.VisibilityAllowlist, Targets: targets}
+	}
+
+	// Standalone export list: publik! { kali, bagi }
+	if p.curTokenIs(LBRACE) {
+		p.nextToken() // enter brace
+		idents := []string{}
+		for !p.curTokenIs(RBRACE) && !p.curTokenIs(EOF) {
+			if p.curTokenIs(IDENT) {
+				idents = append(idents, p.curToken.Literal)
+			}
+			if p.peekTokenIs(COMMA) {
+				p.nextToken()
+			}
+			p.nextToken()
+		}
+		return &uast.VisibilityStatement{
+			NodeType:    uast.NodeTypeVisibilityStatement,
+			Metadata:    meta,
+			Visibility:  *vis,
+			Identifiers: idents,
+		}
+	}
+
+	// Declaration with visibility
+	switch p.curToken.Type {
+	case VAR_DECL:
+		decl := p.parseVariableDeclaration(true)
+		if decl != nil {
+			decl.Visibility = vis
+		}
+		return decl
+	case CONST_DECL:
+		decl := p.parseVariableDeclaration(false)
+		if decl != nil {
+			decl.Visibility = vis
+		}
+		return decl
+	case FUNC:
+		fn := p.parseFunctionDeclaration()
+		if fn != nil {
+			fn.Visibility = vis
+		}
+		return fn
+	default:
+		p.addError(fmt.Sprintf("Modifier visibilitas tidak dapat diterapkan pada '%s'", p.curToken.Literal))
+		return nil
+	}
+}
+
+func (p *Parser) parseImportStatement() *uast.ImportDeclaration {
+	meta := p.currentMetadata()
+	p.nextToken() // eat 'ambil' / 'impor' / 'import'
+
+	specifiers := []uast.ImportSpecifier{}
+
+	// Case 1: Namespace import: ambil * sebagai math dari "./mod.ce"
+	if p.curTokenIs(ASTERISK) {
+		p.nextToken() // eat '*'
+		if !p.curTokenIs(AS) {
+			p.addError("Diharapkan 'sebagai' atau 'as' setelah '*' dalam impor")
+			return nil
+		}
+		p.nextToken() // move to alias identifier
+		if !p.curTokenIs(IDENT) {
+			p.addError("Diharapkan nama alias identifier setelah 'sebagai'")
+			return nil
+		}
+		local := p.curToken.Literal
+		specifiers = append(specifiers, uast.ImportSpecifier{Imported: "*", Local: local, IsAll: true})
+		p.nextToken() // move to 'dari' / 'from'
+	} else if p.curTokenIs(LBRACE) {
+		// Case 2: Named import: ambil { tambah, kali sebagai perkalian } dari "./mod.ce"
+		p.nextToken() // enter '{'
+		for !p.curTokenIs(RBRACE) && !p.curTokenIs(EOF) {
+			if p.curTokenIs(IDENT) {
+				imported := p.curToken.Literal
+				local := imported
+				if p.peekTokenIs(AS) {
+					p.nextToken() // eat 'sebagai' / 'as'
+					p.nextToken() // move to alias
+					if p.curTokenIs(IDENT) {
+						local = p.curToken.Literal
+					}
+				}
+				specifiers = append(specifiers, uast.ImportSpecifier{Imported: imported, Local: local})
+			}
+			if p.peekTokenIs(COMMA) {
+				p.nextToken()
+			}
+			p.nextToken()
+		}
+		p.nextToken() // move to 'dari' / 'from'
+	} else if p.curTokenIs(STRING) {
+		// Case 3: Python style: import "./mod.ce" as math
+		source := p.curToken.Literal
+		if p.peekTokenIs(AS) {
+			p.nextToken() // eat 'as'
+			p.nextToken() // move to alias
+			local := p.curToken.Literal
+			specifiers = append(specifiers, uast.ImportSpecifier{Imported: "*", Local: local, IsAll: true})
+		}
+		return &uast.ImportDeclaration{
+			NodeType:   uast.NodeTypeImportDeclaration,
+			Metadata:   meta,
+			Source:     source,
+			Specifiers: specifiers,
+		}
+	} else {
+		p.addError(fmt.Sprintf("Sintaks impor tidak valid pada token '%s'", p.curToken.Literal))
+		return nil
+	}
+
+	if !p.curTokenIs(FROM) {
+		p.addError("Diharapkan keyword 'dari' atau 'from' setelah daftar impor")
+		return nil
+	}
+	p.nextToken() // move to source path
+
+	if !p.curTokenIs(STRING) {
+		p.addError("Diharapkan path modul berupa string (contoh: \"./modul.ce\")")
+		return nil
+	}
+	source := p.curToken.Literal
+
+	return &uast.ImportDeclaration{
+		NodeType:   uast.NodeTypeImportDeclaration,
+		Metadata:   meta,
+		Source:     source,
+		Specifiers: specifiers,
+	}
+}
+
+func (p *Parser) parsePythonicImportStatement() *uast.ImportDeclaration {
+	meta := p.currentMetadata()
+	p.nextToken() // eat 'dari' / 'from'
+
+	if !p.curTokenIs(STRING) {
+		p.addError("Diharapkan path modul berupa string setelah 'from' / 'dari'")
+		return nil
+	}
+	source := p.curToken.Literal
+	p.nextToken() // move to 'import' / 'ambil'
+
+	if !p.curTokenIs(IMPORT) {
+		p.addError("Diharapkan 'import' atau 'ambil' setelah path modul")
+		return nil
+	}
+	p.nextToken() // move to first specifier
+
+	specifiers := []uast.ImportSpecifier{}
+
+	if p.curTokenIs(ASTERISK) {
+		specifiers = append(specifiers, uast.ImportSpecifier{Imported: "*", Local: "*", IsAll: true})
+	} else {
+		for !p.curTokenIs(SEMICOLON) && !p.curTokenIs(EOF) {
+			if p.curTokenIs(IDENT) {
+				imported := p.curToken.Literal
+				local := imported
+				if p.peekTokenIs(AS) {
+					p.nextToken() // eat 'as'
+					p.nextToken() // move to alias
+					if p.curTokenIs(IDENT) {
+						local = p.curToken.Literal
+					}
+				}
+				specifiers = append(specifiers, uast.ImportSpecifier{Imported: imported, Local: local})
+			}
+			if p.peekTokenIs(COMMA) {
+				p.nextToken()
+				p.nextToken()
+			} else {
+				break
+			}
+		}
+	}
+
+	return &uast.ImportDeclaration{
+		NodeType:   uast.NodeTypeImportDeclaration,
+		Metadata:   meta,
+		Source:     source,
+		Specifiers: specifiers,
 	}
 }
 

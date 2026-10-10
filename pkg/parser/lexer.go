@@ -60,6 +60,14 @@ var keywords = map[string]TokenType{
 	"mengembalikan": RETURN_TYPE,
 	"maka":         MAKA,
 	"selesai":      SELESAI,
+	"ambil":        IMPORT,
+	"impor":        IMPORT,
+	"import":       IMPORT,
+	"dari":         FROM,
+	"from":         FROM,
+	"sebagai":      AS,
+	"as":           AS,
+	"export":       VIS_PUBLIC,
 }
 
 type Lexer struct {
@@ -211,6 +219,34 @@ func (l *Lexer) NextToken() Token {
 				secondWord := l.readIdentifier()
 				tok.Type = ELSE_IF
 				tok.Literal = tok.Literal + " " + secondWord
+			}
+
+			// Handle visibility modifiers: publik!, privat-modul!, privat!, and privat-[...]
+			if tok.Literal == "publik" && l.ch == '!' {
+				l.readChar()
+				tok.Literal = "publik!"
+				tok.Type = VIS_PUBLIC
+				return tok
+			}
+			if tok.Literal == "privat-modul" && l.ch == '!' {
+				l.readChar()
+				tok.Literal = "privat-modul!"
+				tok.Type = VIS_MODULE
+				return tok
+			}
+			if tok.Literal == "privat" {
+				if l.ch == '!' {
+					l.readChar()
+					tok.Literal = "privat!"
+					tok.Type = VIS_PRIVATE
+					return tok
+				}
+				if l.ch == '-' && l.peekChar() == '[' {
+					l.readChar() // eat '-'
+					tok.Literal = "privat-"
+					tok.Type = VIS_ALLOWLIST
+					return tok
+				}
 			}
 
 			return tok

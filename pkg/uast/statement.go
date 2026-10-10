@@ -37,12 +37,13 @@ func (e *ExpressionStatement) UnmarshalJSON(data []byte) error {
 
 // VariableDeclaration represents defining a variable (mutable or immutable).
 type VariableDeclaration struct {
-	NodeType  NodeType      `json:"type"`
-	Metadata  *NodeMetadata `json:"metadata,omitempty"`
-	Name      string        `json:"name"`
-	Value     Expression    `json:"value,omitempty"`
-	IsMutable bool          `json:"is_mutable"`
-	TypeHint  string        `json:"type_hint,omitempty"`
+	NodeType   NodeType      `json:"type"`
+	Metadata   *NodeMetadata `json:"metadata,omitempty"`
+	Name       string        `json:"name"`
+	Value      Expression    `json:"value,omitempty"`
+	IsMutable  bool          `json:"is_mutable"`
+	TypeHint   string        `json:"type_hint,omitempty"`
+	Visibility *Visibility   `json:"visibility,omitempty"`
 }
 
 func (v *VariableDeclaration) Type() NodeType          { return NodeTypeVariableDeclaration }
@@ -51,12 +52,13 @@ func (v *VariableDeclaration) statementNode()          {}
 
 func (v *VariableDeclaration) UnmarshalJSON(data []byte) error {
 	var raw struct {
-		NodeType  NodeType        `json:"type"`
-		Metadata  *NodeMetadata   `json:"metadata,omitempty"`
-		Name      string          `json:"name"`
-		Value     json.RawMessage `json:"value,omitempty"`
-		IsMutable bool            `json:"is_mutable"`
-		TypeHint  string          `json:"type_hint,omitempty"`
+		NodeType   NodeType        `json:"type"`
+		Metadata   *NodeMetadata   `json:"metadata,omitempty"`
+		Name       string          `json:"name"`
+		Value      json.RawMessage `json:"value,omitempty"`
+		IsMutable  bool            `json:"is_mutable"`
+		TypeHint   string          `json:"type_hint,omitempty"`
+		Visibility *Visibility     `json:"visibility,omitempty"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
@@ -75,6 +77,7 @@ func (v *VariableDeclaration) UnmarshalJSON(data []byte) error {
 	v.Value = valExpr
 	v.IsMutable = raw.IsMutable
 	v.TypeHint = raw.TypeHint
+	v.Visibility = raw.Visibility
 	return nil
 }
 
@@ -438,6 +441,7 @@ type FunctionDeclaration struct {
 	Parameters []Parameter     `json:"parameters"`
 	Body       *BlockStatement `json:"body"`
 	ReturnType string          `json:"return_type,omitempty"`
+	Visibility *Visibility     `json:"visibility,omitempty"`
 }
 
 func (f *FunctionDeclaration) Type() NodeType          { return NodeTypeFunctionDeclaration }
@@ -514,3 +518,34 @@ func (c *ConcurrencyStatement) UnmarshalJSON(data []byte) error {
 	c.Tasks = tasks
 	return nil
 }
+
+// ImportSpecifier represents an imported identifier or alias.
+type ImportSpecifier struct {
+	Imported string `json:"imported"`
+	Local    string `json:"local"`
+	IsAll    bool   `json:"is_all,omitempty"`
+}
+
+// ImportDeclaration represents importing symbols from another module/file.
+type ImportDeclaration struct {
+	NodeType   NodeType          `json:"type"`
+	Metadata   *NodeMetadata     `json:"metadata,omitempty"`
+	Source     string            `json:"source"`
+	Specifiers []ImportSpecifier `json:"specifiers"`
+}
+
+func (i *ImportDeclaration) Type() NodeType          { return NodeTypeImportDeclaration }
+func (i *ImportDeclaration) GetMetadata() *NodeMetadata { return i.Metadata }
+func (i *ImportDeclaration) statementNode()          {}
+
+// VisibilityStatement represents a standalone export/visibility declaration (e.g. publik! { kali, bagi }).
+type VisibilityStatement struct {
+	NodeType    NodeType      `json:"type"`
+	Metadata    *NodeMetadata `json:"metadata,omitempty"`
+	Visibility  Visibility    `json:"visibility"`
+	Identifiers []string      `json:"identifiers"`
+}
+
+func (v *VisibilityStatement) Type() NodeType          { return NodeTypeVisibilityStatement }
+func (v *VisibilityStatement) GetMetadata() *NodeMetadata { return v.Metadata }
+func (v *VisibilityStatement) statementNode()          {}

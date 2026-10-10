@@ -2,6 +2,7 @@ package syntax
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"celang/pkg/uast"
@@ -48,6 +49,8 @@ func (f *Formatter) formatStatement(stmt uast.Statement, indent int) string {
 	case *uast.VariableDeclaration:
 		var sb strings.Builder
 		sb.WriteString(prefix)
+
+		sb.WriteString(f.formatVisibility(s.Visibility))
 
 		if s.IsMutable {
 			if f.profile.VarDecl != "" {
@@ -218,6 +221,7 @@ func (f *Formatter) formatStatement(stmt uast.Statement, indent int) string {
 	case *uast.FunctionDeclaration:
 		var sb strings.Builder
 		sb.WriteString(prefix)
+		sb.WriteString(f.formatVisibility(s.Visibility))
 		sb.WriteString(f.profile.Func)
 		sb.WriteString(" ")
 		sb.WriteString(s.Name)
@@ -292,6 +296,83 @@ func (f *Formatter) formatStatement(stmt uast.Statement, indent int) string {
 			sb.WriteString("\n")
 		}
 		sb.WriteString(prefix + "}")
+		return sb.String()
+
+	case *uast.VisibilityStatement:
+		var sb strings.Builder
+		sb.WriteString(prefix)
+		switch f.profile.Name {
+		case "javascript":
+			sb.WriteString("export { ")
+			sb.WriteString(strings.Join(s.Identifiers, ", "))
+			sb.WriteString(" }")
+		case "pythonic":
+			quoted := make([]string, len(s.Identifiers))
+			for i, id := range s.Identifiers {
+				quoted[i] = strconv.Quote(id)
+			}
+			sb.WriteString("__all__ = [")
+			sb.WriteString(strings.Join(quoted, ", "))
+			sb.WriteString("]")
+		default:
+			visStr := f.formatVisibility(&s.Visibility)
+			sb.WriteString(visStr)
+			sb.WriteString("{ ")
+			sb.WriteString(strings.Join(s.Identifiers, ", "))
+			sb.WriteString(" }")
+		}
+		return sb.String()
+
+	case *uast.ImportDeclaration:
+		var sb strings.Builder
+		sb.WriteString(prefix)
+		switch f.profile.Name {
+		case "javascript":
+			if len(s.Specifiers) == 1 && s.Specifiers[0].IsAll {
+				sb.WriteString(fmt.Sprintf("import * as %s from \"%s\"", s.Specifiers[0].Local, s.Source))
+			} else {
+				specs := []string{}
+				for _, spec := range s.Specifiers {
+					if spec.Local != "" && spec.Local != spec.Imported {
+						specs = append(specs, fmt.Sprintf("%s as %s", spec.Imported, spec.Local))
+					} else {
+						specs = append(specs, spec.Imported)
+					}
+				}
+				sb.WriteString(fmt.Sprintf("import { %s } from \"%s\"", strings.Join(specs, ", "), s.Source))
+			}
+		case "pythonic":
+			if len(s.Specifiers) == 1 && s.Specifiers[0].IsAll {
+				sb.WriteString(fmt.Sprintf("import \"%s\" as %s", s.Source, s.Specifiers[0].Local))
+			} else {
+				specs := []string{}
+				for _, spec := range s.Specifiers {
+					if spec.Local != "" && spec.Local != spec.Imported {
+						specs = append(specs, fmt.Sprintf("%s as %s", spec.Imported, spec.Local))
+					} else {
+						specs = append(specs, spec.Imported)
+					}
+				}
+				sb.WriteString(fmt.Sprintf("from \"%s\" import %s", s.Source, strings.Join(specs, ", ")))
+			}
+		default:
+			impWord := "ambil"
+			fromWord := "dari"
+			asWord := "sebagai"
+			if len(s.Specifiers) == 1 && s.Specifiers[0].IsAll {
+				sb.WriteString(fmt.Sprintf("%s * %s %s %s \"%s\"", impWord, asWord, s.Specifiers[0].Local, fromWord, s.Source))
+			} else {
+				specs := []string{}
+				for _, spec := range s.Specifiers {
+					if spec.Local != "" && spec.Local != spec.Imported {
+						specs = append(specs, fmt.Sprintf("%s %s %s", spec.Imported, asWord, spec.Local))
+					} else {
+						specs = append(specs, spec.Imported)
+					}
+				}
+				sb.WriteString(fmt.Sprintf("%s { %s } %s \"%s\"", impWord, strings.Join(specs, ", "), fromWord, s.Source))
+			}
+		}
 		return sb.String()
 	}
 
@@ -404,5 +485,50 @@ func isMajorBlock(stmt uast.Statement) bool {
 		return true
 	default:
 		return false
+	}
+}
+
+func (f *Formatter) formatVisibility(vis *uast.Visibility) string {
+	if vis == nil {
+		return ""
+	}
+	switch f.profile.Name {
+	case "javascript":
+		switch vis.Kind {
+		case uast.VisibilityPublic:
+			return "export "
+		case uast.VisibilityModule:
+			return "/* @privat-modul */ export "
+		case uast.VisibilityAllowlist:
+			return fmt.Sprintf("/* @privat-%v */ export ", vis.Targets)
+		default:
+			return ""
+		}
+	case "pythonic":
+		switch vis.Kind {
+		case uast.VisibilityModule:
+			return "# @privat-modul\n"
+		case uast.VisibilityAllowlist:
+			return fmt.Sprintf("# @privat-%v\n", vis.Targets)
+		default:
+			return ""
+		}
+	default:
+		switch vis.Kind {
+		case uast.VisibilityPublic:
+			return "publik! "
+		case uast.VisibilityModule:
+			return "privat-modul! "
+		case uast.VisibilityPrivate:
+			return "privat! "
+		case uast.VisibilityAllowlist:
+			targets := make([]string, len(vis.Targets))
+			for i, t := range vis.Targets {
+				targets[i] = strconv.Quote(t)
+			}
+			return fmt.Sprintf("privat-[%s]! ", strings.Join(targets, ", "))
+		default:
+			return ""
+		}
 	}
 }

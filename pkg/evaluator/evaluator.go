@@ -2,6 +2,7 @@ package evaluator
 
 import (
 	"fmt"
+	"path/filepath"
 	"sync"
 
 	"celang/pkg/uast"
@@ -39,7 +40,7 @@ func Eval(node uast.Node, env *Environment) Object {
 				return val
 			}
 		}
-		if _, err := env.Define(n.Name, val, n.IsMutable, n.TypeHint); err != nil {
+		if _, err := env.DefineWithVisibility(n.Name, val, n.IsMutable, n.TypeHint, n.Visibility); err != nil {
 			return newError(n.GetMetadata(), err.Error(), "Gunakan nama variabel yang berbeda.")
 		}
 		return val
@@ -217,8 +218,61 @@ func Eval(node uast.Node, env *Environment) Object {
 			Body:       n.Body,
 			Env:        env,
 		}
-		env.Define(n.Name, fn, false, "function")
+		env.DefineWithVisibility(n.Name, fn, false, "function", n.Visibility)
 		return fn
+
+	case *uast.VisibilityStatement:
+		for _, ident := range n.Identifiers {
+			if err := env.SetVisibility(ident, &n.Visibility); err != nil {
+				return newError(n.GetMetadata(), err.Error(), fmt.Sprintf("Pastikan simbol '%s' didefinisikan sebelum mengatur visibilitasnya.", ident))
+			}
+		}
+		return NULL
+
+	case *uast.ImportDeclaration:
+		targetAbsPath, err := resolveModulePath(env.FilePath, n.Source)
+		if err != nil {
+			return newError(n.GetMetadata(), err.Error(), "Pastikan path modul benar dan file tersebut ada.")
+		}
+		targetEnv, err := loadModule(targetAbsPath, env)
+		if err != nil {
+			return newError(n.GetMetadata(), err.Error(), "")
+		}
+
+		callerFile := env.FilePath
+		callerRoot := env.ModuleRoot
+		targetFile := targetEnv.FilePath
+		targetRoot := targetEnv.ModuleRoot
+
+		for _, spec := range n.Specifiers {
+			if spec.IsAll {
+				// Namespace import: ambil * sebagai math dari "..."
+				mapPairs := make(map[string]Object)
+				mapOrder := []string{}
+				for name, entry := range targetEnv.AllEntries() {
+					if err := checkVisibilityAccess(callerFile, callerRoot, targetFile, targetRoot, name, entry.Visibility); err == nil {
+						mapPairs[name] = entry.Current()
+						mapOrder = append(mapOrder, name)
+					}
+				}
+				obj := &Map{Pairs: mapPairs, Order: mapOrder}
+				if _, err := env.Define(spec.Local, obj, true, "Map"); err != nil {
+					return newError(n.GetMetadata(), err.Error(), "")
+				}
+			} else {
+				entry, ok := targetEnv.GetEntry(spec.Imported)
+				if !ok {
+					return newError(n.GetMetadata(), fmt.Sprintf("Simbol '%s' tidak ditemukan di berkas '%s'", spec.Imported, filepath.Base(targetFile)), "Pastikan nama simbol dieja dengan benar.")
+				}
+				if err := checkVisibilityAccess(callerFile, callerRoot, targetFile, targetRoot, spec.Imported, entry.Visibility); err != nil {
+					return newError(n.GetMetadata(), err.Error(), "Pastikan aturan visibilitas pada file target mengizinkan akses dari file ini.")
+				}
+				if _, err := env.Define(spec.Local, entry.Current(), true, entry.TypeHint); err != nil {
+					return newError(n.GetMetadata(), err.Error(), "")
+				}
+			}
+		}
+		return NULL
 
 	case *uast.ReturnStatement:
 		var val Object = NULL

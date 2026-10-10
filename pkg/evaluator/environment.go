@@ -3,15 +3,18 @@ package evaluator
 import (
 	"fmt"
 	"sync"
+
+	"celang/pkg/uast"
 )
 
 // VariableEntry stores the state and timeline history for a variable.
 // This fulfills the "Time-Travel Variables" architecture.
 type VariableEntry struct {
-	Name      string
-	History   []Object
-	IsMutable bool
-	TypeHint  string
+	Name       string
+	History    []Object
+	IsMutable  bool
+	TypeHint   string
+	Visibility *uast.Visibility
 }
 
 // Current returns the most recent value of the variable.
@@ -38,38 +41,95 @@ func (ve *VariableEntry) Initial() Object {
 	return ve.History[0]
 }
 
+// ModuleRegistry caches evaluated modules across imports to prevent duplicate execution and circular loops.
+type ModuleRegistry struct {
+	mu      sync.RWMutex
+	modules map[string]*Environment
+}
+
+func NewModuleRegistry() *ModuleRegistry {
+	return &ModuleRegistry{
+		modules: make(map[string]*Environment),
+	}
+}
+
 // Environment manages variable bindings across lexical scopes with thread-safety for goroutines.
 type Environment struct {
-	mu    sync.RWMutex
-	store map[string]*VariableEntry
-	outer *Environment
+	mu             sync.RWMutex
+	store          map[string]*VariableEntry
+	outer          *Environment
+	FilePath       string
+	ModuleRoot     string
+	ModuleRegistry *ModuleRegistry
 }
 
 func NewEnvironment() *Environment {
 	return &Environment{
-		store: make(map[string]*VariableEntry),
+		store:          make(map[string]*VariableEntry),
+		ModuleRegistry: NewModuleRegistry(),
 	}
 }
 
 func NewEnclosedEnvironment(outer *Environment) *Environment {
 	env := NewEnvironment()
 	env.outer = outer
+	if outer != nil {
+		env.FilePath = outer.FilePath
+		env.ModuleRoot = outer.ModuleRoot
+		env.ModuleRegistry = outer.ModuleRegistry
+	}
 	return env
 }
 
 // Define declares a new variable in the current scope with an initial value and time-travel history.
+// By default, visibility is private (VisibilityPrivate / privat!).
 func (e *Environment) Define(name string, val Object, isMutable bool, typeHint string) (*VariableEntry, error) {
+	return e.DefineWithVisibility(name, val, isMutable, typeHint, &uast.Visibility{Kind: uast.VisibilityPrivate})
+}
+
+// DefineWithVisibility declares a variable with an explicit visibility scope.
+func (e *Environment) DefineWithVisibility(name string, val Object, isMutable bool, typeHint string, vis *uast.Visibility) (*VariableEntry, error) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
+	if vis == nil {
+		vis = &uast.Visibility{Kind: uast.VisibilityPrivate}
+	}
+
 	entry := &VariableEntry{
-		Name:      name,
-		History:   []Object{val},
-		IsMutable: isMutable,
-		TypeHint:  typeHint,
+		Name:       name,
+		History:    []Object{val},
+		IsMutable:  isMutable,
+		TypeHint:   typeHint,
+		Visibility: vis,
 	}
 	e.store[name] = entry
 	return entry, nil
+}
+
+// SetVisibility updates the visibility of an existing symbol in this scope.
+func (e *Environment) SetVisibility(name string, vis *uast.Visibility) error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	entry, ok := e.store[name]
+	if !ok {
+		return fmt.Errorf("simbol '%s' belum didefinisikan", name)
+	}
+	entry.Visibility = vis
+	return nil
+}
+
+// AllEntries returns a snapshot of all variables and their metadata in this scope.
+func (e *Environment) AllEntries() map[string]*VariableEntry {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	snapshot := make(map[string]*VariableEntry, len(e.store))
+	for k, v := range e.store {
+		snapshot[k] = v
+	}
+	return snapshot
 }
 
 // Assign updates an existing variable and records the change into its timeline history.

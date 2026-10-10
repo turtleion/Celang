@@ -1,0 +1,9 @@
+// Program Utama yang mengimpor dari modul_matematika
+
+ambil { tambah, KODE_RAHASIA } dari "./modul_matematika/matematika.ce"
+ambil * sebagai math dari "./modul_matematika/matematika.ce"
+
+buat total = tambah(25, 75)
+cetak("Total penjumlahan:", total)
+cetak("Kode rahasia allowlist:", KODE_RAHASIA)
+cetak("Penjumlahan via namespace math:", math.tambah(100, 200))

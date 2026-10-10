@@ -1,0 +1,17 @@
+// Modul Matematika Celang
+
+// 1. Fungsi Publik (bisa diakses siapa saja)
+publik! fungsi tambah(a, b) {
+    kembalikan a + b
+}
+
+// 2. Fungsi Khusus Modul (hanya bisa diakses berkas di dalam modul ini)
+privat-modul! fungsi rumus_internal(x) {
+    kembalikan x * 42
+}
+
+// 3. Variabel Khusus Allowlist (hanya bisa diakses oleh ../utama.ce)
+privat-["../utama.ce"]! konstanta KODE_RAHASIA = 9999
+
+// 4. Variabel Default Privat (tidak bisa diakses luar sama sekali)
+buat catatan_rahasia = "catatan internal"
