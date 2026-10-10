@@ -132,11 +132,7 @@ type Array struct {
 
 func (a *Array) Type() ObjectType { return ARRAY_OBJ }
 func (a *Array) Inspect() string {
-	var elements []string
-	for _, el := range a.Elements {
-		elements = append(elements, el.Inspect())
-	}
-	return fmt.Sprintf("[%s]", strings.Join(elements, ", "))
+	return inspectObjectWithVisited(a, make(map[any]bool))
 }
 
 // Map represents a key-value dictionary.
@@ -147,12 +143,7 @@ type Map struct {
 
 func (m *Map) Type() ObjectType { return MAP_OBJ }
 func (m *Map) Inspect() string {
-	var pairs []string
-	for _, k := range m.Order {
-		v := m.Pairs[k]
-		pairs = append(pairs, fmt.Sprintf("%q: %s", k, v.Inspect()))
-	}
-	return fmt.Sprintf("{%s}", strings.Join(pairs, ", "))
+	return inspectObjectWithVisited(m, make(map[any]bool))
 }
 
 // Pointer represents a memory reference to a variable in an Environment.
@@ -190,13 +181,56 @@ type StructInstance struct {
 
 func (s *StructInstance) Type() ObjectType { return STRUCT_INSTANCE_OBJ }
 func (s *StructInstance) Inspect() string {
-	var parts []string
-	for _, f := range s.Def.Fields {
-		val := s.Fields[f.Name]
-		if val == nil {
-			val = &Null{}
-		}
-		parts = append(parts, fmt.Sprintf("%s: %s", f.Name, val.Inspect()))
+	return inspectObjectWithVisited(s, make(map[any]bool))
+}
+
+func inspectObjectWithVisited(obj Object, visited map[any]bool) string {
+	if obj == nil {
+		return "null"
 	}
-	return fmt.Sprintf("%s{%s}", s.Def.Name, strings.Join(parts, ", "))
+	switch o := obj.(type) {
+	case *StructInstance:
+		if visited[o] {
+			return fmt.Sprintf("%s{...}", o.Def.Name)
+		}
+		visited[o] = true
+		defer delete(visited, o)
+		var parts []string
+		for _, f := range o.Def.Fields {
+			val := o.Fields[f.Name]
+			if val == nil {
+				val = &Null{}
+			}
+			parts = append(parts, fmt.Sprintf("%s: %s", f.Name, inspectObjectWithVisited(val, visited)))
+		}
+		return fmt.Sprintf("%s{%s}", o.Def.Name, strings.Join(parts, ", "))
+
+	case *Array:
+		if visited[o] {
+			return "[...]"
+		}
+		visited[o] = true
+		defer delete(visited, o)
+		var elements []string
+		for _, el := range o.Elements {
+			elements = append(elements, inspectObjectWithVisited(el, visited))
+		}
+		return fmt.Sprintf("[%s]", strings.Join(elements, ", "))
+
+	case *Map:
+		if visited[o] {
+			return "{...}"
+		}
+		visited[o] = true
+		defer delete(visited, o)
+		var pairs []string
+		for _, k := range o.Order {
+			v := o.Pairs[k]
+			pairs = append(pairs, fmt.Sprintf("%q: %s", k, inspectObjectWithVisited(v, visited)))
+		}
+		return fmt.Sprintf("{%s}", strings.Join(pairs, ", "))
+
+	default:
+		return o.Inspect()
+	}
 }

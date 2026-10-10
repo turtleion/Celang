@@ -1663,32 +1663,41 @@ func (p *Parser) parseMapLiteral() uast.Expression {
 	p.nextToken()
 	key := p.parseExpression(LOWEST)
 
+	var val uast.Expression
 	if p.peekTokenIs(COLON) || p.peekTokenIs(TYPE_ASSIGN) {
 		p.nextToken()
+		p.nextToken() // move to value
+		val = p.parseExpression(LOWEST)
+	} else if id, ok := key.(*uast.Identifier); ok && (p.peekTokenIs(COMMA) || p.peekTokenIs(RBRACE)) {
+		// Shorthand property: { a, b }
+		val = id
 	} else {
 		p.addError("Diharapkan ':' atau 'itu' antara kunci dan nilai map")
 		return nil
 	}
 
-	p.nextToken() // move to value
-	val := p.parseExpression(LOWEST)
-
 	props = append(props, uast.MapProperty{Key: key, Value: val})
 
 	for p.peekTokenIs(COMMA) {
 		p.nextToken() // eat ','
+		if p.peekTokenIs(RBRACE) {
+			break // allow trailing comma
+		}
 		p.nextToken() // move to next key
 		nextKey := p.parseExpression(LOWEST)
 
+		var nextVal uast.Expression
 		if p.peekTokenIs(COLON) || p.peekTokenIs(TYPE_ASSIGN) {
 			p.nextToken()
+			p.nextToken()
+			nextVal = p.parseExpression(LOWEST)
+		} else if id, ok := nextKey.(*uast.Identifier); ok && (p.peekTokenIs(COMMA) || p.peekTokenIs(RBRACE)) {
+			nextVal = id
 		} else {
 			p.addError("Diharapkan ':' atau 'itu' antara kunci dan nilai map")
 			return nil
 		}
 
-		p.nextToken()
-		nextVal := p.parseExpression(LOWEST)
 		props = append(props, uast.MapProperty{Key: nextKey, Value: nextVal})
 	}
 

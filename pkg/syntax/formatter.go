@@ -554,7 +554,17 @@ func (f *Formatter) formatStatement(stmt uast.Statement, indent int) string {
 		}
 		for _, method := range s.Methods {
 			sb.WriteString(strings.Repeat(" ", (indent+1)*f.profile.IndentWidth))
-			sb.WriteString(fmt.Sprintf("fungsi %s(", method.Name))
+			if f.profile.Name == "pythonic" {
+				sb.WriteString(fmt.Sprintf("def %s(", method.Name))
+			} else if f.profile.Name == "javascript" {
+				sb.WriteString(fmt.Sprintf("%s(", method.Name))
+			} else {
+				fnKw := f.profile.Func
+				if fnKw == "" {
+					fnKw = "fungsi"
+				}
+				sb.WriteString(fmt.Sprintf("%s %s(", fnKw, method.Name))
+			}
 			var params []string
 			for _, p := range method.Parameters {
 				pStr := p.Name

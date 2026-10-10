@@ -123,6 +123,10 @@ func convertGoJSONToCelang(val any) Object {
 }
 
 func convertCelangToJSONNative(obj Object) (any, error) {
+	return convertCelangToJSONNativeWithVisited(obj, make(map[any]bool))
+}
+
+func convertCelangToJSONNativeWithVisited(obj Object, visited map[any]bool) (any, error) {
 	if obj == nil {
 		return nil, nil
 	}
@@ -139,9 +143,14 @@ func convertCelangToJSONNative(obj Object) (any, error) {
 	case *String:
 		return o.Value, nil
 	case *Array:
+		if visited[o] {
+			return nil, fmt.Errorf("referensi sirkular terdeteksi pada array saat serialisasi JSON")
+		}
+		visited[o] = true
+		defer delete(visited, o)
 		res := make([]any, len(o.Elements))
 		for i, el := range o.Elements {
-			c, err := convertCelangToJSONNative(el)
+			c, err := convertCelangToJSONNativeWithVisited(el, visited)
 			if err != nil {
 				return nil, err
 			}
@@ -149,9 +158,29 @@ func convertCelangToJSONNative(obj Object) (any, error) {
 		}
 		return res, nil
 	case *Map:
+		if visited[o] {
+			return nil, fmt.Errorf("referensi sirkular terdeteksi pada map saat serialisasi JSON")
+		}
+		visited[o] = true
+		defer delete(visited, o)
 		res := make(map[string]any)
 		for k, v := range o.Pairs {
-			c, err := convertCelangToJSONNative(v)
+			c, err := convertCelangToJSONNativeWithVisited(v, visited)
+			if err != nil {
+				return nil, err
+			}
+			res[k] = c
+		}
+		return res, nil
+	case *StructInstance:
+		if visited[o] {
+			return nil, fmt.Errorf("referensi sirkular terdeteksi pada bentuk '%s' saat serialisasi JSON", o.Def.Name)
+		}
+		visited[o] = true
+		defer delete(visited, o)
+		res := make(map[string]any)
+		for k, v := range o.Fields {
+			c, err := convertCelangToJSONNativeWithVisited(v, visited)
 			if err != nil {
 				return nil, err
 			}
@@ -159,7 +188,7 @@ func convertCelangToJSONNative(obj Object) (any, error) {
 		}
 		return res, nil
 	case *ReturnValue:
-		return convertCelangToJSONNative(o.Value)
+		return convertCelangToJSONNativeWithVisited(o.Value, visited)
 	default:
 		return nil, fmt.Errorf("tipe %s tidak dapat diserialisasi ke JSON", obj.Type())
 	}

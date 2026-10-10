@@ -66,10 +66,15 @@ func Eval(node uast.Node, env *Environment) Object {
 			}
 		case uast.DestructureMap:
 			mp, isMap := val.(*Map)
+			inst, isInst := val.(*StructInstance)
 			for _, b := range n.Bindings {
 				var item Object = NULL
 				if isMap {
 					if v, ok := mp.Pairs[b.SourceKey]; ok {
+						item = v
+					}
+				} else if isInst {
+					if v, ok := inst.Fields[b.SourceKey]; ok {
 						item = v
 					}
 				}
@@ -103,10 +108,15 @@ func Eval(node uast.Node, env *Environment) Object {
 			}
 		case uast.DestructureMap:
 			mp, isMap := val.(*Map)
+			inst, isInst := val.(*StructInstance)
 			for _, b := range n.Bindings {
 				var item Object = NULL
 				if isMap {
 					if v, ok := mp.Pairs[b.SourceKey]; ok {
+						item = v
+					}
+				} else if isInst {
+					if v, ok := inst.Fields[b.SourceKey]; ok {
 						item = v
 					}
 				}
@@ -600,32 +610,12 @@ func Eval(node uast.Node, env *Environment) Object {
 		return val
 
 	case *uast.MemberExpression:
-		// Check for Time-Travel Variable access (e.g. x.sebelumnya, x.awal, x.histori)
-		if id, ok := n.Object.(*uast.Identifier); ok {
-			entry, exists := env.GetEntry(id.Name)
-			if exists {
-				switch n.Property {
-				case "sebelumnya", "prev", "previous":
-					prev, hasPrev := entry.Previous()
-					if !hasPrev {
-						return NULL
-					}
-					return prev
-				case "awal", "initial", "first":
-					return entry.Initial()
-				case "histori", "history":
-					arr := &Array{Elements: make([]Object, len(entry.History))}
-					copy(arr.Elements, entry.History)
-					return arr
-				}
-			}
-		}
-
-		// Fallback to evaluating object
 		obj := Eval(n.Object, env)
 		if isError(obj) {
 			return obj
 		}
+
+		// 1. Array index access (e.g. arr[0] or arr.0)
 		if arr, ok := obj.(*Array); ok {
 			var intIdx int64
 			var hasInt bool
@@ -646,13 +636,8 @@ func Eval(node uast.Node, env *Environment) Object {
 				return newError(n.GetMetadata(), fmt.Sprintf("Indeks array %d di luar jangkauan (panjang: %d)", intIdx, len(arr.Elements)), "Gunakan indeks yang valid antara 0 hingga panjang array - 1.")
 			}
 		}
-		if mp, ok := obj.(*Map); ok {
-			key := n.Property
-			if val, exists := mp.Pairs[key]; exists {
-				return val
-			}
-			return NULL
-		}
+
+		// 2. Struct instance field or method access
 		if inst, ok := obj.(*StructInstance); ok {
 			prop := n.Property
 			if val, exists := inst.Fields[prop]; exists {
@@ -670,8 +655,47 @@ func Eval(node uast.Node, env *Environment) Object {
 					Env:        boundEnv,
 				}
 			}
-			return newError(n.GetMetadata(), fmt.Sprintf("Properti atau fungsi '%s' tidak ditemukan pada bentuk '%s'", prop, inst.Def.Name), "Pastikan nama field atau fungsi dieja dengan benar.")
 		}
+
+		// 3. Map property access
+		if mp, ok := obj.(*Map); ok {
+			key := n.Property
+			if val, exists := mp.Pairs[key]; exists {
+				return val
+			}
+		}
+
+		// 4. Time-Travel Variable access fallback (e.g. x.sebelumnya, x.awal, x.histori)
+		if id, ok := n.Object.(*uast.Identifier); ok {
+			entry, exists := env.GetEntry(id.Name)
+			if exists {
+				switch n.Property {
+				case "sebelumnya", "prev", "previous":
+					prev, hasPrev := entry.Previous()
+					if !hasPrev {
+						return NULL
+					}
+					return prev
+				case "awal", "initial", "first":
+					return entry.Initial()
+				case "histori", "history":
+					arr := &Array{Elements: make([]Object, len(entry.History))}
+					copy(arr.Elements, entry.History)
+					return arr
+				}
+			}
+		}
+
+		// 5. Missing property on Map returns NULL
+		if _, ok := obj.(*Map); ok {
+			return NULL
+		}
+
+		// 6. Missing property on Struct reports friendly error
+		if inst, ok := obj.(*StructInstance); ok {
+			return newError(n.GetMetadata(), fmt.Sprintf("Properti atau fungsi '%s' tidak ditemukan pada bentuk '%s'", n.Property, inst.Def.Name), "Pastikan nama field atau fungsi dieja dengan benar.")
+		}
+
 		return newError(n.GetMetadata(), fmt.Sprintf("Properti '%s' tidak ditemukan pada objek", n.Property), "Pastikan properti yang diakses valid.")
 
 	case *uast.BinaryExpression:
@@ -1050,7 +1074,11 @@ func applyFunction(callee Object, args []Object, meta *uast.NodeMetadata) Object
 				if v, ok := mp.Pairs[f.Name]; ok {
 					instance.Fields[f.Name] = v
 				} else if f.DefaultValue != nil {
-					instance.Fields[f.Name] = Eval(f.DefaultValue, instEnv)
+					defVal := Eval(f.DefaultValue, instEnv)
+					if isError(defVal) {
+						return defVal
+					}
+					instance.Fields[f.Name] = defVal
 				} else {
 					instance.Fields[f.Name] = NULL
 				}
@@ -1060,7 +1088,11 @@ func applyFunction(callee Object, args []Object, meta *uast.NodeMetadata) Object
 				if i < len(args) {
 					instance.Fields[f.Name] = args[i]
 				} else if f.DefaultValue != nil {
-					instance.Fields[f.Name] = Eval(f.DefaultValue, instEnv)
+					defVal := Eval(f.DefaultValue, instEnv)
+					if isError(defVal) {
+						return defVal
+					}
+					instance.Fields[f.Name] = defVal
 				} else {
 					instance.Fields[f.Name] = NULL
 				}

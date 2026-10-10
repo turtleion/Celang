@@ -2,6 +2,7 @@ package evaluator_test
 
 import (
 	"bytes"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -717,6 +718,95 @@ func TestEvaluator_Structs(t *testing.T) {
 	}
 }
 
+func TestAudit_EdgeCasesAndCollisions(t *testing.T) {
+	// 1. Test Map with key 'awal' or 'sebelumnya'
+	inputMap := `
+	buat data = { "awal": 99, "sebelumnya": 88 }
+	[data.awal, data.sebelumnya]
+	`
+	l := parser.NewLexer(inputMap)
+	p := parser.NewParser(l)
+	prog, err := p.ParseProgram()
+	if err != nil {
+		t.Fatalf("parser error: %v", err)
+	}
+	env := evaluator.NewEnvironment()
+	evaluator.RegisterBuiltins(env, nil)
+	res := evaluator.Eval(prog, env)
+	t.Logf("Result of map with 'awal'/'sebelumnya': %v", res.Inspect())
 
+	// 2. Test Struct destructuring
+	inputStructDestruct := `
+	bentuk Point {
+		x itu Angka,
+		y itu Angka
+	}
+	buat pt = Point(10, 20)
+	buat { x, y } = pt
+	[x, y]
+	`
+	l2 := parser.NewLexer(inputStructDestruct)
+	p2 := parser.NewParser(l2)
+	prog2, err2 := p2.ParseProgram()
+	if err2 != nil {
+		t.Fatalf("parser error: %v", err2)
+	}
+	res2 := evaluator.Eval(prog2, env)
+	t.Logf("Result of struct destructuring: %v", res2.Inspect())
 
+	jsonProg, _ := parser.NewParser(parser.NewLexer(`json.format(pt)`)).ParseProgram()
+	jsonRes := evaluator.Eval(jsonProg, env)
+	t.Logf("Result of json.format(pt): %v", jsonRes.Inspect())
 
+	// 3. Test Destructuring Assignment without buat: { a, b } = obj
+	inputDestructAssign := `
+	buat a = 1
+	buat b = 2
+	{ a, b } = { "a": 100, "b": 200 }
+	[a, b]
+	`
+	l3 := parser.NewLexer(inputDestructAssign)
+	p3 := parser.NewParser(l3)
+	prog3, err3 := p3.ParseProgram()
+	if err3 != nil {
+		t.Logf("Parser error on { a, b } = obj: %v", err3)
+	} else {
+		res3 := evaluator.Eval(prog3, env)
+		t.Logf("Result of { a, b } = obj: %v", res3.Inspect())
+	}
+
+	// 4. Test Circular Struct Inspect
+	inputCircular := `
+	bentuk Node {
+		buat val,
+		buat next
+	}
+	buat n = Node(1, null)
+	n.next = n
+	`
+	l4 := parser.NewLexer(inputCircular)
+	p4 := parser.NewParser(l4)
+	prog4, err4 := p4.ParseProgram()
+	if err4 != nil {
+		t.Fatalf("parser error: %v", err4)
+	}
+	res4 := evaluator.Eval(prog4, env)
+	nObj, ok := env.Get("n")
+	if ok {
+		t.Logf("n found, type: %s", nObj.Type())
+		inspectStr := nObj.Inspect()
+		t.Logf("Circular struct inspect result: %s", inspectStr)
+		if !strings.Contains(inspectStr, "Node{...}") {
+			t.Errorf("Expected cycle detection in Inspect, got: %s", inspectStr)
+		}
+
+		// Also verify json.format handles cycle cleanly with error
+		circJSONProg, _ := parser.NewParser(parser.NewLexer(`json.format(n)`)).ParseProgram()
+		circJSONRes := evaluator.Eval(circJSONProg, env)
+		t.Logf("Result of json.format on circular struct: %s", circJSONRes.Inspect())
+		if circErr, ok := circJSONRes.(*evaluator.Error); !ok || !strings.Contains(circErr.Message, "sirkular") {
+			t.Errorf("Expected circular error from json.format, got: %s", circJSONRes.Inspect())
+		}
+	}
+	_ = res4
+}

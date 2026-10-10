@@ -4,10 +4,14 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
+	"sync"
 	"time"
 )
 
-var rnd = rand.New(rand.NewSource(time.Now().UnixNano()))
+var (
+	rndMu sync.Mutex
+	rnd   = rand.New(rand.NewSource(time.Now().UnixNano()))
+)
 
 func initStdlibMatematika(env *Environment) {
 	// akar / sqrt
@@ -128,7 +132,10 @@ func initStdlibMatematika(env *Environment) {
 	acakFn := &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) == 0 {
-				return &Float{Value: rnd.Float64()}
+				rndMu.Lock()
+				val := rnd.Float64()
+				rndMu.Unlock()
+				return &Float{Value: val}
 			}
 			if len(args) == 2 {
 				minVal, _, _, ok1 := CoerceToNumeric(args[0])
@@ -140,7 +147,9 @@ func initStdlibMatematika(env *Environment) {
 					minVal, maxVal = maxVal, minVal
 				}
 				diff := maxVal - minVal + 1
+				rndMu.Lock()
 				res := minVal + rnd.Int63n(diff)
+				rndMu.Unlock()
 				return &Integer{Value: res}
 			}
 			return newError(nil, "matematika.acak mengharapkan 0 argumen atau 2 argumen: acak(min, max)", "")
