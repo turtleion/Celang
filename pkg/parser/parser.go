@@ -11,35 +11,37 @@ import (
 const (
 	_ int = iota
 	LOWEST
-	OR_PREC     // atau, ||
-	AND_PREC    // dan, &&
-	EQUALS      // ==, !=
-	LESSGREATER // <, >, <=, >=
-	SUM         // +, -
-	PRODUCT     // *, /, %
-	PREFIX      // -x, !x, bukan x
-	CALL        // hitung(x)
-	INDEX       // arr[0], map["kunci"], obj.prop
+	PIPELINE_PREC // |>
+	OR_PREC       // atau, ||
+	AND_PREC      // dan, &&
+	EQUALS        // ==, !=
+	LESSGREATER   // <, >, <=, >=
+	SUM           // +, -
+	PRODUCT       // *, /, %
+	PREFIX        // -x, !x, bukan x
+	CALL          // hitung(x)
+	INDEX         // arr[0], map["kunci"], obj.prop
 )
 
 var precedences = map[TokenType]int{
-	OR:       OR_PREC,
-	PIPE:     OR_PREC,
-	AND:      AND_PREC,
-	EQ:       EQUALS,
-	NOT_EQ:   EQUALS,
-	LT:       LESSGREATER,
-	GT:       LESSGREATER,
-	LT_EQ:    LESSGREATER,
-	GT_EQ:    LESSGREATER,
-	PLUS:     SUM,
-	MINUS:    SUM,
-	SLASH:    PRODUCT,
-	ASTERISK: PRODUCT,
-	PERCENT:  PRODUCT,
-	LPAREN:   CALL,
-	LBRACKET: INDEX,
-	DOT:      INDEX,
+	PIPE_ARROW: PIPELINE_PREC,
+	OR:         OR_PREC,
+	PIPE:       OR_PREC,
+	AND:        AND_PREC,
+	EQ:         EQUALS,
+	NOT_EQ:     EQUALS,
+	LT:         LESSGREATER,
+	GT:         LESSGREATER,
+	LT_EQ:      LESSGREATER,
+	GT_EQ:      LESSGREATER,
+	PLUS:       SUM,
+	MINUS:      SUM,
+	SLASH:      PRODUCT,
+	ASTERISK:   PRODUCT,
+	PERCENT:    PRODUCT,
+	LPAREN:     CALL,
+	LBRACKET:   INDEX,
+	DOT:        INDEX,
 }
 
 type (
@@ -82,8 +84,10 @@ func NewParser(l *Lexer) *Parser {
 	p.registerPrefix(LPAREN, p.parseGroupedExpression)
 	p.registerPrefix(LBRACKET, p.parseArrayLiteral)
 	p.registerPrefix(LBRACE, p.parseMapLiteral)
+	p.registerPrefix(FUNC, p.parseFunctionExpression)
 
 	p.infixParseFns = make(map[TokenType]infixParseFn)
+	p.registerInfix(PIPE_ARROW, p.parsePipelineExpression)
 	p.registerInfix(PLUS, p.parseInfixExpression)
 	p.registerInfix(MINUS, p.parseInfixExpression)
 	p.registerInfix(SLASH, p.parseInfixExpression)
@@ -998,7 +1002,9 @@ func (p *Parser) parseExpression(precedence int) uast.Expression {
 
 	for !p.peekTokenIs(SEMICOLON) && precedence < p.peekPrecedence() {
 		if p.peekToken.Line > p.curToken.Line && p.parenDepth == 0 {
-			break
+			if !p.peekTokenIs(PIPE_ARROW) && !p.peekTokenIs(DOT) {
+				break
+			}
 		}
 		infix := p.infixParseFns[p.peekToken.Type]
 		if infix == nil {
@@ -1112,6 +1118,58 @@ func (p *Parser) parseInfixExpression(left uast.Expression) uast.Expression {
 		Right:    right,
 	}
 }
+
+func (p *Parser) parsePipelineExpression(left uast.Expression) uast.Expression {
+	meta := p.currentMetadata()
+	p.nextToken() // eat '|>'
+	right := p.parseExpression(PIPELINE_PREC)
+	if right == nil {
+		p.addError("Diharapkan ekspresi fungsi setelah operator pipeline '|>'")
+		return nil
+	}
+
+	return &uast.PipelineExpression{
+		NodeType: uast.NodeTypePipelineExpression,
+		Metadata: meta,
+		Left:     left,
+		Right:    right,
+	}
+}
+
+func (p *Parser) parseFunctionExpression() uast.Expression {
+	meta := p.currentMetadata()
+	if p.peekTokenIs(IDENT) {
+		p.nextToken() // optional identifier for named function expression
+	}
+
+	if !p.expectPeek(LPAREN) {
+		return nil
+	}
+
+	params := p.parseFunctionParameters()
+
+	returnType := ""
+	if p.peekTokenIs(RETURN_TYPE) || p.peekTokenIs(ARROW) {
+		p.nextToken() // eat 'mengembalikan' or '->'
+		p.nextToken()
+		returnType = p.parseTypeHint()
+	}
+
+	if !p.expectPeek(LBRACE) {
+		return nil
+	}
+
+	body := p.parseBlockStatement()
+
+	return &uast.FunctionExpression{
+		NodeType:   uast.NodeTypeFunctionExpression,
+		Metadata:   meta,
+		Parameters: params,
+		Body:       body,
+		ReturnType: returnType,
+	}
+}
+
 
 func (p *Parser) parseGroupedExpression() uast.Expression {
 	p.parenDepth++

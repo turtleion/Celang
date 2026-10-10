@@ -374,3 +374,121 @@ func TestEvaluator_TryCatchAndThrow(t *testing.T) {
 	}
 }
 
+func TestEvaluator_PipelineOperator(t *testing.T) {
+	// Program 1: String pipeline: "  halo dunia  " |> potong_spasi() |> kapitalisasi()
+	env := evaluator.NewEnvironment()
+	evaluator.RegisterBuiltins(env, nil)
+
+	prog1 := uast.NewProgram(
+		uast.NewVarDecl("teks",
+			uast.NewPipelineExpr(
+				uast.NewPipelineExpr(
+					uast.NewStringLiteral("  halo dunia  "),
+					uast.NewCallExpr(uast.NewIdentifier("potong_spasi")),
+				),
+				uast.NewCallExpr(uast.NewIdentifier("kapitalisasi")),
+			),
+			false, "string",
+		),
+	)
+
+	evaluator.Eval(prog1, env)
+	teksVal, ok := env.Get("teks")
+	if !ok || teksVal.(*evaluator.String).Value != "HALO DUNIA" {
+		t.Fatalf("Expected teks='HALO DUNIA', got %+v", teksVal)
+	}
+
+	// Program 2: Pipeline with extra arguments: "Celang" |> sambung("Hebat")
+	prog2 := uast.NewProgram(
+		uast.NewFuncDecl("sambung",
+			[]uast.Parameter{{Name: "a"}, {Name: "b"}},
+			uast.NewBlock(
+				uast.NewReturn(uast.NewBinaryExpr(uast.NewBinaryExpr(uast.NewIdentifier("a"), "+", uast.NewStringLiteral(" ")), "+", uast.NewIdentifier("b"))),
+			),
+			"string",
+		),
+		uast.NewVarDecl("hasil_sambung",
+			uast.NewPipelineExpr(
+				uast.NewStringLiteral("Celang"),
+				uast.NewCallExpr(uast.NewIdentifier("sambung"), uast.NewStringLiteral("Hebat")),
+			),
+			false, "string",
+		),
+	)
+	evaluator.Eval(prog2, env)
+	sambungVal, ok := env.Get("hasil_sambung")
+	if !ok || sambungVal.(*evaluator.String).Value != "Celang Hebat" {
+		t.Fatalf("Expected hasil_sambung='Celang Hebat', got %+v", sambungVal)
+	}
+
+	// Program 3: Array transformation with anonymous functions
+	// [1, 2, 3, 4, 5, 6]
+	//     |> saring(fungsi(x) { kembalikan x % 2 == 0 })
+	//     |> petakan(fungsi(x) { kembalikan x * 10 })
+	prog3 := uast.NewProgram(
+		uast.NewVarDecl("angka",
+			uast.NewArrayLiteral(
+				uast.NewIntLiteral(1),
+				uast.NewIntLiteral(2),
+				uast.NewIntLiteral(3),
+				uast.NewIntLiteral(4),
+				uast.NewIntLiteral(5),
+				uast.NewIntLiteral(6),
+			),
+			false, "array",
+		),
+		uast.NewVarDecl("hasil_angka",
+			uast.NewPipelineExpr(
+				uast.NewPipelineExpr(
+					uast.NewIdentifier("angka"),
+					uast.NewCallExpr(
+						uast.NewIdentifier("saring"),
+						uast.NewFuncExpr(
+							[]uast.Parameter{{Name: "x"}},
+							uast.NewBlock(
+								uast.NewReturn(
+									uast.NewBinaryExpr(
+										uast.NewBinaryExpr(uast.NewIdentifier("x"), "%", uast.NewIntLiteral(2)),
+										"==",
+										uast.NewIntLiteral(0),
+									),
+								),
+							),
+							"bool",
+						),
+					),
+				),
+				uast.NewCallExpr(
+					uast.NewIdentifier("petakan"),
+					uast.NewFuncExpr(
+						[]uast.Parameter{{Name: "x"}},
+						uast.NewBlock(
+							uast.NewReturn(
+								uast.NewBinaryExpr(uast.NewIdentifier("x"), "*", uast.NewIntLiteral(10)),
+							),
+						),
+						"int",
+					),
+				),
+			),
+			false, "array",
+		),
+	)
+
+	evaluator.Eval(prog3, env)
+	hasilAngkaVal, ok := env.Get("hasil_angka")
+	if !ok {
+		t.Fatalf("Expected hasil_angka to exist")
+	}
+	arr, ok := hasilAngkaVal.(*evaluator.Array)
+	if !ok || len(arr.Elements) != 3 {
+		t.Fatalf("Expected 3 elements [20, 40, 60], got %v", hasilAngkaVal)
+	}
+	if arr.Elements[0].(*evaluator.Integer).Value != 20 ||
+		arr.Elements[1].(*evaluator.Integer).Value != 40 ||
+		arr.Elements[2].(*evaluator.Integer).Value != 60 {
+		t.Fatalf("Expected [20, 40, 60], got %v", arr.Inspect())
+	}
+}
+
+

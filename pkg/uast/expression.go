@@ -331,3 +331,73 @@ func (m *MapLiteral) UnmarshalJSON(data []byte) error {
 	m.Properties = raw.Properties
 	return nil
 }
+
+// PipelineExpression represents piping a value into a function (left |> right).
+type PipelineExpression struct {
+	NodeType NodeType      `json:"type"`
+	Metadata *NodeMetadata `json:"metadata,omitempty"`
+	Left     Expression    `json:"left"`
+	Right    Expression    `json:"right"`
+}
+
+func (p *PipelineExpression) Type() NodeType          { return NodeTypePipelineExpression }
+func (p *PipelineExpression) GetMetadata() *NodeMetadata { return p.Metadata }
+func (p *PipelineExpression) expressionNode()         {}
+
+func (p *PipelineExpression) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		NodeType NodeType        `json:"type"`
+		Metadata *NodeMetadata   `json:"metadata,omitempty"`
+		Left     json.RawMessage `json:"left"`
+		Right    json.RawMessage `json:"right"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	leftExpr, err := UnmarshalExpressionJSON(raw.Left)
+	if err != nil {
+		return fmt.Errorf("PipelineExpression.left unmarshal error: %w", err)
+	}
+	rightExpr, err := UnmarshalExpressionJSON(raw.Right)
+	if err != nil {
+		return fmt.Errorf("PipelineExpression.right unmarshal error: %w", err)
+	}
+	p.NodeType = NodeTypePipelineExpression
+	p.Metadata = raw.Metadata
+	p.Left = leftExpr
+	p.Right = rightExpr
+	return nil
+}
+
+// FunctionExpression represents an anonymous function literal (e.g., fungsi(x) { kembalikan x * 2 }).
+type FunctionExpression struct {
+	NodeType   NodeType        `json:"type"`
+	Metadata   *NodeMetadata   `json:"metadata,omitempty"`
+	Parameters []Parameter     `json:"parameters"`
+	ReturnType string          `json:"return_type,omitempty"`
+	Body       *BlockStatement `json:"body"`
+}
+
+func (f *FunctionExpression) Type() NodeType          { return NodeTypeFunctionExpression }
+func (f *FunctionExpression) GetMetadata() *NodeMetadata { return f.Metadata }
+func (f *FunctionExpression) expressionNode()         {}
+
+func (f *FunctionExpression) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		NodeType   NodeType        `json:"type"`
+		Metadata   *NodeMetadata   `json:"metadata,omitempty"`
+		Parameters []Parameter     `json:"parameters"`
+		ReturnType string          `json:"return_type,omitempty"`
+		Body       *BlockStatement `json:"body"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	f.NodeType = NodeTypeFunctionExpression
+	f.Metadata = raw.Metadata
+	f.Parameters = raw.Parameters
+	f.ReturnType = raw.ReturnType
+	f.Body = raw.Body
+	return nil
+}
+

@@ -187,6 +187,9 @@ func (l *Lexer) NextToken() Token {
 		if l.peekChar() == '|' {
 			l.readChar()
 			tok = Token{Type: OR, Literal: "||", Line: tok.Line, Column: tok.Column}
+		} else if l.peekChar() == '>' {
+			l.readChar()
+			tok = Token{Type: PIPE_ARROW, Literal: "|>", Line: tok.Line, Column: tok.Column}
 		} else {
 			tok = Token{Type: PIPE, Literal: "|", Line: tok.Line, Column: tok.Column}
 		}

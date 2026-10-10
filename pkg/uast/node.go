@@ -34,8 +34,10 @@ const (
 	NodeTypeUnaryExpression  NodeType = "UnaryExpression"
 	NodeTypeCallExpression   NodeType = "CallExpression"
 	NodeTypeMemberExpression NodeType = "MemberExpression"
-	NodeTypeArrayLiteral     NodeType = "ArrayLiteral"
-	NodeTypeMapLiteral       NodeType = "MapLiteral"
+	NodeTypeArrayLiteral        NodeType = "ArrayLiteral"
+	NodeTypeMapLiteral          NodeType = "MapLiteral"
+	NodeTypePipelineExpression  NodeType = "PipelineExpression"
+	NodeTypeFunctionExpression  NodeType = "FunctionExpression"
 )
 
 // Position captures source location information for LSP, tooling, and error reporting.

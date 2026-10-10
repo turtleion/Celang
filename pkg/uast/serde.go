@@ -93,6 +93,20 @@ func UnmarshalExpressionJSON(data []byte) (Expression, error) {
 		}
 		return &m, nil
 
+	case NodeTypePipelineExpression:
+		var pipe PipelineExpression
+		if err := json.Unmarshal(data, &pipe); err != nil {
+			return nil, err
+		}
+		return &pipe, nil
+
+	case NodeTypeFunctionExpression:
+		var fnExpr FunctionExpression
+		if err := json.Unmarshal(data, &fnExpr); err != nil {
+			return nil, err
+		}
+		return &fnExpr, nil
+
 	default:
 		return nil, fmt.Errorf("unrecognized expression type: '%s'", detector.Type)
 	}
@@ -521,3 +535,21 @@ func NewThrow(arg Expression) *ThrowStatement {
 		Argument: arg,
 	}
 }
+
+func NewPipelineExpr(left, right Expression) *PipelineExpression {
+	return &PipelineExpression{
+		NodeType: NodeTypePipelineExpression,
+		Left:     left,
+		Right:    right,
+	}
+}
+
+func NewFuncExpr(params []Parameter, body *BlockStatement, retType string) *FunctionExpression {
+	return &FunctionExpression{
+		NodeType:   NodeTypeFunctionExpression,
+		Parameters: params,
+		Body:       body,
+		ReturnType: retType,
+	}
+}
+

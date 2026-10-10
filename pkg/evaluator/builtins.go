@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 )
 
 func RegisterBuiltins(env *Environment, out io.Writer) {
@@ -98,4 +99,90 @@ func RegisterBuiltins(env *Environment, out io.Writer) {
 	}
 	env.Define("rentang", rentangFn, false, "function")
 	env.Define("range", rentangFn, false, "function")
+
+	// 'saring' / 'filter' filters elements of an array using a predicate function
+	saringFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 2 {
+				return &Error{Message: "saring mengharapkan 2 argumen: saring(array, fungsi)"}
+			}
+			arr, ok := args[0].(*Array)
+			if !ok {
+				return &Error{Message: fmt.Sprintf("argumen pertama saring harus array, menerima %s", args[0].Type())}
+			}
+			fn := args[1]
+			var filtered []Object
+			for _, el := range arr.Elements {
+				res := applyFunction(fn, []Object{el}, nil)
+				if isError(res) {
+					return res
+				}
+				if CoerceToBoolean(res) {
+					filtered = append(filtered, el)
+				}
+			}
+			return &Array{Elements: filtered}
+		},
+	}
+	env.Define("saring", saringFn, false, "function")
+	env.Define("filter", saringFn, false, "function")
+
+	// 'petakan' / 'map' transforms elements of an array using a mapping function
+	petakanFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 2 {
+				return &Error{Message: "petakan mengharapkan 2 argumen: petakan(array, fungsi)"}
+			}
+			arr, ok := args[0].(*Array)
+			if !ok {
+				return &Error{Message: fmt.Sprintf("argumen pertama petakan harus array, menerima %s", args[0].Type())}
+			}
+			fn := args[1]
+			mapped := make([]Object, len(arr.Elements))
+			for i, el := range arr.Elements {
+				res := applyFunction(fn, []Object{el}, nil)
+				if isError(res) {
+					return res
+				}
+				mapped[i] = res
+			}
+			return &Array{Elements: mapped}
+		},
+	}
+	env.Define("petakan", petakanFn, false, "function")
+	env.Define("map", petakanFn, false, "function")
+
+	// 'potong_spasi' / 'trim' trims leading and trailing whitespace
+	potongSpasiFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 {
+				return &Error{Message: "potong_spasi mengharapkan 1 argumen"}
+			}
+			str, ok := args[0].(*String)
+			if !ok {
+				return &Error{Message: fmt.Sprintf("argumen potong_spasi harus teks, menerima %s", args[0].Type())}
+			}
+			return &String{Value: strings.TrimSpace(str.Value)}
+		},
+	}
+	env.Define("potong_spasi", potongSpasiFn, false, "function")
+	env.Define("trim", potongSpasiFn, false, "function")
+
+	// 'kapitalisasi' / 'capitalize' / 'uppercase' converts text to uppercase
+	kapitalisasiFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 {
+				return &Error{Message: "kapitalisasi mengharapkan 1 argumen"}
+			}
+			str, ok := args[0].(*String)
+			if !ok {
+				return &Error{Message: fmt.Sprintf("argumen kapitalisasi harus teks, menerima %s", args[0].Type())}
+			}
+			return &String{Value: strings.ToUpper(str.Value)}
+		},
+	}
+	env.Define("kapitalisasi", kapitalisasiFn, false, "function")
+	env.Define("capitalize", kapitalisasiFn, false, "function")
+	env.Define("uppercase", kapitalisasiFn, false, "function")
 }
+

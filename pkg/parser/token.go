@@ -32,6 +32,7 @@ const (
 	MINUS_ASSIGN TokenType = "-="
 	ARROW        TokenType = "->"
 	PIPE         TokenType = "|"
+	PIPE_ARROW   TokenType = "|>"
 	AMPERSAND    TokenType = "&"
 
 	// Delimiters

@@ -535,6 +535,48 @@ func (f *Formatter) formatExpression(expr uast.Expression) string {
 			pairs[i] = fmt.Sprintf("%s: %s", keyStr, valStr)
 		}
 		return fmt.Sprintf("{%s}", strings.Join(pairs, ", "))
+
+	case *uast.PipelineExpression:
+		return fmt.Sprintf("%s |> %s", f.formatExpression(e.Left), f.formatExpression(e.Right))
+
+	case *uast.FunctionExpression:
+		var sb strings.Builder
+		sb.WriteString(f.profile.Func)
+		sb.WriteString("(")
+		params := make([]string, len(e.Parameters))
+		for i, p := range e.Parameters {
+			pStr := p.Name
+			if p.TypeHint != "" {
+				pStr += " " + f.profile.TypeAssign + " " + f.formatTypeHint(p.TypeHint)
+			}
+			if p.DefaultValue != nil {
+				pStr += " = " + f.formatExpression(p.DefaultValue)
+			}
+			params[i] = pStr
+		}
+		sb.WriteString(strings.Join(params, ", "))
+		sb.WriteString(")")
+		if e.ReturnType != "" && f.profile.ReturnArrow != "" {
+			sb.WriteString(" ")
+			sb.WriteString(f.profile.ReturnArrow)
+			sb.WriteString(" ")
+			sb.WriteString(f.formatTypeHint(e.ReturnType))
+		}
+		if e.Body != nil && len(e.Body.Statements) == 1 {
+			sb.WriteString(" { ")
+			sb.WriteString(strings.TrimSpace(f.formatStatement(e.Body.Statements[0], 0)))
+			sb.WriteString(" }")
+			return sb.String()
+		}
+		sb.WriteString(" {\n")
+		if e.Body != nil {
+			for _, child := range e.Body.Statements {
+				sb.WriteString(f.formatStatement(child, 1))
+				sb.WriteString("\n")
+			}
+		}
+		sb.WriteString("}")
+		return sb.String()
 	}
 
 	return ""

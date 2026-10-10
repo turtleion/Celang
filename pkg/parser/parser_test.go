@@ -5,6 +5,7 @@ import (
 
 	"celang/pkg/evaluator"
 	"celang/pkg/parser"
+	"celang/pkg/uast"
 )
 
 func TestParser_BasicSyntax(t *testing.T) {
@@ -214,3 +215,57 @@ func TestParser_TryCatchAndThrow(t *testing.T) {
 		t.Fatalf("Expected 2 try-catch statements, got %d", len(prog.Body))
 	}
 }
+
+func TestParser_PipelineAndFunctionExpression(t *testing.T) {
+	input := `
+	buat hasil = "  halo dunia  "
+		|> potong_spasi()
+		|> kapitalisasi()
+
+	buat angka = [1, 2, 3]
+		|> saring(fungsi(x) { kembalikan x > 1 })
+	`
+
+	l := parser.NewLexer(input)
+	p := parser.NewParser(l)
+	prog, err := p.ParseProgram()
+	if err != nil {
+		t.Fatalf("Parser error: %v", err)
+	}
+
+	if len(prog.Body) != 2 {
+		t.Fatalf("Expected 2 statements, got %d", len(prog.Body))
+	}
+
+	decl1, ok := prog.Body[0].(*uast.VariableDeclaration)
+	if !ok {
+		t.Fatalf("Expected VariableDeclaration, got %T", prog.Body[0])
+	}
+	pipe1, ok := decl1.Value.(*uast.PipelineExpression)
+	if !ok {
+		t.Fatalf("Expected PipelineExpression, got %T", decl1.Value)
+	}
+	if _, ok := pipe1.Left.(*uast.PipelineExpression); !ok {
+		t.Fatalf("Expected nested PipelineExpression on Left, got %T", pipe1.Left)
+	}
+
+	decl2, ok := prog.Body[1].(*uast.VariableDeclaration)
+	if !ok {
+		t.Fatalf("Expected VariableDeclaration, got %T", prog.Body[1])
+	}
+	pipe2, ok := decl2.Value.(*uast.PipelineExpression)
+	if !ok {
+		t.Fatalf("Expected PipelineExpression, got %T", decl2.Value)
+	}
+	call2, ok := pipe2.Right.(*uast.CallExpression)
+	if !ok {
+		t.Fatalf("Expected CallExpression on Right, got %T", pipe2.Right)
+	}
+	if len(call2.Arguments) != 1 {
+		t.Fatalf("Expected 1 argument in saring call, got %d", len(call2.Arguments))
+	}
+	if _, ok := call2.Arguments[0].(*uast.FunctionExpression); !ok {
+		t.Fatalf("Expected FunctionExpression in argument, got %T", call2.Arguments[0])
+	}
+}
+

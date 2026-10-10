@@ -438,6 +438,33 @@ func Eval(node uast.Node, env *Environment) Object {
 		return newError(n.GetMetadata(), fmt.Sprintf("Properti '%s' tidak ditemukan pada objek", n.Property), "Pastikan properti yang diakses valid.")
 
 	case *uast.BinaryExpression:
+		if n.Operator == "|>" {
+			leftVal := Eval(n.Left, env)
+			if isError(leftVal) {
+				return leftVal
+			}
+			if call, ok := n.Right.(*uast.CallExpression); ok {
+				callee := Eval(call.Callee, env)
+				if isError(callee) {
+					return callee
+				}
+				args := make([]Object, 1+len(call.Arguments))
+				args[0] = leftVal
+				for i, argNode := range call.Arguments {
+					argVal := Eval(argNode, env)
+					if isError(argVal) {
+						return argVal
+					}
+					args[1+i] = argVal
+				}
+				return applyFunction(callee, args, n.GetMetadata())
+			}
+			callee := Eval(n.Right, env)
+			if isError(callee) {
+				return callee
+			}
+			return applyFunction(callee, []Object{leftVal}, n.GetMetadata())
+		}
 		left := Eval(n.Left, env)
 		if isError(left) {
 			return left
@@ -447,6 +474,41 @@ func Eval(node uast.Node, env *Environment) Object {
 			return right
 		}
 		return evalBinaryOp(n.Operator, left, right, n.GetMetadata())
+
+	case *uast.PipelineExpression:
+		leftVal := Eval(n.Left, env)
+		if isError(leftVal) {
+			return leftVal
+		}
+		if call, ok := n.Right.(*uast.CallExpression); ok {
+			callee := Eval(call.Callee, env)
+			if isError(callee) {
+				return callee
+			}
+			args := make([]Object, 1+len(call.Arguments))
+			args[0] = leftVal
+			for i, argNode := range call.Arguments {
+				argVal := Eval(argNode, env)
+				if isError(argVal) {
+					return argVal
+				}
+				args[1+i] = argVal
+			}
+			return applyFunction(callee, args, n.GetMetadata())
+		}
+		callee := Eval(n.Right, env)
+		if isError(callee) {
+			return callee
+		}
+		return applyFunction(callee, []Object{leftVal}, n.GetMetadata())
+
+	case *uast.FunctionExpression:
+		return &Function{
+			Name:       "<anon>",
+			Parameters: n.Parameters,
+			Body:       n.Body,
+			Env:        env,
+		}
 
 	case *uast.UnaryExpression:
 		if n.Operator == "&" {
