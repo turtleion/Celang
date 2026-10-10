@@ -184,5 +184,8 @@ func RegisterBuiltins(env *Environment, out io.Writer) {
 	env.Define("kapitalisasi", kapitalisasiFn, false, "function")
 	env.Define("capitalize", kapitalisasiFn, false, "function")
 	env.Define("uppercase", kapitalisasiFn, false, "function")
+
+	// Register Standard Library global objects (berkas, fs, matematika, math, teks, strings, waktu, time, json)
+	RegisterStdlibGlobals(env)
 }
 

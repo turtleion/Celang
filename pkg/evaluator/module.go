@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"celang/pkg/parser"
 	"celang/pkg/uast"
@@ -41,6 +42,10 @@ func findModuleRoot(filePath string) string {
 
 // resolveModulePath resolves an import path relative to the caller's file.
 func resolveModulePath(callerFilePath, importSource string) (string, error) {
+	if isStdlibModule(importSource) {
+		return "stdlib:" + normalizeStdlibName(importSource), nil
+	}
+
 	baseDir := ""
 	if callerFilePath != "" {
 		baseDir = filepath.Dir(callerFilePath)
@@ -73,6 +78,11 @@ func resolveModulePath(callerFilePath, importSource string) (string, error) {
 
 // loadModule loads and evaluates a module, caching the resulting environment.
 func loadModule(targetAbsPath string, env *Environment) (*Environment, error) {
+	if strings.HasPrefix(targetAbsPath, "stdlib:") {
+		canonName := strings.TrimPrefix(targetAbsPath, "stdlib:")
+		return getStdlibModuleEnvironment(canonName)
+	}
+
 	if env.ModuleRegistry == nil {
 		env.ModuleRegistry = NewModuleRegistry()
 	}

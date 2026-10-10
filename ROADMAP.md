@@ -13,13 +13,13 @@ Fokus utama saat ini adalah menyediakan pustaka standar bawaan agar Celang dapat
 
 ## 🗺️ Rangkuman Fitur-Fitur Masa Depan
 
-### 1. 📦 Standard Library Bawaan (Sedang Dikerjakan)
+### 1. 📦 Standard Library Bawaan (✅ Selesai di `feature/stdlib`)
 Modul-modul inti yang terikat langsung ke sistem operasi melalui backend runtime Go:
 - **`berkas` / `fs`**: I/O berkas dan folder (`baca`, `tulis`, `tambah`, `ada`, `hapus`).
-- **`matematika` / `math`**: Operasi numerik presisi (`akar`, `pangkat`, `mutlak`, `bulat`, `acak`, konstanta `PI`).
-- **`teks` / `strings`**: Pemrosesan string (`pisah`, `gabung`, `ganti`, `berisi`, `kapital`, `kecil`).
-- **`waktu` / `time`**: Penanganan waktu & penundaan (`sekarang`, `tidur`).
-- **`json`**: Serialisasi & parsing objek JSON (`uraikan`, `format`).
+- **`matematika` / `math`**: Operasi numerik presisi (`akar`, `pangkat`, `mutlak`, `bulat`, `lantai`, `atap`, `acak`, `maks`, `min`, konstanta `PI`, `E`).
+- **`teks` / `strings`**: Pemrosesan string (`pisah`, `gabung`, `ganti`, `berisi`, `kapital`, `kecil`, `potong`, `dimulai_dengan`, `diakhiri_dengan`).
+- **`waktu` / `time`**: Penanganan waktu & penundaan (`sekarang`, `sekarang_detik`, `format`, `tidur`).
+- **`json`**: Serialisasi & parsing objek JSON rekursif (`uraikan` / `parse`, `format` / `stringify`).
 
 ---
 

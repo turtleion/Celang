@@ -1,0 +1,21 @@
+// Demo Import Modul Standar Celang (Virtual Module Registry)
+
+ambil { akar, PI } dari "matematika"
+import { split, join, upper } from "strings"
+ambil { sekarang, tidur } dari "waktu"
+import { parse, stringify } from "json"
+
+cetak("Akar 81 =", akar(81))
+cetak("PI =", PI)
+
+buat kata = split("belajar-celang-menyenangkan", "-")
+cetak("Upper & Join:", upper(join(kata, " ")))
+
+buat t0 = sekarang()
+tidur(20)
+buat t1 = sekarang()
+cetak("Waktu berlalu:", t1 - t0, "ms")
+
+buat data = parse("{\"status\": \"sukses\", \"kode\": 200}")
+cetak("Status respon:", data.status, "Kode:", data.kode)
+cetak("Stringify balik:", stringify(data))

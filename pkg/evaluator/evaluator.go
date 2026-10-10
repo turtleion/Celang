@@ -3,6 +3,7 @@ package evaluator
 import (
 	"fmt"
 	"path/filepath"
+	"strconv"
 	"sync"
 
 	"celang/pkg/uast"
@@ -437,8 +438,19 @@ func Eval(node uast.Node, env *Environment) Object {
 			return obj
 		}
 		if arr, ok := obj.(*Array); ok {
-			idxObj := Eval(uast.NewIdentifier(n.Property), env)
-			if intIdx, _, isInt, ok := CoerceToNumeric(idxObj); ok && isInt {
+			var intIdx int64
+			var hasInt bool
+			if parsed, err := strconv.ParseInt(n.Property, 10, 64); err == nil {
+				intIdx = parsed
+				hasInt = true
+			} else {
+				idxObj := Eval(uast.NewIdentifier(n.Property), env)
+				if iVal, _, isInt, ok := CoerceToNumeric(idxObj); ok && isInt {
+					intIdx = iVal
+					hasInt = true
+				}
+			}
+			if hasInt {
 				if intIdx >= 0 && int(intIdx) < len(arr.Elements) {
 					return arr.Elements[intIdx]
 				}

@@ -1,0 +1,67 @@
+// Demo Standard Library Celang (Batteries Included)
+// Menunjukkan 5 modul bawaan: berkas/fs, matematika/math, teks/strings, waktu/time, json
+
+cetak("============================================")
+cetak("🚀 DEMO STANDARD LIBRARY CELANG (DWIBASA)")
+cetak("============================================")
+
+// 1. Modul Matematika (matematika / math)
+cetak("\n--- [1] Modul Matematika (matematika / math) ---")
+buat nilai = 144
+buat akarNilai = matematika.akar(nilai)
+buat pangkatTiga = math.pow(2, 8)
+buat bilanganAcak = matematika.acak(1, 100)
+cetak("Akar dari", nilai, "=", akarNilai)
+cetak("2 pangkat 8 =", pangkatTiga)
+cetak("Bilangan acak (1 - 100):", bilanganAcak)
+cetak("Konstanta PI:", math.PI)
+
+// 2. Modul Teks (teks / strings)
+cetak("\n--- [2] Modul Teks (teks / strings) ---")
+buat kalimat = "  celang adalah bahasa yang ramah dan ekspresif  "
+buat bersih = teks.potong(kalimat)
+buat kapital = teks.kapital(bersih)
+buat kataKata = strings.split(bersih, " ")
+buat sambungLagi = strings.join(kataKata, " -> ")
+
+cetak("Teks asli (dipotong):", bersih)
+cetak("Kapital:", kapital)
+cetak("Daftar kata:", kataKata)
+cetak("Disambung panah:", sambungLagi)
+cetak("Berisi kata 'ramah'?", teks.berisi(bersih, "ramah"))
+
+// 3. Modul Waktu (waktu / time)
+cetak("\n--- [3] Modul Waktu (waktu / time) ---")
+buat mulaiMs = waktu.sekarang()
+cetak("Timestamp milidetik awal:", mulaiMs)
+cetak("Waktu diformat:", waktu.format(mulaiMs, "2006-01-02 15:04:05"))
+cetak("Menunda sejenak 50 milidetik...")
+waktu.tidur(50)
+buat selesaiMs = time.now()
+cetak("Selesai setelah:", selesaiMs - mulaiMs, "ms")
+
+// 4. Modul JSON (json / json)
+cetak("\n--- [4] Modul JSON (json) ---")
+buat dataJSON = "{\"nama\": \"Celang\", \"versi\": 1, \"fitur\": [\"U-AST\", \"Styling\", \"Stdlib\"]}"
+buat objek = json.uraikan(dataJSON)
+cetak("Hasil parse nama:", objek.nama)
+cetak("Hasil parse fitur ke-0:", objek.fitur[0])
+
+buat hasilStringify = json.format(objek, 2)
+cetak("Hasil format JSON rapi:\n" + hasilStringify)
+
+// 5. Modul Berkas (berkas / fs)
+cetak("\n--- [5] Modul Berkas (berkas / fs) ---")
+buat pathBerkas = "./temp_demo_catatan.txt"
+berkas.tulis(pathBerkas, "Baris 1: Catatan pengujian stdlib Celang.\n")
+fs.append(pathBerkas, "Baris 2: Ditambahkan dengan alias fs.append.\n")
+
+jika berkas.ada(pathBerkas) {
+    cetak("Berkas berhasil dibuat di:", pathBerkas)
+    buat isiBerkas = berkas.baca(pathBerkas)
+    cetak("Isi berkas:\n" + isiBerkas)
+    berkas.hapus(pathBerkas)
+    cetak("Berkas sementara berhasil dibersihkan.")
+}
+
+cetak("\n✅ Seluruh demonstrasi Standard Library berhasil dijalankan!")
