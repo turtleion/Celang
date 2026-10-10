@@ -290,7 +290,7 @@ func (c *Compiler) compileStatement(stmt uast.Statement) error {
 		c.emitOp(bytecode.OpLessThan, line)
 
 		exitJump := c.emitJump(bytecode.OpJumpIfFalse, line)
-		c.emitOp(bytecode.OpPop, line)
+		c.emitOp(bytecode.OpPop, line) // pop boolean condition
 
 		// 6. Set s.Item = __iter[__idx]
 		c.emitOp(bytecode.OpGetLocal, line)
@@ -384,6 +384,24 @@ func (c *Compiler) compileStatement(stmt uast.Statement) error {
 			c.emitOp(bytecode.OpDefineGlobal, line)
 			c.chunk.WriteUint16(nameIdx, line)
 		}
+		return nil
+
+	case *uast.StyleBlockStatement:
+		if s.Body != nil {
+			for _, child := range s.Body.Statements {
+				if err := c.compileStatement(child); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+
+	case *uast.ImportDeclaration, *uast.StructDeclaration, *uast.ConcurrencyStatement,
+		*uast.DestructureDeclaration, *uast.DestructureAssignment, *uast.TryCatchStatement, *uast.ThrowStatement:
+		wrapper := &evaluator.ASTNodeWrapper{Node: s}
+		constIdx := c.chunk.AddConstant(wrapper)
+		c.emitOp(bytecode.OpEvalAST, line)
+		c.chunk.WriteUint16(constIdx, line)
 		return nil
 
 	default:
@@ -555,6 +573,18 @@ func (c *Compiler) compileExpression(expr uast.Expression) error {
 		return nil
 
 	case *uast.MemberExpression:
+		if id, ok := e.Object.(*uast.Identifier); ok {
+			switch e.Property {
+			case "sebelumnya", "prev", "previous", "awal", "initial", "first", "histori", "history":
+				nameIdx := c.chunk.AddConstant(&evaluator.String{Value: id.Name})
+				propIdx := c.chunk.AddConstant(&evaluator.String{Value: e.Property})
+				c.emitOp(bytecode.OpTimeTravel, line)
+				c.chunk.WriteUint16(nameIdx, line)
+				c.chunk.WriteUint16(propIdx, line)
+				return nil
+			}
+		}
+
 		if err := c.compileExpression(e.Object); err != nil {
 			return err
 		}

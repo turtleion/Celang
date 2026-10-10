@@ -2,12 +2,53 @@ package vm
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
+	"sync"
 
 	"celang/pkg/bytecode"
 	"celang/pkg/evaluator"
 )
+
+var (
+	activeVMEnv   *evaluator.Environment
+	activeVMEnvMu sync.RWMutex
+)
+
+func getActiveEnv() *evaluator.Environment {
+	activeVMEnvMu.RLock()
+	defer activeVMEnvMu.RUnlock()
+	return activeVMEnv
+}
+
+func setActiveEnv(env *evaluator.Environment) {
+	activeVMEnvMu.Lock()
+	defer activeVMEnvMu.Unlock()
+	activeVMEnv = env
+}
+
+func init() {
+	bytecode.SetVMRunner(func(fn *bytecode.CompiledFunction, args []evaluator.Object) evaluator.Object {
+		env := getActiveEnv()
+		if env == nil {
+			env = evaluator.NewEnvironment()
+			evaluator.RegisterBuiltins(env, os.Stdout)
+		}
+		virtualMachine := NewWithEnv(fn.Chunk, env)
+		virtualMachine.frames[0].fn = fn
+		virtualMachine.frames[0].basePointer = 0
+		virtualMachine.sp = 0
+		for _, arg := range args {
+			_ = virtualMachine.push(arg)
+		}
+		res, err := virtualMachine.Run()
+		if err != nil {
+			return &evaluator.Error{Message: err.Error()}
+		}
+		return res
+	})
+}
 
 const (
 	StackMax  = 2048
@@ -92,6 +133,9 @@ func (vm *VM) peek(distance int) evaluator.Object {
 
 // Run starts bytecode execution.
 func (vm *VM) Run() (evaluator.Object, error) {
+	if vm.env != nil {
+		setActiveEnv(vm.env)
+	}
 	for vm.frameCount > 0 {
 		frame := &vm.frames[vm.frameCount-1]
 		chunk := frame.fn.Chunk
@@ -351,6 +395,53 @@ func (vm *VM) Run() (evaluator.Object, error) {
 			vm.sp = frame.basePointer - 1
 			vm.push(result)
 
+		case bytecode.OpEvalAST:
+			constIdx := chunk.ReadUint16(frame.ip)
+			frame.ip += 2
+			wrapper := chunk.Constants[constIdx].(*evaluator.ASTNodeWrapper)
+			env := vm.env
+			if env == nil {
+				env = evaluator.NewEnvironment()
+				evaluator.RegisterBuiltins(env, os.Stdout)
+				vm.env = env
+			}
+			res := evaluator.Eval(wrapper.Node, env)
+			if errObj, ok := res.(*evaluator.Error); ok {
+				return nil, fmt.Errorf("%s", errObj.Inspect())
+			}
+
+		case bytecode.OpTimeTravel:
+			nameIdx := chunk.ReadUint16(frame.ip)
+			propIdx := chunk.ReadUint16(frame.ip + 2)
+			frame.ip += 4
+			name := chunk.Constants[nameIdx].(*evaluator.String).Value
+			prop := chunk.Constants[propIdx].(*evaluator.String).Value
+			if vm.env == nil {
+				vm.push(&evaluator.Null{})
+				break
+			}
+			entry, exists := vm.env.GetEntry(name)
+			if !exists {
+				return nil, fmt.Errorf("variabel '%s' tidak ditemukan dalam pencarian histori", name)
+			}
+			switch prop {
+			case "sebelumnya", "prev", "previous":
+				prev, hasPrev := entry.Previous()
+				if !hasPrev {
+					vm.push(&evaluator.Null{})
+				} else {
+					vm.push(prev)
+				}
+			case "awal", "initial", "first":
+				vm.push(entry.Initial())
+			case "histori", "history":
+				arr := &evaluator.Array{Elements: make([]evaluator.Object, len(entry.History))}
+				copy(arr.Elements, entry.History)
+				vm.push(arr)
+			default:
+				vm.push(&evaluator.Null{})
+			}
+
 		default:
 			return nil, fmt.Errorf("opcode tidak dikenal: 0x%02X (%s)", byte(op), op.String())
 		}
@@ -398,6 +489,19 @@ func (vm *VM) callValue(argCount int) error {
 		return nil
 
 	case *evaluator.Function:
+		args := make([]evaluator.Object, argCount)
+		for i := 0; i < argCount; i++ {
+			args[i] = vm.stack[vm.sp-argCount+i]
+		}
+		vm.sp -= argCount + 1
+		res := evaluator.ApplyFunction(fn, args, nil)
+		if errObj, ok := res.(*evaluator.Error); ok {
+			return fmt.Errorf("%s", errObj.Inspect())
+		}
+		vm.push(res)
+		return nil
+
+	case *evaluator.StructDefinition:
 		args := make([]evaluator.Object, argCount)
 		for i := 0; i < argCount; i++ {
 			args[i] = vm.stack[vm.sp-argCount+i]
@@ -465,6 +569,18 @@ func (vm *VM) evalIndex(targetObj, indexObj evaluator.Object) (evaluator.Object,
 		key := indexObj.Inspect()
 		if val, exists := obj.Fields[key]; exists {
 			return val, nil
+		}
+		if method, exists := obj.Def.Methods[key]; exists {
+			boundEnv := evaluator.NewEnclosedEnvironment(method.Env)
+			boundEnv.Define("diri", obj, false, obj.Def.Name)
+			boundEnv.Define("this", obj, false, obj.Def.Name)
+			boundEnv.Define("self", obj, false, obj.Def.Name)
+			return &evaluator.Function{
+				Name:       method.Name,
+				Parameters: method.Parameters,
+				Body:       method.Body,
+				Env:        boundEnv,
+			}, nil
 		}
 		return &evaluator.Null{}, nil
 

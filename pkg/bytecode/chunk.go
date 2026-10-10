@@ -122,6 +122,29 @@ func (c *Chunk) DisassembleInstruction(offset int) (string, int) {
 		args := c.Instructions[offset+1]
 		return fmt.Sprintf("%s  args %d", prefix, args), offset + 2
 
+	case OpEvalAST:
+		if offset+2 >= len(c.Instructions) {
+			return fmt.Sprintf("%s [truncated]", prefix), offset + 1
+		}
+		constIdx := c.ReadUint16(offset + 1)
+		return fmt.Sprintf("%s  #%d (AST)", prefix, constIdx), offset + 3
+
+	case OpTimeTravel:
+		if offset+4 >= len(c.Instructions) {
+			return fmt.Sprintf("%s [truncated]", prefix), offset + 1
+		}
+		nameIdx := c.ReadUint16(offset + 1)
+		propIdx := c.ReadUint16(offset + 3)
+		nameStr := "<name>"
+		if int(nameIdx) < len(c.Constants) {
+			nameStr = c.Constants[nameIdx].Inspect()
+		}
+		propStr := "<prop>"
+		if int(propIdx) < len(c.Constants) {
+			propStr = c.Constants[propIdx].Inspect()
+		}
+		return fmt.Sprintf("%s  %s.%s", prefix, nameStr, propStr), offset + 5
+
 	default:
 		return prefix, offset + 1
 	}

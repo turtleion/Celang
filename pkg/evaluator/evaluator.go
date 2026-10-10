@@ -1104,6 +1104,8 @@ func applyFunction(callee Object, args []Object, meta *uast.NodeMetadata) Object
 			}
 		}
 		return instance
+	case Callable:
+		return fn.Call(args...)
 	default:
 		return newError(meta, fmt.Sprintf("Objek bukan fungsi: %s", callee.Type()), "Pastikan Anda memanggil fungsi yang sah.")
 	}
