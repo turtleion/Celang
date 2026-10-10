@@ -8,10 +8,13 @@ import (
 	"os"
 	"strings"
 
+	"celang/pkg/bytecode"
+	"celang/pkg/compiler"
 	"celang/pkg/evaluator"
 	"celang/pkg/parser"
 	"celang/pkg/syntax"
 	"celang/pkg/uast"
+	"celang/pkg/vm"
 )
 
 const (
@@ -116,7 +119,7 @@ func Start(opts Options) error {
 }
 
 func printBanner(out io.Writer, styleName string) {
-	fmt.Fprintln(out, "🌟 Celang Interactive REPL v"+Version+" (Human-Centric & Syntax-Styling)")
+	fmt.Fprintln(out, "🌟 Celang Interactive REPL v"+Version+" (Bytecode VM Engine)")
 	fmt.Fprintf(out, "Gaya aktif: %s | Ketik ':bantuan' untuk petunjuk, ':keluar' untuk selesai.\n\n", styleName)
 }
 
@@ -215,6 +218,27 @@ func handleMetaCommand(cmd string, env *evaluator.Environment, profile **syntax.
 			}
 		}
 
+	case ":bc", ":disasm", ":bytecode":
+		if len(parts) < 2 {
+			fmt.Fprintln(out, "Penggunaan: :bc <kode_ekspresi>")
+		} else {
+			codeToParse := strings.TrimPrefix(cmd, parts[0]+" ")
+			l := parser.NewLexer(codeToParse)
+			p := parser.NewParser(l)
+			prog, err := p.ParseProgram()
+			if err != nil {
+				fmt.Fprintf(out, "❌ Error parsing: %v\n", err)
+			} else {
+				comp := compiler.NewCompiler()
+				chunk, err := comp.Compile(prog)
+				if err != nil {
+					fmt.Fprintf(out, "❌ Error kompilasi: %v\n", err)
+				} else {
+					fmt.Fprint(out, chunk.Disassemble("repl_snippet"))
+				}
+			}
+		}
+
 	case ":reset", ":ulang":
 		*env = *evaluator.NewEnvironment()
 		evaluator.RegisterBuiltins(env, out)
@@ -237,6 +261,7 @@ func printHelp(out io.Writer) {
 	fmt.Fprintln(out, "  :bersih, :clear             Membersihkan layar terminal")
 	fmt.Fprintln(out, "  :lingkungan, :env, :vars    Melihat variabel & fungsi yang aktif di memori")
 	fmt.Fprintln(out, "  :gaya <nama|path>           Mengganti profil gaya sintaks aktif")
+	fmt.Fprintln(out, "  :bc <ekspresi>              Melihat instruksi assembly Bytecode")
 	fmt.Fprintln(out, "  :ast <ekspresi>             Melihat pohon U-AST JSON dari baris kode")
 	fmt.Fprintln(out, "  :reset, :ulang              Mengosongkan memori variabel kembali ke awal")
 }
@@ -251,21 +276,32 @@ func evaluateInput(input string, env *evaluator.Environment, profile *syntax.Sty
 	}
 
 	for _, stmt := range prog.Body {
-		result := evaluator.Eval(stmt, env)
-		if result == nil {
-			continue
+		comp := compiler.NewCompiler()
+		var chunk *bytecode.Chunk
+		var compErr error
+		isExprStmt := false
+
+		if exprStmt, ok := stmt.(*uast.ExpressionStatement); ok {
+			isExprStmt = true
+			chunk, compErr = comp.CompileExpression(exprStmt.Expression)
+		} else {
+			progSingle := &uast.Program{Body: []uast.Statement{stmt}}
+			chunk, compErr = comp.Compile(progSingle)
 		}
 
-		if isErr, ok := result.(*evaluator.Error); ok {
-			fmt.Fprintf(out, "❌ %s\n", isErr.Message)
-			if isErr.FriendlyHint != "" {
-				fmt.Fprintf(out, "   💡 %s\n", isErr.FriendlyHint)
-			}
+		if compErr != nil {
+			fmt.Fprintf(out, "❌ Kesalahan kompilasi: %v\n", compErr)
 			return
 		}
 
-		// Only print return arrow for ExpressionStatements
-		if _, isExprStmt := stmt.(*uast.ExpressionStatement); isExprStmt {
+		virtualMachine := vm.NewWithEnv(chunk, env)
+		result, err := virtualMachine.Run()
+		if err != nil {
+			fmt.Fprintf(out, "❌ %v\n", err)
+			return
+		}
+
+		if isExprStmt && result != nil {
 			fmt.Fprintf(out, "=> %s\n", result.Inspect())
 		}
 	}
