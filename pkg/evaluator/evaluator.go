@@ -1037,6 +1037,11 @@ func evalUnaryOp(op string, right Object, meta *uast.NodeMetadata) Object {
 	return newError(meta, fmt.Sprintf("Operator unary '%s' tidak dikenal", op), "Operator unary yang didukung: '!', 'bukan', '-'.")
 }
 
+// ApplyFunction calls a function or builtin object with the given arguments.
+func ApplyFunction(callee Object, args []Object, meta *uast.NodeMetadata) Object {
+	return applyFunction(callee, args, meta)
+}
+
 func applyFunction(callee Object, args []Object, meta *uast.NodeMetadata) Object {
 	switch fn := callee.(type) {
 	case *Builtin:

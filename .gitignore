@@ -1,0 +1,12 @@
+# Binaries
+celang
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test binaries
+*.test
+
+# Output artifacts
+*.out
