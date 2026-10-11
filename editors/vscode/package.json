@@ -50,6 +50,33 @@
         "language": "celang",
         "path": "./snippets/celang.json"
       }
-    ]
+    ],
+    "configurationDefaults": {
+      "[celang]": {
+        "cSpell.words": [
+          "celang",
+          "buat",
+          "konstanta",
+          "selama",
+          "kembalikan",
+          "sebelumnya",
+          "histori",
+          "bentuk",
+          "bersamaan",
+          "sambil",
+          "cetak",
+          "masukan",
+          "rentang",
+          "saring",
+          "petakan",
+          "potong_spasi",
+          "kapitalisasi",
+          "matematika",
+          "waktu",
+          "berkas",
+          "dialek"
+        ]
+      }
+    }
   }
 }
