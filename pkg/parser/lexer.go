@@ -83,6 +83,10 @@ var keywords = map[string]TokenType{
 	"dialek":       STYLE_BLOCK,
 	"bentuk":       STRUCT_DECL,
 	"struct":       STRUCT_DECL,
+	"privat":       PRIVATE,
+	"rujuk":        REF_DECL,
+	"ref":          REF_DECL,
+	"tipe":         TYPE_DECL,
 }
 
 type Lexer struct {
@@ -206,6 +210,8 @@ func (l *Lexer) NextToken() Token {
 		}
 	case ',':
 		tok = Token{Type: COMMA, Literal: ",", Line: tok.Line, Column: tok.Column}
+	case '@':
+		tok = Token{Type: AT, Literal: "@", Line: tok.Line, Column: tok.Column}
 	case ':':
 		tok = Token{Type: COLON, Literal: ":", Line: tok.Line, Column: tok.Column}
 	case ';':

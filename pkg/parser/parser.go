@@ -18,6 +18,7 @@ const (
 	LESSGREATER   // <, >, <=, >=
 	SUM           // +, -
 	PRODUCT       // *, /, %
+	CAST_PREC     // sebagai, as
 	PREFIX        // -x, !x, bukan x
 	CALL          // hitung(x)
 	INDEX         // arr[0], map["kunci"], obj.prop
@@ -39,6 +40,7 @@ var precedences = map[TokenType]int{
 	SLASH:      PRODUCT,
 	ASTERISK:   PRODUCT,
 	PERCENT:    PRODUCT,
+	AS:         CAST_PREC,
 	LPAREN:     CALL,
 	LBRACKET:   INDEX,
 	DOT:        INDEX,
@@ -85,6 +87,7 @@ func NewParser(l *Lexer) *Parser {
 	p.registerPrefix(LBRACKET, p.parseArrayLiteral)
 	p.registerPrefix(LBRACE, p.parseMapLiteral)
 	p.registerPrefix(FUNC, p.parseFunctionExpression)
+	p.registerPrefix(AT, p.parseAtExpression)
 
 	p.infixParseFns = make(map[TokenType]infixParseFn)
 	p.registerInfix(PIPE_ARROW, p.parsePipelineExpression)
@@ -93,6 +96,7 @@ func NewParser(l *Lexer) *Parser {
 	p.registerInfix(SLASH, p.parseInfixExpression)
 	p.registerInfix(ASTERISK, p.parseInfixExpression)
 	p.registerInfix(PERCENT, p.parseInfixExpression)
+	p.registerInfix(AS, p.parseCastExpression)
 	p.registerInfix(EQ, p.parseInfixExpression)
 	p.registerInfix(NOT_EQ, p.parseInfixExpression)
 	p.registerInfix(LT, p.parseInfixExpression)
@@ -231,10 +235,11 @@ func (p *Parser) parseStatement() uast.Statement {
 		return p.parseStyleBlockStatement()
 	case STRUCT_DECL:
 		return p.parseStructDeclaration()
+	case TYPE_DECL:
+		return p.parseTypeDeclaration()
+	case REF_DECL:
+		return p.parseReferenceDeclaration()
 	default:
-		if p.curTokenIs(IDENT) && p.curToken.Literal == "tipe" && p.peekTokenIs(IDENT) {
-			return p.parseStructDeclaration()
-		}
 		return p.parseExpressionStatement()
 	}
 }
@@ -328,6 +333,12 @@ func (p *Parser) parseVisibilityOrExportStatement() uast.Statement {
 			s.Visibility = vis
 		}
 		return s
+	case TYPE_DECL:
+		t := p.parseTypeDeclaration()
+		if s, ok := t.(*uast.StructDeclaration); ok && s != nil {
+			s.Visibility = vis
+		}
+		return t
 	default:
 		p.addError(fmt.Sprintf("Modifier visibilitas tidak dapat diterapkan pada '%s'", p.curToken.Literal))
 		return nil
@@ -674,7 +685,7 @@ func (p *Parser) parseVariableDeclaration(isMutable bool) uast.Statement {
 
 func (p *Parser) parseStructDeclaration() *uast.StructDeclaration {
 	meta := p.currentMetadata()
-	p.nextToken() // eat 'bentuk' / 'struct' / 'tipe'
+	p.nextToken() // eat 'bentuk' / 'struct'
 
 	if !p.curTokenIs(IDENT) {
 		p.addError(fmt.Sprintf("Diharapkan nama bentuk (struct), menerima '%s'", p.curToken.Literal))
@@ -682,7 +693,61 @@ func (p *Parser) parseStructDeclaration() *uast.StructDeclaration {
 	}
 
 	name := p.curToken.Literal
+	return p.parseStructBody(meta, name)
+}
 
+func (p *Parser) parseTypeDeclaration() uast.Statement {
+	meta := p.currentMetadata()
+	p.nextToken() // eat 'tipe'
+	if !p.curTokenIs(IDENT) {
+		p.addError("Diharapkan nama tipe setelah 'tipe'")
+		return nil
+	}
+	name := p.curToken.Literal
+
+	if p.peekTokenIs(ASSIGN) {
+		p.nextToken() // eat '='
+		p.nextToken() // move to base type
+		baseType := p.parseTypeHint()
+		return &uast.TypeAliasDeclaration{
+			NodeType: uast.NodeTypeTypeAliasDeclaration,
+			Metadata: meta,
+			Name:     name,
+			BaseType: baseType,
+		}
+	}
+
+	// Legacy or Go-style: tipe Point struct { ... } or tipe Point { ... }
+	if p.peekTokenIs(STRUCT_DECL) {
+		p.nextToken() // eat 'struct'
+	}
+	return p.parseStructBody(meta, name)
+}
+
+func (p *Parser) parseReferenceDeclaration() *uast.ReferenceDeclaration {
+	meta := p.currentMetadata()
+	p.nextToken() // eat 'rujuk' / 'ref'
+	if !p.curTokenIs(IDENT) {
+		p.addError("Diharapkan nama variabel alias setelah 'rujuk'")
+		return nil
+	}
+	target := p.curToken.Literal
+
+	if !p.expectPeek(ASSIGN) {
+		return nil
+	}
+	p.nextToken() // move to source expression
+	source := p.parseExpression(LOWEST)
+
+	return &uast.ReferenceDeclaration{
+		NodeType: uast.NodeTypeReferenceDeclaration,
+		Metadata: meta,
+		Target:   target,
+		Source:   source,
+	}
+}
+
+func (p *Parser) parseStructBody(meta *uast.NodeMetadata, name string) *uast.StructDeclaration {
 	if !p.expectPeek(LBRACE) {
 		return nil
 	}
@@ -690,6 +755,7 @@ func (p *Parser) parseStructDeclaration() *uast.StructDeclaration {
 
 	var fields []uast.StructField
 	var methods []uast.StructMethod
+	var embeds []string
 
 	for !p.curTokenIs(RBRACE) && !p.curTokenIs(EOF) {
 		if p.curTokenIs(SEMICOLON) || p.curTokenIs(COMMA) {
@@ -697,16 +763,79 @@ func (p *Parser) parseStructDeclaration() *uast.StructDeclaration {
 			continue
 		}
 
-		if p.curTokenIs(FUNC) {
-			p.nextToken() // eat 'fungsi'
-			if !p.curTokenIs(IDENT) {
-				p.addError("Diharapkan nama fungsi pada bentuk")
-				return nil
+		if p.curTokenIs(PRIVATE) {
+			if p.peekTokenIs(LBRACE) {
+				p.nextToken() // eat 'privat'
+				p.nextToken() // enter '{' of private block
+				for !p.curTokenIs(RBRACE) && !p.curTokenIs(EOF) {
+					if p.curTokenIs(SEMICOLON) || p.curTokenIs(COMMA) {
+						p.nextToken()
+						continue
+					}
+					p.parseStructMember(true, &fields, &methods, &embeds)
+					p.nextToken()
+				}
+				p.nextToken() // eat '}' of private block
+				continue
+			} else {
+				p.nextToken() // eat 'privat'
+				p.parseStructMember(true, &fields, &methods, &embeds)
+				p.nextToken()
+				continue
 			}
+		}
+
+		p.parseStructMember(false, &fields, &methods, &embeds)
+		p.nextToken()
+	}
+
+	return &uast.StructDeclaration{
+		NodeType: uast.NodeTypeStructDeclaration,
+		Metadata: meta,
+		Name:     name,
+		Fields:   fields,
+		Methods:  methods,
+		Embeds:   embeds,
+	}
+}
+
+func (p *Parser) parseStructMember(isPrivate bool, fields *[]uast.StructField, methods *[]uast.StructMethod, embeds *[]string) {
+	if p.curTokenIs(FUNC) {
+		p.nextToken() // eat 'fungsi'
+		if !p.curTokenIs(IDENT) {
+			p.addError("Diharapkan nama fungsi pada bentuk")
+			return
+		}
+		methodName := p.curToken.Literal
+		if !p.expectPeek(LPAREN) {
+			return
+		}
+		params := p.parseFunctionParameters()
+		retType := ""
+		if p.peekTokenIs(RETURN_TYPE) || p.peekTokenIs(ARROW) || p.peekTokenIs(COLON) {
+			p.nextToken()
+			p.nextToken()
+			retType = p.parseTypeHint()
+		}
+		if !p.expectPeek(LBRACE) {
+			return
+		}
+		body := p.parseBlockStatement()
+		*methods = append(*methods, uast.StructMethod{
+			Name:       methodName,
+			Parameters: params,
+			ReturnType: retType,
+			Body:       body,
+			IsPrivate:  isPrivate,
+		})
+		return
+	}
+
+	if p.curTokenIs(IDENT) {
+		if p.peekTokenIs(LPAREN) {
+			// Method without 'fungsi' keyword: setor(jumlah) { ... }
 			methodName := p.curToken.Literal
-			if !p.expectPeek(LPAREN) {
-				return nil
-			}
+			p.nextToken() // move to LPAREN
 			params := p.parseFunctionParameters()
 			retType := ""
 			if p.peekTokenIs(RETURN_TYPE) || p.peekTokenIs(ARROW) || p.peekTokenIs(COLON) {
@@ -715,46 +844,21 @@ func (p *Parser) parseStructDeclaration() *uast.StructDeclaration {
 				retType = p.parseTypeHint()
 			}
 			if !p.expectPeek(LBRACE) {
-				return nil
+				return
 			}
 			body := p.parseBlockStatement()
-			methods = append(methods, uast.StructMethod{
+			*methods = append(*methods, uast.StructMethod{
 				Name:       methodName,
 				Parameters: params,
 				ReturnType: retType,
 				Body:       body,
+				IsPrivate:  isPrivate,
 			})
-			p.nextToken()
-			continue
+			return
 		}
 
-		if p.curTokenIs(IDENT) {
-			if p.peekTokenIs(LPAREN) {
-				// Method without 'fungsi' keyword: setor(jumlah) { ... }
-				methodName := p.curToken.Literal
-				p.nextToken() // move to LPAREN
-				params := p.parseFunctionParameters()
-				retType := ""
-				if p.peekTokenIs(RETURN_TYPE) || p.peekTokenIs(ARROW) || p.peekTokenIs(COLON) {
-					p.nextToken()
-					p.nextToken()
-					retType = p.parseTypeHint()
-				}
-				if !p.expectPeek(LBRACE) {
-					return nil
-				}
-				body := p.parseBlockStatement()
-				methods = append(methods, uast.StructMethod{
-					Name:       methodName,
-					Parameters: params,
-					ReturnType: retType,
-					Body:       body,
-				})
-				p.nextToken()
-				continue
-			}
-
-			// Struct field: nama: Teks, saldo itu Angka = 0, dll.
+		if p.peekTokenIs(COLON) || p.peekTokenIs(TYPE_ASSIGN) || p.peekTokenIs(ASSIGN) {
+			// Struct field: nama: Teks, saldo itu Angka = 0, saldo = 0
 			fieldName := p.curToken.Literal
 			typeHint := ""
 			var defVal uast.Expression
@@ -771,24 +875,18 @@ func (p *Parser) parseStructDeclaration() *uast.StructDeclaration {
 				defVal = p.parseExpression(LOWEST)
 			}
 
-			fields = append(fields, uast.StructField{
+			*fields = append(*fields, uast.StructField{
 				Name:         fieldName,
 				TypeHint:     typeHint,
 				DefaultValue: defVal,
+				IsPrivate:    isPrivate,
 			})
-			p.nextToken()
-			continue
+			return
 		}
 
-		p.nextToken()
-	}
-
-	return &uast.StructDeclaration{
-		NodeType: uast.NodeTypeStructDeclaration,
-		Metadata: meta,
-		Name:     name,
-		Fields:   fields,
-		Methods:  methods,
+		// Embedded struct: e.g. Identitas, or Identitas
+		*embeds = append(*embeds, p.curToken.Literal)
+		return
 	}
 }
 
@@ -1130,6 +1228,11 @@ func (p *Parser) parseFunctionParameters() []uast.Parameter {
 }
 
 func (p *Parser) parseParameter() uast.Parameter {
+	isRef := false
+	if p.curTokenIs(REF_DECL) {
+		isRef = true
+		p.nextToken() // eat 'rujuk' / 'ref'
+	}
 	name := p.curToken.Literal
 	typeHint := ""
 	var defaultVal uast.Expression
@@ -1150,6 +1253,7 @@ func (p *Parser) parseParameter() uast.Parameter {
 		Name:         name,
 		TypeHint:     typeHint,
 		DefaultValue: defaultVal,
+		IsReference:  isRef,
 	}
 }
 
@@ -1801,3 +1905,38 @@ func (p *Parser) currentMetadata() *uast.NodeMetadata {
 		},
 	}
 }
+
+func (p *Parser) parseAtExpression() uast.Expression {
+	meta := p.currentMetadata()
+	if !p.expectPeek(IDENT) {
+		p.addError("Diharapkan nama properti atau metode setelah '@' (contoh: @saldo atau @hitung())")
+		return nil
+	}
+	prop := p.curToken.Literal
+
+	return &uast.MemberExpression{
+		NodeType: uast.NodeTypeMemberExpression,
+		Metadata: meta,
+		Object: &uast.Identifier{
+			NodeType: uast.NodeTypeIdentifier,
+			Metadata: meta,
+			Name:     "diri",
+		},
+		Property: prop,
+		Computed: false,
+	}
+}
+
+func (p *Parser) parseCastExpression(left uast.Expression) uast.Expression {
+	meta := p.currentMetadata()
+	p.nextToken() // move to target type token
+	targetType := p.parseTypeHint()
+
+	return &uast.CastExpression{
+		NodeType:   uast.NodeTypeCastExpression,
+		Metadata:   meta,
+		Value:      left,
+		TargetType: targetType,
+	}
+}
+

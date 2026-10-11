@@ -133,7 +133,61 @@ func Eval(node uast.Node, env *Environment) Object {
 
 	case *uast.StructDeclaration:
 		methods := make(map[string]*Function)
+		privateFields := make(map[string]bool)
+		privateMethods := make(map[string]bool)
+		var allFields []uast.StructField
+		fieldNames := make(map[string]bool)
+
+		// 1. Resolve embedded structs
+		for _, embedName := range n.Embeds {
+			embedObj, ok := env.Get(embedName)
+			if !ok {
+				return newError(n.GetMetadata(), fmt.Sprintf("Bentuk embed '%s' tidak ditemukan", embedName), "Pastikan bentuk yang di-embed sudah didefinisikan sebelumnya.")
+			}
+			embedDef, ok := embedObj.(*StructDefinition)
+			if !ok {
+				return newError(n.GetMetadata(), fmt.Sprintf("Simbol embed '%s' bukan sebuah bentuk (struct)", embedName), "")
+			}
+			for _, ef := range embedDef.Fields {
+				if !fieldNames[ef.Name] {
+					allFields = append(allFields, ef)
+					fieldNames[ef.Name] = true
+					if embedDef.PrivateFields[ef.Name] {
+						privateFields[ef.Name] = true
+					}
+				}
+			}
+			for mName, em := range embedDef.Methods {
+				methods[mName] = em
+				if embedDef.PrivateMethods[mName] {
+					privateMethods[mName] = true
+				}
+			}
+		}
+
+		// 2. Add outer struct fields
+		for _, f := range n.Fields {
+			if f.IsPrivate {
+				privateFields[f.Name] = true
+			}
+			if !fieldNames[f.Name] {
+				allFields = append(allFields, f)
+				fieldNames[f.Name] = true
+			} else {
+				for idx, ef := range allFields {
+					if ef.Name == f.Name {
+						allFields[idx] = f
+						break
+					}
+				}
+			}
+		}
+
+		// 3. Add outer struct methods
 		for _, m := range n.Methods {
+			if m.IsPrivate {
+				privateMethods[m.Name] = true
+			}
 			methods[m.Name] = &Function{
 				Name:       m.Name,
 				Parameters: m.Parameters,
@@ -141,16 +195,59 @@ func Eval(node uast.Node, env *Environment) Object {
 				Env:        env,
 			}
 		}
+
 		structDef := &StructDefinition{
-			Name:    n.Name,
-			Fields:  n.Fields,
-			Methods: methods,
-			Env:     env,
+			Name:           n.Name,
+			Fields:         allFields,
+			Methods:        methods,
+			PrivateFields:  privateFields,
+			PrivateMethods: privateMethods,
+			Embeds:         n.Embeds,
+			Env:            env,
 		}
 		if _, err := env.DefineWithVisibility(n.Name, structDef, false, "bentuk", n.Visibility); err != nil {
 			return newError(n.GetMetadata(), err.Error(), "")
 		}
 		return structDef
+
+	case *uast.ReferenceDeclaration:
+		id, ok := n.Source.(*uast.Identifier)
+		if !ok {
+			return newError(n.GetMetadata(), "Sumber rujuk harus berupa variabel (identifier)", "Contoh penggunaan: rujuk alias = target")
+		}
+		targetEntry, ok := env.GetEntry(id.Name)
+		if !ok {
+			return newError(n.GetMetadata(), fmt.Sprintf("Variabel '%s' yang dirujuk tidak ditemukan", id.Name), "Deklarasikan variabel target terlebih dahulu sebelum membuat rujukan.")
+		}
+		entry, err := env.DefineReference(n.Target, targetEntry)
+		if err != nil {
+			return newError(n.GetMetadata(), err.Error(), "")
+		}
+		return entry.Current()
+
+	case *uast.TypeAliasDeclaration:
+		env.DefineTypeAlias(n.Name, n.BaseType)
+		aliasName := n.Name
+		baseType := n.BaseType
+		aliasCtor := &Builtin{
+			Fn: func(args ...Object) Object {
+				if len(args) != 1 {
+					return &Error{Message: fmt.Sprintf("%s() mengharapkan 1 argumen, menerima %d", aliasName, len(args))}
+				}
+				return castValueToType(args[0], baseType, nil, env)
+			},
+		}
+		if _, err := env.DefineWithVisibility(n.Name, aliasCtor, false, "tipe", nil); err != nil {
+			return newError(n.GetMetadata(), err.Error(), "")
+		}
+		return &String{Value: n.Name}
+
+	case *uast.CastExpression:
+		val := Eval(n.Value, env)
+		if isError(val) {
+			return val
+		}
+		return castValueToType(val, n.TargetType, n.GetMetadata(), env)
 
 	case *uast.AssignmentStatement:
 		val := Eval(n.Value, env)
@@ -204,6 +301,11 @@ func Eval(node uast.Node, env *Environment) Object {
 			}
 			prop := target.Property
 			if inst, ok := obj.(*StructInstance); ok {
+				if inst.Def.PrivateFields[prop] && !isInternalAccess(inst, env) {
+					return newError(n.GetMetadata(),
+						fmt.Sprintf("Properti '%s' bersifat privat pada bentuk '%s' dan tidak dapat diubah dari luar", prop, inst.Def.Name),
+						"Modifikasi properti privat hanya diperbolehkan dari dalam metode bentuk menggunakan 'diri' atau '@'.")
+				}
 				if n.Operator != "=" && len(n.Operator) > 1 && n.Operator[len(n.Operator)-1] == '=' {
 					baseOp := n.Operator[:len(n.Operator)-1]
 					curVal := inst.Fields[prop]
@@ -655,9 +757,19 @@ func Eval(node uast.Node, env *Environment) Object {
 		if inst, ok := obj.(*StructInstance); ok {
 			prop := n.Property
 			if val, exists := inst.Fields[prop]; exists {
+				if inst.Def.PrivateFields[prop] && !isInternalAccess(inst, env) {
+					return newError(n.GetMetadata(),
+						fmt.Sprintf("Properti '%s' bersifat privat pada bentuk '%s' dan tidak dapat diakses dari luar", prop, inst.Def.Name),
+						"Akses hanya diperbolehkan dari dalam metode bentuk menggunakan 'diri' atau '@'.")
+				}
 				return val
 			}
 			if method, exists := inst.Def.Methods[prop]; exists {
+				if inst.Def.PrivateMethods[prop] && !isInternalAccess(inst, env) {
+					return newError(n.GetMetadata(),
+						fmt.Sprintf("Metode '%s' bersifat privat pada bentuk '%s' dan tidak dapat dipanggil dari luar", prop, inst.Def.Name),
+						"Metode privat hanya dapat dipanggil secara internal dari dalam metode bentuk.")
+				}
 				boundEnv := NewEnclosedEnvironment(method.Env)
 				boundEnv.Define("diri", inst, false, inst.Def.Name)
 				boundEnv.Define("this", inst, false, inst.Def.Name)
@@ -817,6 +929,9 @@ func Eval(node uast.Node, env *Environment) Object {
 		callee := Eval(n.Callee, env)
 		if isError(callee) {
 			return callee
+		}
+		if fn, ok := callee.(*Function); ok {
+			return applyFunctionWithASTArgs(fn, n.Arguments, env, n.GetMetadata())
 		}
 		args := make([]Object, len(n.Arguments))
 		for i, argNode := range n.Arguments {
@@ -1147,3 +1262,134 @@ func newError(meta *uast.NodeMetadata, msg, hint string) *Error {
 		FriendlyHint: hint,
 	}
 }
+
+func isInternalAccess(inst *StructInstance, env *Environment) bool {
+	if env == nil || inst == nil {
+		return false
+	}
+	selfObj, ok := env.Get("diri")
+	if !ok {
+		selfObj, ok = env.Get("this")
+	}
+	if !ok {
+		selfObj, ok = env.Get("self")
+	}
+	if !ok {
+		return false
+	}
+	if callerInst, ok := selfObj.(*StructInstance); ok {
+		return callerInst == inst
+	}
+	return false
+}
+
+func castValueToType(val Object, targetType string, meta *uast.NodeMetadata, env *Environment) Object {
+	if env != nil {
+		if alias, ok := env.GetTypeAlias(targetType); ok {
+			targetType = alias
+		}
+	}
+
+	switch targetType {
+	case "Angka", "angka", "Int", "int", "Integer":
+		switch v := val.(type) {
+		case *Integer:
+			return v
+		case *Float:
+			return &Integer{Value: int64(v.Value)}
+		case *String:
+			if iv, err := strconv.ParseInt(v.Value, 10, 64); err == nil {
+				return &Integer{Value: iv}
+			}
+			if fv, err := strconv.ParseFloat(v.Value, 64); err == nil {
+				return &Integer{Value: int64(fv)}
+			}
+			return newError(meta, fmt.Sprintf("Gagal mengubah teks '%s' menjadi Angka", v.Value), "Pastikan format teks adalah angka yang valid.")
+		case *Boolean:
+			if v.Value {
+				return &Integer{Value: 1}
+			}
+			return &Integer{Value: 0}
+		default:
+			return newError(meta, fmt.Sprintf("Tidak dapat mengubah tipe %s menjadi Angka", val.Type()), "")
+		}
+
+	case "Pecahan", "pecahan", "Float", "float":
+		switch v := val.(type) {
+		case *Float:
+			return v
+		case *Integer:
+			return &Float{Value: float64(v.Value)}
+		case *String:
+			if fv, err := strconv.ParseFloat(v.Value, 64); err == nil {
+				return &Float{Value: fv}
+			}
+			return newError(meta, fmt.Sprintf("Gagal mengubah teks '%s' menjadi Pecahan", v.Value), "Pastikan format teks adalah desimal yang valid.")
+		case *Boolean:
+			if v.Value {
+				return &Float{Value: 1.0}
+			}
+			return &Float{Value: 0.0}
+		default:
+			return newError(meta, fmt.Sprintf("Tidak dapat mengubah tipe %s menjadi Pecahan", val.Type()), "")
+		}
+
+	case "Teks", "teks", "String", "string":
+		switch v := val.(type) {
+		case *String:
+			return v
+		default:
+			return &String{Value: v.Inspect()}
+		}
+
+	case "Logika", "logika", "Bool", "bool", "Boolean":
+		return nativeBool(CoerceToBoolean(val))
+
+	default:
+		return newError(meta, fmt.Sprintf("Tipe tujuan casting '%s' tidak didukung", targetType), "Tipe yang didukung: Angka, Pecahan, Teks, Logika, atau alias yang terdaftar.")
+	}
+}
+
+func applyFunctionWithASTArgs(fn *Function, argNodes []uast.Expression, callerEnv *Environment, meta *uast.NodeMetadata) Object {
+	fnEnv := NewEnclosedEnvironment(fn.Env)
+	for i, param := range fn.Parameters {
+		if param.IsReference {
+			if i >= len(argNodes) {
+				return newError(meta, fmt.Sprintf("Parameter rujuk '%s' membutuhkan argumen", param.Name), "")
+			}
+			id, ok := argNodes[i].(*uast.Identifier)
+			if !ok {
+				return newError(meta,
+					fmt.Sprintf("Argumen untuk parameter rujuk '%s' harus berupa variabel (contoh: %s(x)), bukan ekspresi atau literal", param.Name, fn.Name),
+					"Buat variabel terlebih dahulu sebelum meneruskannya sebagai referensi.")
+			}
+			targetEntry, ok := callerEnv.GetEntry(id.Name)
+			if !ok {
+				return newError(meta, fmt.Sprintf("Variabel '%s' tidak ditemukan di lingkungan pemanggil", id.Name), "")
+			}
+			if _, err := fnEnv.DefineReference(param.Name, targetEntry); err != nil {
+				return newError(meta, err.Error(), "")
+			}
+		} else {
+			var argVal Object = NULL
+			if i < len(argNodes) {
+				argVal = Eval(argNodes[i], callerEnv)
+				if isError(argVal) {
+					return argVal
+				}
+			} else if param.DefaultValue != nil {
+				argVal = Eval(param.DefaultValue, fnEnv)
+				if isError(argVal) {
+					return argVal
+				}
+			}
+			fnEnv.Define(param.Name, argVal, true, param.TypeHint)
+		}
+	}
+	res := Eval(fn.Body, fnEnv)
+	if ret, ok := res.(*ReturnValue); ok {
+		return ret.Value
+	}
+	return res
+}
+

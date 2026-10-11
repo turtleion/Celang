@@ -13,19 +13,32 @@ const DefaultHistoryCapacity = 50
 // Uses an Anchor Snapshot + Bounded Ring Buffer architecture to guarantee O(1) memory usage
 // even in long-running loops with millions of mutations.
 type VariableEntry struct {
-	Name        string
-	InitialVal  Object
-	PreviousVal Object
-	CurrentVal  Object
-	History     []Object
-	HistoryCap  int
-	IsMutable   bool
-	TypeHint    string
-	Visibility  *uast.Visibility
+	Name         string
+	InitialVal   Object
+	PreviousVal  Object
+	CurrentVal   Object
+	History      []Object
+	HistoryCap   int
+	IsMutable    bool
+	TypeHint     string
+	Visibility   *uast.Visibility
+	AliasedEntry *VariableEntry
+}
+
+// Resolve unwraps any reference chain and returns the root VariableEntry.
+func (ve *VariableEntry) Resolve() *VariableEntry {
+	curr := ve
+	for curr.AliasedEntry != nil {
+		curr = curr.AliasedEntry
+	}
+	return curr
 }
 
 // Current returns the most recent value of the variable.
 func (ve *VariableEntry) Current() Object {
+	if ve.AliasedEntry != nil {
+		return ve.AliasedEntry.Current()
+	}
 	if ve.CurrentVal != nil {
 		return ve.CurrentVal
 	}
@@ -37,6 +50,9 @@ func (ve *VariableEntry) Current() Object {
 
 // Previous returns the value right before the current one (if available).
 func (ve *VariableEntry) Previous() (Object, bool) {
+	if ve.AliasedEntry != nil {
+		return ve.AliasedEntry.Previous()
+	}
 	if ve.PreviousVal != nil {
 		return ve.PreviousVal, true
 	}
@@ -48,6 +64,9 @@ func (ve *VariableEntry) Previous() (Object, bool) {
 
 // Initial returns the first value ever assigned to this variable.
 func (ve *VariableEntry) Initial() Object {
+	if ve.AliasedEntry != nil {
+		return ve.AliasedEntry.Initial()
+	}
 	if ve.InitialVal != nil {
 		return ve.InitialVal
 	}
@@ -73,6 +92,7 @@ func NewModuleRegistry() *ModuleRegistry {
 type Environment struct {
 	mu             sync.RWMutex
 	store          map[string]*VariableEntry
+	typeAliases    map[string]string
 	outer          *Environment
 	FilePath       string
 	ModuleRoot     string
@@ -82,6 +102,7 @@ type Environment struct {
 func NewEnvironment() *Environment {
 	return &Environment{
 		store:          make(map[string]*VariableEntry),
+		typeAliases:    make(map[string]string),
 		ModuleRegistry: NewModuleRegistry(),
 	}
 }
@@ -151,6 +172,50 @@ func (e *Environment) AllEntries() map[string]*VariableEntry {
 	return snapshot
 }
 
+// DefineTypeAlias registers a custom type alias in the current environment.
+func (e *Environment) DefineTypeAlias(name, baseType string) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.typeAliases == nil {
+		e.typeAliases = make(map[string]string)
+	}
+	e.typeAliases[name] = baseType
+}
+
+// GetTypeAlias retrieves a type alias if defined in this or outer environments.
+func (e *Environment) GetTypeAlias(name string) (string, bool) {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	if e.typeAliases != nil {
+		if base, ok := e.typeAliases[name]; ok {
+			return base, true
+		}
+	}
+	if e.outer != nil {
+		return e.outer.GetTypeAlias(name)
+	}
+	return "", false
+}
+
+// DefineReference creates a transparent reference alias pointing to a target VariableEntry.
+func (e *Environment) DefineReference(aliasName string, target *VariableEntry) (*VariableEntry, error) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	if target == nil {
+		return nil, fmt.Errorf("target rujuk tidak boleh nil")
+	}
+
+	target = target.Resolve()
+	entry := &VariableEntry{
+		Name:         aliasName,
+		AliasedEntry: target,
+		IsMutable:    true,
+	}
+	e.store[aliasName] = entry
+	return entry, nil
+}
+
 // Assign updates an existing variable and records the change into its timeline history.
 func (e *Environment) Assign(name string, val Object) error {
 	e.mu.Lock()
@@ -164,24 +229,25 @@ func (e *Environment) Assign(name string, val Object) error {
 		return fmt.Errorf("variabel '%s' belum didefinisikan", name)
 	}
 
-	if !entry.IsMutable {
-		return fmt.Errorf("variabel '%s' bersifat tetap (immutable) dan tidak dapat diubah", name)
+	target := entry.Resolve()
+	if !target.IsMutable {
+		return fmt.Errorf("variabel '%s' bersifat tetap (immutable) dan tidak dapat diubah", target.Name)
 	}
 
-	entry.PreviousVal = entry.CurrentVal
-	entry.CurrentVal = val
+	target.PreviousVal = target.CurrentVal
+	target.CurrentVal = val
 
-	capLimit := entry.HistoryCap
+	capLimit := target.HistoryCap
 	if capLimit <= 0 {
 		capLimit = DefaultHistoryCapacity
 	}
 
-	if len(entry.History) >= capLimit {
+	if len(target.History) >= capLimit {
 		// Zero-allocation sliding window: drop oldest, preserve last 'capLimit' entries
-		copy(entry.History, entry.History[1:])
-		entry.History[len(entry.History)-1] = val
+		copy(target.History, target.History[1:])
+		target.History[len(target.History)-1] = val
 	} else {
-		entry.History = append(entry.History, val)
+		target.History = append(target.History, val)
 	}
 
 	return nil
@@ -199,7 +265,7 @@ func (e *Environment) Get(name string) (Object, bool) {
 	if !ok {
 		return nil, false
 	}
-	return entry.Current(), true
+	return entry.Resolve().Current(), true
 }
 
 // GetEntry retrieves the VariableEntry to inspect its time-travel history.
@@ -211,5 +277,8 @@ func (e *Environment) GetEntry(name string) (*VariableEntry, bool) {
 	if !ok && e.outer != nil {
 		return e.outer.GetEntry(name)
 	}
-	return entry, ok
+	if !ok {
+		return nil, false
+	}
+	return entry.Resolve(), true
 }

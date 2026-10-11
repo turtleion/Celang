@@ -410,6 +410,7 @@ type Parameter struct {
 	Name         string     `json:"name"`
 	TypeHint     string     `json:"type_hint,omitempty"`
 	DefaultValue Expression `json:"default_value,omitempty"`
+	IsReference  bool       `json:"is_reference,omitempty"`
 }
 
 func (p *Parameter) UnmarshalJSON(data []byte) error {
@@ -417,12 +418,14 @@ func (p *Parameter) UnmarshalJSON(data []byte) error {
 		Name         string          `json:"name"`
 		TypeHint     string          `json:"type_hint,omitempty"`
 		DefaultValue json.RawMessage `json:"default_value,omitempty"`
+		IsReference  bool            `json:"is_reference,omitempty"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
 	}
 	p.Name = raw.Name
 	p.TypeHint = raw.TypeHint
+	p.IsReference = raw.IsReference
 	if len(raw.DefaultValue) > 0 && string(raw.DefaultValue) != "null" {
 		defVal, err := UnmarshalExpressionJSON(raw.DefaultValue)
 		if err != nil {
@@ -728,6 +731,7 @@ type StructField struct {
 	Name         string     `json:"name"`
 	TypeHint     string     `json:"type_hint,omitempty"`
 	DefaultValue Expression `json:"default_value,omitempty"`
+	IsPrivate    bool       `json:"is_private,omitempty"`
 }
 
 func (f *StructField) UnmarshalJSON(data []byte) error {
@@ -735,12 +739,14 @@ func (f *StructField) UnmarshalJSON(data []byte) error {
 		Name         string          `json:"name"`
 		TypeHint     string          `json:"type_hint,omitempty"`
 		DefaultValue json.RawMessage `json:"default_value,omitempty"`
+		IsPrivate    bool            `json:"is_private,omitempty"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
 	}
 	f.Name = raw.Name
 	f.TypeHint = raw.TypeHint
+	f.IsPrivate = raw.IsPrivate
 	if len(raw.DefaultValue) > 0 && string(raw.DefaultValue) != "null" {
 		defVal, err := UnmarshalExpressionJSON(raw.DefaultValue)
 		if err != nil {
@@ -757,6 +763,7 @@ type StructMethod struct {
 	Parameters []Parameter     `json:"parameters"`
 	ReturnType string          `json:"return_type,omitempty"`
 	Body       *BlockStatement `json:"body"`
+	IsPrivate  bool            `json:"is_private,omitempty"`
 }
 
 // StructDeclaration represents: bentuk RekeningBank { ... } or struct Point { ... }
@@ -766,11 +773,59 @@ type StructDeclaration struct {
 	Name       string          `json:"name"`
 	Fields     []StructField   `json:"fields"`
 	Methods    []StructMethod  `json:"methods"`
+	Embeds     []string        `json:"embeds,omitempty"` // Embedded structs
 	Visibility *Visibility     `json:"visibility,omitempty"`
 }
 
 func (s *StructDeclaration) Type() NodeType          { return NodeTypeStructDeclaration }
 func (s *StructDeclaration) GetMetadata() *NodeMetadata { return s.Metadata }
 func (s *StructDeclaration) statementNode()          {}
+
+// ReferenceDeclaration represents: rujuk alias = target
+type ReferenceDeclaration struct {
+	NodeType NodeType      `json:"type"`
+	Metadata *NodeMetadata `json:"metadata,omitempty"`
+	Target   string        `json:"target"`
+	Source   Expression    `json:"source"`
+}
+
+func (r *ReferenceDeclaration) Type() NodeType          { return NodeTypeReferenceDeclaration }
+func (r *ReferenceDeclaration) GetMetadata() *NodeMetadata { return r.Metadata }
+func (r *ReferenceDeclaration) statementNode()          {}
+
+func (r *ReferenceDeclaration) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		NodeType NodeType        `json:"type"`
+		Metadata *NodeMetadata   `json:"metadata,omitempty"`
+		Target   string          `json:"target"`
+		Source   json.RawMessage `json:"source"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	r.NodeType = NodeTypeReferenceDeclaration
+	r.Metadata = raw.Metadata
+	r.Target = raw.Target
+	if len(raw.Source) > 0 && string(raw.Source) != "null" {
+		src, err := UnmarshalExpressionJSON(raw.Source)
+		if err != nil {
+			return err
+		}
+		r.Source = src
+	}
+	return nil
+}
+
+// TypeAliasDeclaration represents: tipe ID = Angka
+type TypeAliasDeclaration struct {
+	NodeType NodeType      `json:"type"`
+	Metadata *NodeMetadata `json:"metadata,omitempty"`
+	Name     string        `json:"name"`
+	BaseType string        `json:"base_type"`
+}
+
+func (t *TypeAliasDeclaration) Type() NodeType          { return NodeTypeTypeAliasDeclaration }
+func (t *TypeAliasDeclaration) GetMetadata() *NodeMetadata { return t.Metadata }
+func (t *TypeAliasDeclaration) statementNode()          {}
 
 

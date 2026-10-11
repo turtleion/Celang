@@ -215,7 +215,99 @@ func RegisterBuiltinsWithIO(env *Environment, in io.Reader, out io.Writer) {
 	env.Define("capitalize", kapitalisasiFn, false, "function")
 	env.Define("uppercase", kapitalisasiFn, false, "function")
 
+	// Type casting constructors: Angka(), Teks(), Logika()
+	angkaFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 {
+				return &Error{Message: fmt.Sprintf("Angka mengharapkan 1 argumen, menerima %d", len(args))}
+			}
+			return castValueToType(args[0], "Angka", nil, env)
+		},
+	}
+	env.Define("Angka", angkaFn, false, "function")
+	env.Define("angka", angkaFn, false, "function")
+
+	teksFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 {
+				return &Error{Message: fmt.Sprintf("Teks mengharapkan 1 argumen, menerima %d", len(args))}
+			}
+			return castValueToType(args[0], "Teks", nil, env)
+		},
+	}
+	env.Define("Teks", teksFn, false, "function")
+	env.Define("teks", teksFn, false, "function")
+
+	logikaFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 {
+				return &Error{Message: fmt.Sprintf("Logika mengharapkan 1 argumen, menerima %d", len(args))}
+			}
+			return castValueToType(args[0], "Logika", nil, env)
+		},
+	}
+	env.Define("Logika", logikaFn, false, "function")
+	env.Define("logika", logikaFn, false, "function")
+
+	// Deep Memory Clone Builtin: salin(obj) / clone(obj)
+	salinFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 {
+				return &Error{Message: fmt.Sprintf("salin mengharapkan 1 argumen, menerima %d", len(args))}
+			}
+			return deepClone(args[0])
+		},
+	}
+	env.Define("salin", salinFn, false, "function")
+	env.Define("clone", salinFn, false, "function")
+
 	// Register Standard Library global objects (berkas, fs, matematika, math, teks, strings, waktu, time, json)
 	RegisterStdlibGlobals(env)
+}
+
+func deepClone(obj Object) Object {
+	if obj == nil {
+		return NULL
+	}
+	switch o := obj.(type) {
+	case *Integer:
+		return &Integer{Value: o.Value}
+	case *Float:
+		return &Float{Value: o.Value}
+	case *String:
+		return &String{Value: o.Value}
+	case *Boolean:
+		return &Boolean{Value: o.Value}
+	case *Null:
+		return &Null{}
+	case *Array:
+		newElems := make([]Object, len(o.Elements))
+		for i, el := range o.Elements {
+			newElems[i] = deepClone(el)
+		}
+		return &Array{Elements: newElems}
+	case *Map:
+		newPairs := make(map[string]Object, len(o.Pairs))
+		for k, v := range o.Pairs {
+			newPairs[k] = deepClone(v)
+		}
+		return &Map{Pairs: newPairs}
+	case *StructInstance:
+		newFields := make(map[string]Object, len(o.Fields))
+		for k, v := range o.Fields {
+			newFields[k] = deepClone(v)
+		}
+		cloneInst := &StructInstance{
+			Def:    o.Def,
+			Fields: newFields,
+			Env:    NewEnclosedEnvironment(o.Def.Env),
+		}
+		cloneInst.Env.Define("diri", cloneInst, false, o.Def.Name)
+		cloneInst.Env.Define("this", cloneInst, false, o.Def.Name)
+		cloneInst.Env.Define("self", cloneInst, false, o.Def.Name)
+		return cloneInst
+	default:
+		return o
+	}
 }
 

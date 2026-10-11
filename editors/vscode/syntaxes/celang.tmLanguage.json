@@ -89,7 +89,11 @@
       "patterns": [
         {
           "name": "keyword.declaration.celang",
-          "match": "\\b(buat|konstanta|bentuk|fungsi|itu|let|const|var|def|function|struct|jieun|tetep)\\b"
+          "match": "\\b(buat|konstanta|bentuk|fungsi|itu|let|const|var|def|function|struct|jieun|tetep|rujuk|ref|tipe|privat)\\b"
+        },
+        {
+          "name": "keyword.operator.cast.celang",
+          "match": "\\b(sebagai|as)\\b"
         },
         {
           "name": "keyword.control.flow.celang",
@@ -109,7 +113,7 @@
         },
         {
           "name": "variable.language.this.celang",
-          "match": "\\b(diri|this|self)\\b"
+          "match": "(@[a-zA-Z_][a-zA-Z0-9_]*|\\b(diri|this|self)\\b)"
         }
       ]
     },
@@ -117,7 +121,7 @@
       "patterns": [
         {
           "name": "entity.name.type.celang",
-          "match": "\\b(Angka|Teks|Logika|Array|Map|Bentuk|Number|String|Boolean)\\b"
+          "match": "\\b(Angka|Pecahan|Teks|Logika|Array|Map|Bentuk|Number|Float|String|Boolean)\\b"
         }
       ]
     },
@@ -137,7 +141,7 @@
       "patterns": [
         {
           "name": "support.function.builtin.celang",
-          "match": "\\b(cetak|masukan|panjang|tipe|rentang|saring|petakan|potong_spasi|kapitalisasi|print|input|len|type|range|filter|map|trim)\\b"
+          "match": "\\b(cetak|masukan|panjang|tipe|rentang|saring|petakan|potong_spasi|kapitalisasi|print|input|len|type|range|filter|map|trim|salin|clone)\\b"
         }
       ]
     },

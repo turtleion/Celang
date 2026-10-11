@@ -246,3 +246,46 @@ func BenchmarkFunctionLoop_BytecodeVM(b *testing.B) {
 		vm.Run()
 	}
 }
+
+func TestVM_SuperBigUpdateFeatures(t *testing.T) {
+	// Test struct with @ shorthand and private block
+	code1 := `
+	bentuk Dompet {
+		privat saldo: Angka = 500,
+		setor(n: Angka) {
+			@saldo += n
+			kembalikan @saldo
+		}
+	}
+	buat d = Dompet()
+	d.setor(250)
+	`
+	res1, _, _ := runVM(t, code1)
+	if res1.Inspect() != "750" {
+		t.Errorf("expected 750, got %s", res1.Inspect())
+	}
+
+	// Test casting and type alias
+	code2 := `
+	tipe ID = Angka
+	buat x = "123" sebagai ID
+	x + 1
+	`
+	res2, _, _ := runVM(t, code2)
+	if res2.Inspect() != "124" {
+		t.Errorf("expected 124, got %s", res2.Inspect())
+	}
+
+	// Test transparent reference
+	code3 := `
+	buat a = 10
+	rujuk b = a
+	b = 40
+	a
+	`
+	res3, _, _ := runVM(t, code3)
+	if res3.Inspect() != "40" {
+		t.Errorf("expected 40, got %s", res3.Inspect())
+	}
+}
+

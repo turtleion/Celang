@@ -283,9 +283,13 @@ func (vm *VM) Run() (evaluator.Object, error) {
 			constIdx := chunk.ReadUint16(frame.ip)
 			frame.ip += 2
 			name := chunk.Constants[constIdx].(*evaluator.String).Value
-			val, exists := vm.globals[name]
-			if !exists && vm.env != nil {
+			var val evaluator.Object
+			var exists bool
+			if vm.env != nil {
 				val, exists = vm.env.Get(name)
+			}
+			if !exists {
+				val, exists = vm.globals[name]
 			}
 			if !exists {
 				return nil, fmt.Errorf("variabel global '%s' belum didefinisikan", name)
@@ -297,10 +301,14 @@ func (vm *VM) Run() (evaluator.Object, error) {
 			frame.ip += 2
 			name := chunk.Constants[constIdx].(*evaluator.String).Value
 			val := vm.peek(0)
-			vm.globals[name] = val
 			if vm.env != nil {
 				vm.env.Assign(name, val)
+				if entry, ok := vm.env.GetEntry(name); ok {
+					root := entry.Resolve()
+					vm.globals[root.Name] = root.Current()
+				}
 			}
+			vm.globals[name] = val
 
 		case bytecode.OpGetLocal:
 			slot := chunk.ReadUint16(frame.ip)

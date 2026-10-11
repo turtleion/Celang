@@ -34,6 +34,7 @@ const (
 	PIPE         TokenType = "|"
 	PIPE_ARROW   TokenType = "|>"
 	AMPERSAND    TokenType = "&"
+	AT           TokenType = "@"
 
 	// Delimiters
 	COMMA     TokenType = ","
@@ -95,7 +96,10 @@ const (
 	STYLE_BLOCK TokenType = "STYLE_BLOCK" // gaya, style, dialek
 
 	// Data Structures / Structs
-	STRUCT_DECL TokenType = "STRUCT_DECL" // bentuk, struct, tipe
+	STRUCT_DECL TokenType = "STRUCT_DECL" // bentuk, struct
+	PRIVATE     TokenType = "PRIVATE"     // privat
+	REF_DECL    TokenType = "REF_DECL"    // rujuk, ref
+	TYPE_DECL   TokenType = "TYPE_DECL"   // tipe
 )
 
 type Token struct {

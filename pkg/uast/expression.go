@@ -442,4 +442,39 @@ func (t *TemplateLiteral) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// CastExpression represents explicit type casting (e.g., expr sebagai Tipe or expr as Type).
+type CastExpression struct {
+	NodeType   NodeType      `json:"type"`
+	Metadata   *NodeMetadata `json:"metadata,omitempty"`
+	Value      Expression    `json:"value"`
+	TargetType string        `json:"target_type"`
+}
+
+func (c *CastExpression) Type() NodeType          { return NodeTypeCastExpression }
+func (c *CastExpression) GetMetadata() *NodeMetadata { return c.Metadata }
+func (c *CastExpression) expressionNode()         {}
+
+func (c *CastExpression) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		NodeType   NodeType        `json:"type"`
+		Metadata   *NodeMetadata   `json:"metadata,omitempty"`
+		Value      json.RawMessage `json:"value"`
+		TargetType string          `json:"target_type"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	c.NodeType = NodeTypeCastExpression
+	c.Metadata = raw.Metadata
+	c.TargetType = raw.TargetType
+	if len(raw.Value) > 0 && string(raw.Value) != "null" {
+		valExpr, err := UnmarshalExpressionJSON(raw.Value)
+		if err != nil {
+			return fmt.Errorf("CastExpression.value unmarshal error: %w", err)
+		}
+		c.Value = valExpr
+	}
+	return nil
+}
+
 

@@ -130,3 +130,69 @@ cetak(tipe(benar))        // Output: Logika
 cetak(tipe([1, 2, 3]))    // Output: Array
 cetak(tipe({"a": 1}))     // Output: Map
 ```
+
+---
+
+## 7. Referensi Transparan (`rujuk` / `ref`)
+
+Celang menyediakan pengikatan referensi memori (*reference binding*) yang aman dan transparan tanpa kerumitan pointer (`*`, `&`, atau bahaya *dangling pointer*). Fitur ini bekerja untuk semua tipe data, termasuk tipe primitif:
+
+```celang
+buat angkaUtama = 10
+rujuk aliasAngka = angkaUtama
+
+// Mengubah nilai melalui alias secara otomatis mengubah sumbernya
+aliasAngka = 25
+cetak(angkaUtama) // Output: 25
+
+// Melalui parameter fungsi
+fungsi kalikanDua(rujuk x: Angka) {
+    x *= 2
+}
+
+buat skor = 50
+kalikanDua(skor)
+cetak(skor) // Output: 100
+```
+
+---
+
+## 8. Alias Tipe (`tipe`)
+
+Anda dapat mendefinisikan alias tipe untuk memperjelas domain data program:
+
+```celang
+tipe IDPengguna = Angka
+tipe Surel = Teks
+
+buat id: IDPengguna = 1001
+buat kontak: Surel = "pengguna@celang.id"
+```
+
+Setiap alias tipe secara otomatis berfungsi ganda sebagai fungsi konstruktor / casting:
+
+```celang
+buat idBaru = IDPengguna("2026")
+cetak(idBaru) // Output: 2026 (Angka)
+```
+
+---
+
+## 9. Konversi Tipe Eksplisit (*Type Casting*)
+
+Celang mendukung konversi tipe eksplisit menggunakan operator `sebagai` (atau `as`) serta fungsi konstruktor bawaan:
+
+### Operator `sebagai` / `as`
+```celang
+buat bilangan = "123" sebagai Angka   // 123
+buat bulat = 3.99 sebagai Angka        // 3 (pemotongan desimal)
+buat string = 450 sebagai Teks         // "450"
+buat id = "789" sebagai IDPengguna     // 789
+```
+
+### Konstruktor Bawaan
+```celang
+buat a = Angka("100")
+buat t = Teks(500)
+buat b = Logika(1) // benar
+```

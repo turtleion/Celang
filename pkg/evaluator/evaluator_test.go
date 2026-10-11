@@ -900,3 +900,288 @@ func TestEvaluator_TimeTravelMemoryBounded(t *testing.T) {
 		t.Errorf("Expected history window from 951 to 1000, got %d to %d", firstHistVal, lastHistVal)
 	}
 }
+
+func testEvalSource(t *testing.T, input string) evaluator.Object {
+	t.Helper()
+	l := parser.NewLexer(input)
+	p := parser.NewParser(l)
+	prog, err := p.ParseProgram()
+	if err != nil {
+		t.Fatalf("parser error: %v", err)
+	}
+	env := evaluator.NewEnvironment()
+	evaluator.RegisterBuiltins(env, nil)
+	return evaluator.Eval(prog, env)
+}
+
+func TestEvaluator_StructVisibilityAndAtShorthand(t *testing.T) {
+	// 1. Test internal access with @ and diri, and block external access to privat field
+	inputSuccess := `
+	bentuk Dompet {
+		pemilik: Teks,
+		privat saldo: Angka = 1000,
+		privat {
+			pin: Angka = 1234,
+			cekPin(p: Angka) {
+				kembalikan p == @pin
+			}
+		}
+
+		setor(jumlah: Angka) {
+			@saldo += jumlah
+			kembalikan @saldo
+		}
+
+		ambilSaldo(p: Angka) {
+			jika @cekPin(p) {
+				kembalikan @saldo
+			}
+			kembalikan -1
+		}
+	}
+
+	buat d = Dompet("Andi")
+	buat s1 = d.setor(500)
+	buat s2 = d.ambilSaldo(1234)
+	buat s3 = d.ambilSaldo(0)
+	[s1, s2, s3, d.pemilik]
+	`
+	res := testEvalSource(t, inputSuccess)
+	arr, ok := res.(*evaluator.Array)
+	if !ok {
+		t.Fatalf("expected array, got %s", res.Inspect())
+	}
+	if arr.Elements[0].(*evaluator.Integer).Value != 1500 {
+		t.Errorf("expected s1 = 1500, got %v", arr.Elements[0])
+	}
+	if arr.Elements[1].(*evaluator.Integer).Value != 1500 {
+		t.Errorf("expected s2 = 1500, got %v", arr.Elements[1])
+	}
+	if arr.Elements[2].(*evaluator.Integer).Value != -1 {
+		t.Errorf("expected s3 = -1, got %v", arr.Elements[2])
+	}
+	if arr.Elements[3].(*evaluator.String).Value != "Andi" {
+		t.Errorf("expected d.pemilik = Andi, got %v", arr.Elements[3])
+	}
+
+	// 2. Direct external read on private field should fail
+	inputFailRead := `
+	bentuk Dompet {
+		privat saldo: Angka = 1000
+	}
+	buat d = Dompet()
+	d.saldo
+	`
+	errObj := testEvalSource(t, inputFailRead)
+	if errObj.Type() != evaluator.ERROR_OBJ {
+		t.Errorf("expected error on external read of privat saldo, got %s", errObj.Inspect())
+	} else {
+		errVal := errObj.(*evaluator.Error)
+		if !strings.Contains(errVal.Message, "privat") {
+			t.Errorf("expected error message mentioning 'privat', got %s", errVal.Message)
+		}
+	}
+
+	// 3. Direct external write on private field should fail
+	inputFailWrite := `
+	bentuk Dompet {
+		privat saldo: Angka = 1000
+	}
+	buat d = Dompet()
+	d.saldo = 9999
+	`
+	errObjWrite := testEvalSource(t, inputFailWrite)
+	if errObjWrite.Type() != evaluator.ERROR_OBJ {
+		t.Errorf("expected error on external write of privat saldo, got %s", errObjWrite.Inspect())
+	}
+
+	// 4. Direct external call to private method should fail
+	inputFailMethod := `
+	bentuk Kunci {
+		privat rahasia() {
+			kembalikan 42
+		}
+	}
+	buat k = Kunci()
+	k.rahasia()
+	`
+	errObjMethod := testEvalSource(t, inputFailMethod)
+	if errObjMethod.Type() != evaluator.ERROR_OBJ {
+		t.Errorf("expected error on external call of private method, got %s", errObjMethod.Inspect())
+	}
+}
+
+func TestEvaluator_ReferenceTransparent(t *testing.T) {
+	// 1. Primitive reference binding
+	input := `
+	buat a = 10
+	rujuk b = a
+	b = 25
+	buat c = a
+	a = 50
+	buat d = b
+	[c, d, b.sebelumnya]
+	`
+	res := testEvalSource(t, input)
+	arr, ok := res.(*evaluator.Array)
+	if !ok {
+		t.Fatalf("expected array, got %s", res.Inspect())
+	}
+	if arr.Elements[0].(*evaluator.Integer).Value != 25 {
+		t.Errorf("expected c = 25, got %v", arr.Elements[0])
+	}
+	if arr.Elements[1].(*evaluator.Integer).Value != 50 {
+		t.Errorf("expected d = 50, got %v", arr.Elements[1])
+	}
+	if arr.Elements[2].(*evaluator.Integer).Value != 25 {
+		t.Errorf("expected b.sebelumnya = 25, got %v", arr.Elements[2])
+	}
+
+	// 2. Function parameter reference
+	inputFn := `
+	fungsi tambahLima(rujuk x: Angka) {
+		x += 5
+	}
+	buat skor = 100
+	tambahLima(skor)
+	skor
+	`
+	resFn := testEvalSource(t, inputFn)
+	intVal, ok := resFn.(*evaluator.Integer)
+	if !ok || intVal.Value != 105 {
+		t.Errorf("expected skor = 105, got %s", resFn.Inspect())
+	}
+}
+
+func TestEvaluator_StructEmbedding(t *testing.T) {
+	input := `
+	bentuk Identitas {
+		nama: Teks,
+		umur: Angka,
+		sapa() {
+			kembalikan "Halo, aku " + @nama
+		}
+	}
+
+	bentuk Admin {
+		Identitas,
+		level: Angka = 1,
+		sapaAdmin() {
+			kembalikan @sapa() + " (Level " + Teks(@level) + ")"
+		}
+	}
+
+	buat adm = Admin("Budi", 30, 99)
+	[adm.nama, adm.umur, adm.level, adm.sapa(), adm.sapaAdmin()]
+	`
+	res := testEvalSource(t, input)
+	arr, ok := res.(*evaluator.Array)
+	if !ok {
+		t.Fatalf("expected array, got %s", res.Inspect())
+	}
+	if arr.Elements[0].(*evaluator.String).Value != "Budi" {
+		t.Errorf("expected adm.nama = Budi, got %v", arr.Elements[0])
+	}
+	if arr.Elements[1].(*evaluator.Integer).Value != 30 {
+		t.Errorf("expected adm.umur = 30, got %v", arr.Elements[1])
+	}
+	if arr.Elements[2].(*evaluator.Integer).Value != 99 {
+		t.Errorf("expected adm.level = 99, got %v", arr.Elements[2])
+	}
+	if arr.Elements[3].(*evaluator.String).Value != "Halo, aku Budi" {
+		t.Errorf("expected adm.sapa() = 'Halo, aku Budi', got %v", arr.Elements[3])
+	}
+	if arr.Elements[4].(*evaluator.String).Value != "Halo, aku Budi (Level 99)" {
+		t.Errorf("expected adm.sapaAdmin() = 'Halo, aku Budi (Level 99)', got %v", arr.Elements[4])
+	}
+}
+
+func TestEvaluator_TypeAliasAndCasting(t *testing.T) {
+	input := `
+	tipe ID = Angka
+
+	buat a = "42" sebagai Angka
+	buat b = 3.99 sebagai Angka
+	buat c = 100 sebagai Teks
+	buat d = "99" sebagai ID
+	buat e = ID("123")
+	buat f = Angka("500")
+	buat g = Teks(777)
+	buat h = Logika(1)
+
+	[a, b, c, d, e, f, g, h]
+	`
+	res := testEvalSource(t, input)
+	arr, ok := res.(*evaluator.Array)
+	if !ok {
+		t.Fatalf("expected array, got %s", res.Inspect())
+	}
+	if arr.Elements[0].(*evaluator.Integer).Value != 42 {
+		t.Errorf("expected a = 42, got %v", arr.Elements[0])
+	}
+	if arr.Elements[1].(*evaluator.Integer).Value != 3 {
+		t.Errorf("expected b = 3, got %v", arr.Elements[1])
+	}
+	if arr.Elements[2].(*evaluator.String).Value != "100" {
+		t.Errorf("expected c = '100', got %v", arr.Elements[2])
+	}
+	if arr.Elements[3].(*evaluator.Integer).Value != 99 {
+		t.Errorf("expected d = 99, got %v", arr.Elements[3])
+	}
+	if arr.Elements[4].(*evaluator.Integer).Value != 123 {
+		t.Errorf("expected e = 123, got %v", arr.Elements[4])
+	}
+	if arr.Elements[5].(*evaluator.Integer).Value != 500 {
+		t.Errorf("expected f = 500, got %v", arr.Elements[5])
+	}
+	if arr.Elements[6].(*evaluator.String).Value != "777" {
+		t.Errorf("expected g = '777', got %v", arr.Elements[6])
+	}
+	if !arr.Elements[7].(*evaluator.Boolean).Value {
+		t.Errorf("expected h = true, got %v", arr.Elements[7])
+	}
+}
+
+func TestEvaluator_DeepClone(t *testing.T) {
+	input := `
+	bentuk Profil {
+		nama: Teks,
+		skor: Angka
+	}
+
+	buat p1 = Profil("Dewi", 100)
+	buat p2 = salin(p1)
+	p2.nama = "Sari"
+	p2.skor = 200
+
+	buat arr1 = [1, 2, [3, 4]]
+	buat arr2 = clone(arr1)
+	arr2[0] = 99
+
+	[p1.nama, p1.skor, p2.nama, p2.skor, arr1[0], arr2[0]]
+	`
+	res := testEvalSource(t, input)
+	arr, ok := res.(*evaluator.Array)
+	if !ok {
+		t.Fatalf("expected array, got %s", res.Inspect())
+	}
+	if arr.Elements[0].(*evaluator.String).Value != "Dewi" {
+		t.Errorf("expected p1.nama = Dewi, got %v", arr.Elements[0])
+	}
+	if arr.Elements[1].(*evaluator.Integer).Value != 100 {
+		t.Errorf("expected p1.skor = 100, got %v", arr.Elements[1])
+	}
+	if arr.Elements[2].(*evaluator.String).Value != "Sari" {
+		t.Errorf("expected p2.nama = Sari, got %v", arr.Elements[2])
+	}
+	if arr.Elements[3].(*evaluator.Integer).Value != 200 {
+		t.Errorf("expected p2.skor = 200, got %v", arr.Elements[3])
+	}
+	if arr.Elements[4].(*evaluator.Integer).Value != 1 {
+		t.Errorf("expected arr1[0] = 1, got %v", arr.Elements[4])
+	}
+	if arr.Elements[5].(*evaluator.Integer).Value != 99 {
+		t.Errorf("expected arr2[0] = 99, got %v", arr.Elements[5])
+	}
+}
+

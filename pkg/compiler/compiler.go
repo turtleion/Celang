@@ -469,7 +469,8 @@ func (c *Compiler) compileStatement(stmt uast.Statement) error {
 		return nil
 
 	case *uast.ImportDeclaration, *uast.StructDeclaration, *uast.ConcurrencyStatement,
-		*uast.DestructureDeclaration, *uast.DestructureAssignment, *uast.TryCatchStatement, *uast.ThrowStatement:
+		*uast.DestructureDeclaration, *uast.DestructureAssignment, *uast.TryCatchStatement, *uast.ThrowStatement,
+		*uast.ReferenceDeclaration, *uast.TypeAliasDeclaration:
 		wrapper := &evaluator.ASTNodeWrapper{Node: s}
 		constIdx := c.chunk.AddConstant(wrapper)
 		c.emitOp(bytecode.OpEvalAST, line)
@@ -724,6 +725,13 @@ func (c *Compiler) compileExpression(expr uast.Expression) error {
 			}
 			c.emitOp(bytecode.OpAdd, line)
 		}
+		return nil
+
+	case *uast.CastExpression:
+		wrapper := &evaluator.ASTNodeWrapper{Node: e}
+		constIdx := c.chunk.AddConstant(wrapper)
+		c.emitOp(bytecode.OpEvalAST, line)
+		c.chunk.WriteUint16(constIdx, line)
 		return nil
 
 	default:

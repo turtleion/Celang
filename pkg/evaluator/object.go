@@ -177,10 +177,13 @@ func (p *Pointer) Inspect() string {
 
 // StructDefinition represents the blueprint of a custom data type (bentuk).
 type StructDefinition struct {
-	Name    string
-	Fields  []uast.StructField
-	Methods map[string]*Function
-	Env     *Environment
+	Name           string
+	Fields         []uast.StructField
+	Methods        map[string]*Function
+	PrivateFields  map[string]bool
+	PrivateMethods map[string]bool
+	Embeds         []string
+	Env            *Environment
 }
 
 func (s *StructDefinition) Type() ObjectType { return STRUCT_DEF_OBJ }

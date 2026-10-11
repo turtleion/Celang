@@ -114,6 +114,13 @@ func UnmarshalExpressionJSON(data []byte) (Expression, error) {
 		}
 		return &templ, nil
 
+	case NodeTypeCastExpression:
+		var cast CastExpression
+		if err := json.Unmarshal(data, &cast); err != nil {
+			return nil, err
+		}
+		return &cast, nil
+
 	default:
 		return nil, fmt.Errorf("unrecognized expression type: '%s'", detector.Type)
 	}
@@ -288,6 +295,22 @@ func UnmarshalStatementJSON(data []byte) (Statement, error) {
 		}
 		sDecl.NodeType = NodeTypeStructDeclaration
 		return &sDecl, nil
+
+	case NodeTypeReferenceDeclaration:
+		var refDecl ReferenceDeclaration
+		if err := json.Unmarshal(data, &refDecl); err != nil {
+			return nil, err
+		}
+		refDecl.NodeType = NodeTypeReferenceDeclaration
+		return &refDecl, nil
+
+	case NodeTypeTypeAliasDeclaration:
+		var typeAlias TypeAliasDeclaration
+		if err := json.Unmarshal(data, &typeAlias); err != nil {
+			return nil, err
+		}
+		typeAlias.NodeType = NodeTypeTypeAliasDeclaration
+		return &typeAlias, nil
 
 	default:
 		return nil, fmt.Errorf("unrecognized statement type: '%s'", detector.Type)
@@ -597,6 +620,30 @@ func NewStyleBlock(styleName string, body *BlockStatement) *StyleBlockStatement 
 		NodeType:  NodeTypeStyleBlockStatement,
 		StyleName: styleName,
 		Body:      body,
+	}
+}
+
+func NewCastExpr(val Expression, targetType string) *CastExpression {
+	return &CastExpression{
+		NodeType:   NodeTypeCastExpression,
+		Value:      val,
+		TargetType: targetType,
+	}
+}
+
+func NewRefDecl(target string, src Expression) *ReferenceDeclaration {
+	return &ReferenceDeclaration{
+		NodeType: NodeTypeReferenceDeclaration,
+		Target:   target,
+		Source:   src,
+	}
+}
+
+func NewTypeAliasDecl(name, baseType string) *TypeAliasDeclaration {
+	return &TypeAliasDeclaration{
+		NodeType: NodeTypeTypeAliasDeclaration,
+		Name:     name,
+		BaseType: baseType,
 	}
 }
 

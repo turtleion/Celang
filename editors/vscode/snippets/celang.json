@@ -99,5 +99,29 @@
       "}"
     ],
     "description": "Blok pergantian dialek sintaks dalam kode"
+  },
+  "Deklarasi Rujukan": {
+    "prefix": "rujuk",
+    "body": [
+      "rujuk ${1:alias} = ${2:target}"
+    ],
+    "description": "Mendeklarasikan referensi transparan ke variabel yang sudah ada"
+  },
+  "Deklarasi Alias Tipe": {
+    "prefix": "tipe",
+    "body": [
+      "tipe ${1:NamaAlias} = ${2:TipeBasis}"
+    ],
+    "description": "Mendeklarasikan alias tipe kustom"
+  },
+  "Blok Privat Bentuk": {
+    "prefix": "privat",
+    "body": [
+      "privat {",
+      "\t${1:properti}: ${2:Tipe},",
+      "}"
+    ],
+    "description": "Blok enkapsulasi privat dalam bentuk (struct)"
   }
 }
+
