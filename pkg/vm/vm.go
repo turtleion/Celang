@@ -9,6 +9,7 @@ import (
 
 	"celang/pkg/bytecode"
 	"celang/pkg/evaluator"
+	"celang/pkg/uast"
 )
 
 var (
@@ -409,6 +410,12 @@ func (vm *VM) Run() (evaluator.Object, error) {
 			if errObj, ok := res.(*evaluator.Error); ok {
 				return nil, fmt.Errorf("%s", errObj.Inspect())
 			}
+			if _, isExpr := wrapper.Node.(uast.Expression); isExpr {
+				if res == nil {
+					res = &evaluator.Null{}
+				}
+				vm.push(res)
+			}
 
 		case bytecode.OpTimeTravel:
 			nameIdx := chunk.ReadUint16(frame.ip)
@@ -522,6 +529,16 @@ func (vm *VM) callValue(argCount int) error {
 func (vm *VM) evalIndex(targetObj, indexObj evaluator.Object) (evaluator.Object, error) {
 	switch obj := targetObj.(type) {
 	case *evaluator.Array:
+		if sVal, ok := indexObj.(*evaluator.String); ok {
+			if sVal.Value == "tambah" || sVal.Value == "push" {
+				return &evaluator.Builtin{
+					Fn: func(args ...evaluator.Object) evaluator.Object {
+						obj.Elements = append(obj.Elements, args...)
+						return obj
+					},
+				}, nil
+			}
+		}
 		var idx int = -1
 		if iVal, ok := indexObj.(*evaluator.Integer); ok {
 			idx = int(iVal.Value)

@@ -1,0 +1,55 @@
+{
+  "name": "celang",
+  "displayName": "Celang Language Support",
+  "description": "Dukungan sintaks resmi, pelengkapan kode, dan cuplikan (snippets) untuk bahasa pemrograman Celang.",
+  "version": "1.0.0",
+  "publisher": "celang-project",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/celang/celang"
+  },
+  "engines": {
+    "vscode": "^1.70.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Snippets"
+  ],
+  "keywords": [
+    "celang",
+    "indonesian",
+    "human-centric",
+    "syntax-styling",
+    "time-travel"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "celang",
+        "aliases": [
+          "Celang",
+          "celang"
+        ],
+        "extensions": [
+          ".ce",
+          ".ast"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "celang",
+        "scopeName": "source.celang",
+        "path": "./syntaxes/celang.tmLanguage.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "celang",
+        "path": "./snippets/celang.json"
+      }
+    ]
+  }
+}

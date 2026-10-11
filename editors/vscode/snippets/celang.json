@@ -1,0 +1,103 @@
+{
+  "Deklarasi Variabel": {
+    "prefix": "buat",
+    "body": [
+      "buat ${1:namaVariabel} = ${2:nilai}"
+    ],
+    "description": "Mendeklarasikan variabel baru yang dapat diubah nilainya"
+  },
+  "Deklarasi Konstanta": {
+    "prefix": "konstanta",
+    "body": [
+      "konstanta ${1:NAMA_KONSTANTA} = ${2:nilai}"
+    ],
+    "description": "Mendeklarasikan konstanta tetap"
+  },
+  "Deklarasi Fungsi": {
+    "prefix": "fungsi",
+    "body": [
+      "fungsi ${1:namaFungsi}(${2:parameter}) {",
+      "\t${3:// implementasi}",
+      "\tkembalikan ${4:hasil}",
+      "}"
+    ],
+    "description": "Mendeklarasikan fungsi baru"
+  },
+  "Deklarasi Bentuk (Struct)": {
+    "prefix": "bentuk",
+    "body": [
+      "bentuk ${1:NamaBentuk} {",
+      "\t${2:properti}: ${3:Tipe},",
+      "",
+      "\tfungsi ${4:metode}(${5:args}) {",
+      "\t\t${6:// logika}",
+      "\t\tkembalikan diri.${2:properti}",
+      "\t}",
+      "}"
+    ],
+    "description": "Mendeklarasikan cetak biru Bentuk (Struct) baru"
+  },
+  "Kondisi Jika-Selain": {
+    "prefix": "jika",
+    "body": [
+      "jika ${1:kondisi} {",
+      "\t${2:// cabang benar}",
+      "} selain {",
+      "\t${3:// cabang salah}",
+      "}"
+    ],
+    "description": "Pernyataan percabangan kondisi jika-selain"
+  },
+  "Perulangan Selama": {
+    "prefix": "selama",
+    "body": [
+      "selama ${1:kondisi} {",
+      "\t${2:// alur perulangan}",
+    ],
+    "description": "Perulangan bersyarat (while loop)"
+  },
+  "Perulangan Untuk Koleksi": {
+    "prefix": "untuk",
+    "body": [
+      "untuk ${1:item} dalam ${2:koleksi} {",
+      "\t${3:cetak(item)}",
+      "}"
+    ],
+    "description": "Perulangan for-each untuk array atau rentang"
+  },
+  "Asinkron Sambil": {
+    "prefix": "sambil",
+    "body": [
+      "sambil {",
+      "\t${1:// tugas latar belakang non-blocking}",
+      "}"
+    ],
+    "description": "Konkurensi asinkron di latar belakang"
+  },
+  "Paralel Bersamaan": {
+    "prefix": "bersamaan",
+    "body": [
+      "bersamaan {",
+      "\t${1:// tugas1()}",
+      "\t${2:// tugas2()}",
+      "}"
+    ],
+    "description": "Eksekusi paralel terkoordinasi (wait group otomatis)"
+  },
+  "Cetak Terminal": {
+    "prefix": "cetak",
+    "body": [
+      "cetak(${1:pesan})"
+    ],
+    "description": "Mencetak teks atau nilai ke output terminal"
+  },
+  "In-Code Styling Block": {
+    "prefix": "gaya",
+    "body": [
+      "gaya \"${1|javascript,pythonic,sunda|}\" {",
+      "\t${2:// kode dengan gaya sintaks terpilih}",
+      "}"
+    ],
+    "description": "Blok pergantian dialek sintaks dalam kode"
+  }
+}

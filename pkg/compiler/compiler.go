@@ -108,13 +108,45 @@ func (c *Compiler) compileStatement(stmt uast.Statement) error {
 		return nil
 
 	case *uast.AssignmentStatement:
-		if err := c.compileExpression(s.Value); err != nil {
-			return err
-		}
-
 		switch target := s.Target.(type) {
 		case *uast.Identifier:
 			slot, isLocal := c.resolveLocal(target.Name)
+			if s.Operator != "=" && len(s.Operator) > 1 && s.Operator[len(s.Operator)-1] == '=' {
+				// Push current target value
+				if isLocal {
+					c.emitOp(bytecode.OpGetLocal, line)
+					c.chunk.WriteUint16(slot, line)
+				} else {
+					constIdx := c.chunk.AddConstant(&evaluator.String{Value: target.Name})
+					c.emitOp(bytecode.OpGetGlobal, line)
+					c.chunk.WriteUint16(constIdx, line)
+				}
+				// Push rhs value
+				if err := c.compileExpression(s.Value); err != nil {
+					return err
+				}
+				// Apply base operator
+				baseOp := s.Operator[:len(s.Operator)-1]
+				switch baseOp {
+				case "+":
+					c.emitOp(bytecode.OpAdd, line)
+				case "-":
+					c.emitOp(bytecode.OpSub, line)
+				case "*":
+					c.emitOp(bytecode.OpMul, line)
+				case "/":
+					c.emitOp(bytecode.OpDiv, line)
+				case "%":
+					c.emitOp(bytecode.OpMod, line)
+				default:
+					return fmt.Errorf("operator penugasan '%s' tidak dikenal", s.Operator)
+				}
+			} else {
+				if err := c.compileExpression(s.Value); err != nil {
+					return err
+				}
+			}
+
 			if isLocal {
 				c.emitOp(bytecode.OpSetLocal, line)
 				c.chunk.WriteUint16(slot, line)
@@ -127,12 +159,44 @@ func (c *Compiler) compileStatement(stmt uast.Statement) error {
 			return nil
 
 		case *uast.MemberExpression:
-			// Stack currently has [value]
+			if s.Operator != "=" && len(s.Operator) > 1 && s.Operator[len(s.Operator)-1] == '=' {
+				if err := c.compileExpression(target); err != nil {
+					return err
+				}
+				if err := c.compileExpression(s.Value); err != nil {
+					return err
+				}
+				baseOp := s.Operator[:len(s.Operator)-1]
+				switch baseOp {
+				case "+":
+					c.emitOp(bytecode.OpAdd, line)
+				case "-":
+					c.emitOp(bytecode.OpSub, line)
+				case "*":
+					c.emitOp(bytecode.OpMul, line)
+				case "/":
+					c.emitOp(bytecode.OpDiv, line)
+				case "%":
+					c.emitOp(bytecode.OpMod, line)
+				default:
+					return fmt.Errorf("operator penugasan '%s' tidak dikenal", s.Operator)
+				}
+			} else {
+				if err := c.compileExpression(s.Value); err != nil {
+					return err
+				}
+			}
+
+			// Stack currently has [computed_value]
 			if err := c.compileExpression(target.Object); err != nil {
 				return err
 			}
 			if target.Computed {
-				if intVal, err := strconv.ParseInt(target.Property, 10, 64); err == nil {
+				if target.PropertyExpr != nil {
+					if err := c.compileExpression(target.PropertyExpr); err != nil {
+						return err
+					}
+				} else if intVal, err := strconv.ParseInt(target.Property, 10, 64); err == nil {
 					constIdx := c.chunk.AddConstant(&evaluator.Integer{Value: intVal})
 					c.emitOp(bytecode.OpConstant, line)
 					c.chunk.WriteUint16(constIdx, line)
@@ -354,6 +418,14 @@ func (c *Compiler) compileStatement(stmt uast.Statement) error {
 		return nil
 
 	case *uast.FunctionDeclaration:
+		if containsInnerFunction(s.Body) {
+			wrapper := &evaluator.ASTNodeWrapper{Node: s}
+			constIdx := c.chunk.AddConstant(wrapper)
+			c.emitOp(bytecode.OpEvalAST, line)
+			c.chunk.WriteUint16(constIdx, line)
+			return nil
+		}
+
 		fnComp := newFunctionCompiler(c, s.Name, len(s.Parameters))
 		for _, p := range s.Parameters {
 			fnComp.addLocal(p.Name)
@@ -589,7 +661,11 @@ func (c *Compiler) compileExpression(expr uast.Expression) error {
 			return err
 		}
 		if e.Computed {
-			if intVal, err := strconv.ParseInt(e.Property, 10, 64); err == nil {
+			if e.PropertyExpr != nil {
+				if err := c.compileExpression(e.PropertyExpr); err != nil {
+					return err
+				}
+			} else if intVal, err := strconv.ParseInt(e.Property, 10, 64); err == nil {
 				constIdx := c.chunk.AddConstant(&evaluator.Integer{Value: intVal})
 				c.emitOp(bytecode.OpConstant, line)
 				c.chunk.WriteUint16(constIdx, line)
@@ -626,27 +702,9 @@ func (c *Compiler) compileExpression(expr uast.Expression) error {
 		return nil
 
 	case *uast.FunctionExpression:
-		fnComp := newFunctionCompiler(c, "", len(e.Parameters))
-		for _, p := range e.Parameters {
-			fnComp.addLocal(p.Name)
-		}
-		if e.Body != nil {
-			for _, child := range e.Body.Statements {
-				if err := fnComp.compileStatement(child); err != nil {
-					return err
-				}
-			}
-		}
-		fnComp.emitOp(bytecode.OpNull, line)
-		fnComp.emitOp(bytecode.OpReturn, line)
-
-		compiledFn := &bytecode.CompiledFunction{
-			Name:      "",
-			NumParams: len(e.Parameters),
-			Chunk:     fnComp.chunk,
-		}
-		constIdx := c.chunk.AddConstant(compiledFn)
-		c.emitOp(bytecode.OpConstant, line)
+		wrapper := &evaluator.ASTNodeWrapper{Node: e}
+		constIdx := c.chunk.AddConstant(wrapper)
+		c.emitOp(bytecode.OpEvalAST, line)
 		c.chunk.WriteUint16(constIdx, line)
 		return nil
 
@@ -750,4 +808,49 @@ func (c *Compiler) resolveLocal(name string) (uint16, bool) {
 		}
 	}
 	return 0, false
+}
+
+func containsInnerFunction(stmt uast.Statement) bool {
+	if stmt == nil {
+		return false
+	}
+	var found bool
+	var walk func(n uast.Node)
+	walk = func(n uast.Node) {
+		if n == nil || found {
+			return
+		}
+		switch node := n.(type) {
+		case *uast.FunctionDeclaration, *uast.FunctionExpression:
+			found = true
+			return
+		case *uast.BlockStatement:
+			for _, s := range node.Statements {
+				walk(s)
+			}
+		case *uast.ReturnStatement:
+			if node.Value != nil {
+				walk(node.Value)
+			}
+		case *uast.ExpressionStatement:
+			walk(node.Expression)
+		case *uast.VariableDeclaration:
+			if node.Value != nil {
+				walk(node.Value)
+			}
+		case *uast.AssignmentStatement:
+			walk(node.Value)
+		case *uast.IfStatement:
+			walk(node.Condition)
+			walk(node.Consequent)
+			if node.Alternate != nil {
+				walk(node.Alternate)
+			}
+		case *uast.WhileStatement:
+			walk(node.Condition)
+			walk(node.Body)
+		}
+	}
+	walk(stmt)
+	return found
 }

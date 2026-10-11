@@ -208,11 +208,12 @@ func (c *CallExpression) UnmarshalJSON(data []byte) error {
 // MemberExpression represents accessing properties (e.g., x.sebelumnya, user.nama, data[0]).
 // This is essential for features like Time-Travel Variables (.sebelumnya, .awal).
 type MemberExpression struct {
-	NodeType NodeType      `json:"type"`
-	Metadata *NodeMetadata `json:"metadata,omitempty"`
-	Object   Expression    `json:"object"`
-	Property string        `json:"property"`
-	Computed bool          `json:"computed"` // true if obj[prop]
+	NodeType     NodeType      `json:"type"`
+	Metadata     *NodeMetadata `json:"metadata,omitempty"`
+	Object       Expression    `json:"object"`
+	Property     string        `json:"property"`
+	PropertyExpr Expression    `json:"property_expr,omitempty"`
+	Computed     bool          `json:"computed"` // true if obj[prop]
 }
 
 func (m *MemberExpression) Type() NodeType          { return NodeTypeMemberExpression }
@@ -221,11 +222,12 @@ func (m *MemberExpression) expressionNode()         {}
 
 func (m *MemberExpression) UnmarshalJSON(data []byte) error {
 	var raw struct {
-		NodeType NodeType        `json:"type"`
-		Metadata *NodeMetadata   `json:"metadata,omitempty"`
-		Object   json.RawMessage `json:"object"`
-		Property string          `json:"property"`
-		Computed bool            `json:"computed"`
+		NodeType     NodeType        `json:"type"`
+		Metadata     *NodeMetadata   `json:"metadata,omitempty"`
+		Object       json.RawMessage `json:"object"`
+		Property     string          `json:"property"`
+		PropertyExpr json.RawMessage `json:"property_expr,omitempty"`
+		Computed     bool            `json:"computed"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
@@ -239,6 +241,12 @@ func (m *MemberExpression) UnmarshalJSON(data []byte) error {
 	m.Object = objExpr
 	m.Property = raw.Property
 	m.Computed = raw.Computed
+	if len(raw.PropertyExpr) > 0 && string(raw.PropertyExpr) != "null" {
+		propExpr, err := UnmarshalExpressionJSON(raw.PropertyExpr)
+		if err == nil {
+			m.PropertyExpr = propExpr
+		}
+	}
 	return nil
 }
 

@@ -12,12 +12,12 @@ hero:
     - theme: brand
       text: 🚀 Mulai Sekarang
       link: /panduan/mulai-cepat
+    - theme: brand
+      text: 🎮 Buka Playground Web
+      link: /playground
     - theme: alt
-      text: ⚡ Coba Fitur Time-Travel
+      text: ⚡ Coba Time-Travel
       link: /fitur-khas/time-travel
-    - theme: alt
-      text: 🎨 Pelajari Syntax Styling
-      link: /gaya-sintaks/multi-dialek
 
 features:
   - icon: 🎨

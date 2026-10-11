@@ -1768,11 +1768,12 @@ func (p *Parser) parseIndexExpression(left uast.Expression) uast.Expression {
 	}
 
 	return &uast.MemberExpression{
-		NodeType: uast.NodeTypeMemberExpression,
-		Metadata: meta,
-		Object:   left,
-		Property: propStr,
-		Computed: true,
+		NodeType:     uast.NodeTypeMemberExpression,
+		Metadata:     meta,
+		Object:       left,
+		Property:     propStr,
+		PropertyExpr: index,
+		Computed:     true,
 	}
 }
 

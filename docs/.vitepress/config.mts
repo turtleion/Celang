@@ -61,6 +61,7 @@ export default defineConfig({
     siteTitle: 'Celang',
     nav: [
       { text: 'Panduan', link: '/panduan/mulai-cepat' },
+      { text: 'Playground', link: '/playground' },
       { text: 'Fitur Unggulan', link: '/fitur-khas/time-travel' },
       { text: 'Syntax Styling', link: '/gaya-sintaks/multi-dialek' },
       { text: 'Stdlib API', link: '/pustaka-standar/matematika' },

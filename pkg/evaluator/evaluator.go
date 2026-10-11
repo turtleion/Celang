@@ -615,11 +615,25 @@ func Eval(node uast.Node, env *Environment) Object {
 			return obj
 		}
 
-		// 1. Array index access (e.g. arr[0] or arr.0)
+		// 1. Array index access (e.g. arr[0] or arr.0) or built-in methods (arr.tambah, arr.push)
 		if arr, ok := obj.(*Array); ok {
+			if n.Property == "tambah" || n.Property == "push" {
+				return &Builtin{
+					Fn: func(args ...Object) Object {
+						arr.Elements = append(arr.Elements, args...)
+						return arr
+					},
+				}
+			}
 			var intIdx int64
 			var hasInt bool
-			if parsed, err := strconv.ParseInt(n.Property, 10, 64); err == nil {
+			if n.Computed && n.PropertyExpr != nil {
+				idxObj := Eval(n.PropertyExpr, env)
+				if iVal, _, isInt, ok := CoerceToNumeric(idxObj); ok && isInt {
+					intIdx = iVal
+					hasInt = true
+				}
+			} else if parsed, err := strconv.ParseInt(n.Property, 10, 64); err == nil {
 				intIdx = parsed
 				hasInt = true
 			} else {
