@@ -587,6 +587,13 @@ func (f *Formatter) formatStatement(stmt uast.Statement, indent int) string {
 		sb.WriteString(prefix)
 		sb.WriteString("}")
 		return sb.String()
+
+	case *uast.DeferStatement:
+		var sb strings.Builder
+		sb.WriteString(prefix)
+		sb.WriteString("saat_selesai ")
+		sb.WriteString(strings.TrimSpace(f.formatStatement(s.Body, indent)))
+		return sb.String()
 	}
 
 	return prefix
@@ -656,7 +663,13 @@ func (f *Formatter) formatExpression(expr uast.Expression) string {
 	case *uast.MemberExpression:
 		objStr := f.formatExpression(e.Object)
 		if e.Computed {
+			if e.PropertyExpr != nil {
+				return fmt.Sprintf("%s[%s]", objStr, f.formatExpression(e.PropertyExpr))
+			}
 			return fmt.Sprintf("%s[%s]", objStr, e.Property)
+		}
+		if e.Safe {
+			return fmt.Sprintf("%s?.%s", objStr, e.Property)
 		}
 		return fmt.Sprintf("%s.%s", objStr, e.Property)
 
@@ -744,6 +757,23 @@ func (f *Formatter) formatExpression(expr uast.Expression) string {
 			sb.WriteByte('`')
 		} else {
 			sb.WriteByte('"')
+		}
+		return sb.String()
+
+	case *uast.SafeNavigationExpression:
+		return "mungkin " + f.formatExpression(e.Value)
+
+	case *uast.NullCoalesceExpression:
+		return f.formatExpression(e.Left) + " kalau kosong " + f.formatExpression(e.Right)
+
+	case *uast.RangeExpression:
+		var sb strings.Builder
+		if e.Start != nil {
+			sb.WriteString(f.formatExpression(e.Start))
+		}
+		sb.WriteString("..")
+		if e.End != nil {
+			sb.WriteString(f.formatExpression(e.End))
 		}
 		return sb.String()
 	}

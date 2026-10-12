@@ -34,11 +34,11 @@ export default defineConfig({
           },
           {
             name: 'keyword.control.celang',
-            match: '\\b(jika|selain jika|selain|selama|untuk|dalam|kembalikan|berhenti|lanjut|sambil|bersamaan|mundur ke|lempar|tangkap|gaya|if|else|while|for|return|break|continue|async|parallel|lamun|salami|pikeun|balikkeun)\\b'
+            match: '\\b(jika|selain jika|selain|selama|untuk|dalam|kembalikan|berhenti|lanjut|sambil|bersamaan|mundur ke|lempar|tangkap|gaya|mungkin|saat_selesai|kalau|bila|defer|if|else|while|for|return|break|continue|async|parallel|lamun|salami|pikeun|balikkeun)\\b'
           },
           {
             name: 'keyword.declaration.celang',
-            match: '\\b(buat|konstanta|fungsi|bentuk|itu|let|const|var|function|def|jieun|tetep|struct)\\b'
+            match: '\\b(buat|konstanta|fungsi|bentuk|itu|rujuk|sebagai|tipe|let|const|var|function|def|jieun|tetep|struct|ref|as)\\b'
           },
           {
             name: 'constant.language.celang',
@@ -92,6 +92,7 @@ export default defineConfig({
           { text: 'Destrukturisasi (Array & Map)', link: '/fitur-khas/destrukturisasi' },
           { text: 'String Interpolation', link: '/fitur-khas/interpolasi-teks' },
           { text: 'Pipeline Operator (|>)', link: '/fitur-khas/pipeline' },
+          { text: 'Ergonomi & Null Safety (mungkin, kalau kosong, saat_selesai, ..)', link: '/fitur-khas/ergonomi-dan-null-safety' },
           { text: 'Konkurensi Alami (sambil & bersamaan)', link: '/fitur-khas/konkurensi' }
         ]
       },

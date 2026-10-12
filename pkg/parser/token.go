@@ -46,7 +46,9 @@ const (
 	RBRACE    TokenType = "}"
 	LBRACKET  TokenType = "["
 	RBRACKET  TokenType = "]"
-	DOT       TokenType = "."
+	DOT          TokenType = "."
+	RANGE        TokenType = ".."
+	OPTIONAL_DOT TokenType = "?."
 
 	// Keywords
 	VAR_DECL    TokenType = "VAR_DECL"    // buat, let, var
@@ -100,6 +102,11 @@ const (
 	PRIVATE     TokenType = "PRIVATE"     // privat
 	REF_DECL    TokenType = "REF_DECL"    // rujuk, ref
 	TYPE_DECL   TokenType = "TYPE_DECL"   // tipe
+
+	// Human Ergonomics & Null Safety
+	NULL_COALESCE TokenType = "NULL_COALESCE" // kalau kosong, bila kosong, ??
+	MAYBE         TokenType = "MAYBE"         // mungkin
+	DEFER         TokenType = "DEFER"         // saat_selesai, defer
 )
 
 type Token struct {

@@ -289,3 +289,52 @@ func TestVM_SuperBigUpdateFeatures(t *testing.T) {
 	}
 }
 
+func TestVM_ErgonomicFeatures(t *testing.T) {
+	// 1. Safe navigation (mungkin) & Null Coalesce (kalau kosong / ??)
+	code1 := `
+	bentuk Detail {
+		kota: Teks
+	}
+	bentuk Akun {
+		detail: Detail
+	}
+	buat a = Akun(Detail("Surabaya"))
+	buat b = kosong
+
+	buat k1 = mungkin a.detail.kota
+	buat k2 = mungkin b.detail.kota kalau kosong "Jakarta"
+	k1 + " " + k2
+	`
+	res1, _, _ := runVM(t, code1)
+	if res1.Inspect() != "\"Surabaya Jakarta\"" && res1.Inspect() != "Surabaya Jakarta" {
+		t.Errorf("expected 'Surabaya Jakarta', got %s", res1.Inspect())
+	}
+
+	// 2. Defer (saat_selesai)
+	code2 := `
+	buat log = []
+	fungsi tes() {
+		saat_selesai log.tambah("tutup")
+		log.tambah("kerja")
+		kembalikan 100
+	}
+	tes()
+	log[1]
+	`
+	res2, _, _ := runVM(t, code2)
+	if res2.Inspect() != "\"tutup\"" && res2.Inspect() != "tutup" {
+		t.Errorf("expected 'tutup', got %s", res2.Inspect())
+	}
+
+	// 3. Range & Slicing
+	code3 := `
+	buat angka = 1..5
+	buat sub = angka[1..3]
+	sub[0] + sub[1]
+	`
+	res3, _, _ := runVM(t, code3)
+	if res3.Inspect() != "5" { // sub is [2, 3] -> 2 + 3 = 5
+		t.Errorf("expected 5, got %s", res3.Inspect())
+	}
+}
+

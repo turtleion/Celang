@@ -214,6 +214,7 @@ type MemberExpression struct {
 	Property     string        `json:"property"`
 	PropertyExpr Expression    `json:"property_expr,omitempty"`
 	Computed     bool          `json:"computed"` // true if obj[prop]
+	Safe         bool          `json:"safe,omitempty"` // true if optional chaining / safe navigation
 }
 
 func (m *MemberExpression) Type() NodeType          { return NodeTypeMemberExpression }
@@ -228,6 +229,7 @@ func (m *MemberExpression) UnmarshalJSON(data []byte) error {
 		Property     string          `json:"property"`
 		PropertyExpr json.RawMessage `json:"property_expr,omitempty"`
 		Computed     bool            `json:"computed"`
+		Safe         bool            `json:"safe,omitempty"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
@@ -241,6 +243,7 @@ func (m *MemberExpression) UnmarshalJSON(data []byte) error {
 	m.Object = objExpr
 	m.Property = raw.Property
 	m.Computed = raw.Computed
+	m.Safe = raw.Safe
 	if len(raw.PropertyExpr) > 0 && string(raw.PropertyExpr) != "null" {
 		propExpr, err := UnmarshalExpressionJSON(raw.PropertyExpr)
 		if err == nil {
@@ -473,6 +476,123 @@ func (c *CastExpression) UnmarshalJSON(data []byte) error {
 			return fmt.Errorf("CastExpression.value unmarshal error: %w", err)
 		}
 		c.Value = valExpr
+	}
+	return nil
+}
+
+// SafeNavigationExpression represents maybe / safe navigation (e.g. mungkin pengguna.profil.alamat.kota).
+type SafeNavigationExpression struct {
+	NodeType NodeType      `json:"type"`
+	Metadata *NodeMetadata `json:"metadata,omitempty"`
+	Value    Expression    `json:"value"`
+}
+
+func (s *SafeNavigationExpression) Type() NodeType          { return NodeTypeSafeNavigationExpression }
+func (s *SafeNavigationExpression) GetMetadata() *NodeMetadata { return s.Metadata }
+func (s *SafeNavigationExpression) expressionNode()         {}
+
+func (s *SafeNavigationExpression) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		NodeType NodeType        `json:"type"`
+		Metadata *NodeMetadata   `json:"metadata,omitempty"`
+		Value    json.RawMessage `json:"value"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	s.NodeType = NodeTypeSafeNavigationExpression
+	s.Metadata = raw.Metadata
+	if len(raw.Value) > 0 && string(raw.Value) != "null" {
+		valExpr, err := UnmarshalExpressionJSON(raw.Value)
+		if err != nil {
+			return fmt.Errorf("SafeNavigationExpression.value unmarshal error: %w", err)
+		}
+		s.Value = valExpr
+	}
+	return nil
+}
+
+// NullCoalesceExpression represents null fallback (e.g. a kalau kosong b or a ?? b).
+type NullCoalesceExpression struct {
+	NodeType NodeType      `json:"type"`
+	Metadata *NodeMetadata `json:"metadata,omitempty"`
+	Left     Expression    `json:"left"`
+	Right    Expression    `json:"right"`
+}
+
+func (n *NullCoalesceExpression) Type() NodeType          { return NodeTypeNullCoalesceExpression }
+func (n *NullCoalesceExpression) GetMetadata() *NodeMetadata { return n.Metadata }
+func (n *NullCoalesceExpression) expressionNode()         {}
+
+func (n *NullCoalesceExpression) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		NodeType NodeType        `json:"type"`
+		Metadata *NodeMetadata   `json:"metadata,omitempty"`
+		Left     json.RawMessage `json:"left"`
+		Right    json.RawMessage `json:"right"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	n.NodeType = NodeTypeNullCoalesceExpression
+	n.Metadata = raw.Metadata
+	if len(raw.Left) > 0 && string(raw.Left) != "null" {
+		leftExpr, err := UnmarshalExpressionJSON(raw.Left)
+		if err != nil {
+			return fmt.Errorf("NullCoalesceExpression.left unmarshal error: %w", err)
+		}
+		n.Left = leftExpr
+	}
+	if len(raw.Right) > 0 && string(raw.Right) != "null" {
+		rightExpr, err := UnmarshalExpressionJSON(raw.Right)
+		if err != nil {
+			return fmt.Errorf("NullCoalesceExpression.right unmarshal error: %w", err)
+		}
+		n.Right = rightExpr
+	}
+	return nil
+}
+
+// RangeExpression represents numeric range or slice boundary (e.g. 1..5, arr[0..2], ..10, 5..).
+type RangeExpression struct {
+	NodeType  NodeType      `json:"type"`
+	Metadata  *NodeMetadata `json:"metadata,omitempty"`
+	Start     Expression    `json:"start,omitempty"`
+	End       Expression    `json:"end,omitempty"`
+	Inclusive bool          `json:"inclusive"`
+}
+
+func (r *RangeExpression) Type() NodeType          { return NodeTypeRangeExpression }
+func (r *RangeExpression) GetMetadata() *NodeMetadata { return r.Metadata }
+func (r *RangeExpression) expressionNode()         {}
+
+func (r *RangeExpression) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		NodeType  NodeType        `json:"type"`
+		Metadata  *NodeMetadata   `json:"metadata,omitempty"`
+		Start     json.RawMessage `json:"start,omitempty"`
+		End       json.RawMessage `json:"end,omitempty"`
+		Inclusive bool            `json:"inclusive"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	r.NodeType = NodeTypeRangeExpression
+	r.Metadata = raw.Metadata
+	r.Inclusive = raw.Inclusive
+	if len(raw.Start) > 0 && string(raw.Start) != "null" {
+		startExpr, err := UnmarshalExpressionJSON(raw.Start)
+		if err != nil {
+			return fmt.Errorf("RangeExpression.start unmarshal error: %w", err)
+		}
+		r.Start = startExpr
+	}
+	if len(raw.End) > 0 && string(raw.End) != "null" {
+		endExpr, err := UnmarshalExpressionJSON(raw.End)
+		if err != nil {
+			return fmt.Errorf("RangeExpression.end unmarshal error: %w", err)
+		}
+		r.End = endExpr
 	}
 	return nil
 }

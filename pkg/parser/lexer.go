@@ -81,12 +81,18 @@ var keywords = map[string]TokenType{
 	"gaya":         STYLE_BLOCK,
 	"style":        STYLE_BLOCK,
 	"dialek":       STYLE_BLOCK,
-	"bentuk":       STRUCT_DECL,
-	"struct":       STRUCT_DECL,
-	"privat":       PRIVATE,
-	"rujuk":        REF_DECL,
-	"ref":          REF_DECL,
-	"tipe":         TYPE_DECL,
+	"bentuk":         STRUCT_DECL,
+	"struct":         STRUCT_DECL,
+	"privat":         PRIVATE,
+	"rujuk":          REF_DECL,
+	"ref":            REF_DECL,
+	"tipe":           TYPE_DECL,
+	"mungkin":        MAYBE,
+	"saat_selesai":   DEFER,
+	"defer":          DEFER,
+	"ketika_selesai": DEFER,
+	"kalau_kosong":   NULL_COALESCE,
+	"bila_kosong":    NULL_COALESCE,
 }
 
 type Lexer struct {
@@ -229,7 +235,22 @@ func (l *Lexer) NextToken() Token {
 	case ']':
 		tok = Token{Type: RBRACKET, Literal: "]", Line: tok.Line, Column: tok.Column}
 	case '.':
-		tok = Token{Type: DOT, Literal: ".", Line: tok.Line, Column: tok.Column}
+		if l.peekChar() == '.' {
+			l.readChar()
+			tok = Token{Type: RANGE, Literal: "..", Line: tok.Line, Column: tok.Column}
+		} else {
+			tok = Token{Type: DOT, Literal: ".", Line: tok.Line, Column: tok.Column}
+		}
+	case '?':
+		if l.peekChar() == '?' {
+			l.readChar()
+			tok = Token{Type: NULL_COALESCE, Literal: "??", Line: tok.Line, Column: tok.Column}
+		} else if l.peekChar() == '.' {
+			l.readChar()
+			tok = Token{Type: OPTIONAL_DOT, Literal: "?.", Line: tok.Line, Column: tok.Column}
+		} else {
+			tok = Token{Type: ILLEGAL, Literal: string(l.ch), Line: tok.Line, Column: tok.Column}
+		}
 	case '"', '\'', '`':
 		tok.Type = STRING
 		tok.Literal = l.readString(l.ch)
@@ -248,6 +269,22 @@ func (l *Lexer) NextToken() Token {
 				l.skipWhitespaceAndComments()
 				secondWord := l.readIdentifier()
 				tok.Type = ELSE_IF
+				tok.Literal = tok.Literal + " " + secondWord
+			}
+
+			// Handle compound keywords: "kalau kosong", "bila kosong"
+			if (tok.Literal == "kalau" || tok.Literal == "bila") && (l.peekNextWord() == "kosong" || l.peekNextWord() == "nihil" || l.peekNextWord() == "null") {
+				l.skipWhitespaceAndComments()
+				secondWord := l.readIdentifier()
+				tok.Type = NULL_COALESCE
+				tok.Literal = tok.Literal + " " + secondWord
+			}
+
+			// Handle compound keywords: "saat selesai"
+			if tok.Literal == "saat" && l.peekNextWord() == "selesai" {
+				l.skipWhitespaceAndComments()
+				secondWord := l.readIdentifier()
+				tok.Type = DEFER
 				tok.Literal = tok.Literal + " " + secondWord
 			}
 

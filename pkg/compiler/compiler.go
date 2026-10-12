@@ -470,7 +470,7 @@ func (c *Compiler) compileStatement(stmt uast.Statement) error {
 
 	case *uast.ImportDeclaration, *uast.StructDeclaration, *uast.ConcurrencyStatement,
 		*uast.DestructureDeclaration, *uast.DestructureAssignment, *uast.TryCatchStatement, *uast.ThrowStatement,
-		*uast.ReferenceDeclaration, *uast.TypeAliasDeclaration:
+		*uast.ReferenceDeclaration, *uast.TypeAliasDeclaration, *uast.DeferStatement:
 		wrapper := &evaluator.ASTNodeWrapper{Node: s}
 		constIdx := c.chunk.AddConstant(wrapper)
 		c.emitOp(bytecode.OpEvalAST, line)
@@ -646,6 +646,21 @@ func (c *Compiler) compileExpression(expr uast.Expression) error {
 		return nil
 
 	case *uast.MemberExpression:
+		if e.Safe {
+			wrapper := &evaluator.ASTNodeWrapper{Node: e}
+			constIdx := c.chunk.AddConstant(wrapper)
+			c.emitOp(bytecode.OpEvalAST, line)
+			c.chunk.WriteUint16(constIdx, line)
+			return nil
+		}
+		if _, isRange := e.PropertyExpr.(*uast.RangeExpression); isRange {
+			wrapper := &evaluator.ASTNodeWrapper{Node: e}
+			constIdx := c.chunk.AddConstant(wrapper)
+			c.emitOp(bytecode.OpEvalAST, line)
+			c.chunk.WriteUint16(constIdx, line)
+			return nil
+		}
+
 		if id, ok := e.Object.(*uast.Identifier); ok {
 			switch e.Property {
 			case "sebelumnya", "prev", "previous", "awal", "initial", "first", "histori", "history":
@@ -727,7 +742,7 @@ func (c *Compiler) compileExpression(expr uast.Expression) error {
 		}
 		return nil
 
-	case *uast.CastExpression:
+	case *uast.CastExpression, *uast.SafeNavigationExpression, *uast.NullCoalesceExpression, *uast.RangeExpression:
 		wrapper := &evaluator.ASTNodeWrapper{Node: e}
 		constIdx := c.chunk.AddConstant(wrapper)
 		c.emitOp(bytecode.OpEvalAST, line)
@@ -829,7 +844,7 @@ func containsInnerFunction(stmt uast.Statement) bool {
 			return
 		}
 		switch node := n.(type) {
-		case *uast.FunctionDeclaration, *uast.FunctionExpression:
+		case *uast.FunctionDeclaration, *uast.FunctionExpression, *uast.DeferStatement:
 			found = true
 			return
 		case *uast.BlockStatement:

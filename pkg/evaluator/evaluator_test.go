@@ -1185,3 +1185,150 @@ func TestEvaluator_DeepClone(t *testing.T) {
 	}
 }
 
+func TestEvaluator_ErgonomicFeatures(t *testing.T) {
+	// 1. Safe Navigation (mungkin) & Null Coalesce (kalau kosong / ??)
+	inputSafeNav := `
+	bentuk Profil {
+		kota: Teks
+	}
+	bentuk Pengguna {
+		profil: Profil
+	}
+
+	buat p1 = kosong
+	buat p2 = Pengguna(Profil("Bandung"))
+	buat p3 = Pengguna(kosong)
+
+	buat kota1 = mungkin p1.profil.kota
+	buat kota2 = mungkin p2.profil.kota
+	buat kota3 = mungkin p3.profil.kota
+
+	buat fb1 = kota1 kalau kosong "Default"
+	buat fb2 = kota2 kalau kosong "Default"
+	buat fb3 = kota3 ?? "Default"
+	buat fbFalse = salah kalau kosong benar
+	buat fbZero = 0 kalau kosong 99
+
+	[kota1 == kosong, kota2, kota3 == kosong, fb1, fb2, fb3, fbFalse, fbZero]
+	`
+	res1 := testEvalSource(t, inputSafeNav)
+	arr1, ok := res1.(*evaluator.Array)
+	if !ok {
+		t.Fatalf("expected array, got %s", res1.Inspect())
+	}
+	if !arr1.Elements[0].(*evaluator.Boolean).Value {
+		t.Errorf("expected kota1 == kosong, got %v", arr1.Elements[0])
+	}
+	if arr1.Elements[1].(*evaluator.String).Value != "Bandung" {
+		t.Errorf("expected kota2 = Bandung, got %v", arr1.Elements[1])
+	}
+	if !arr1.Elements[2].(*evaluator.Boolean).Value {
+		t.Errorf("expected kota3 == kosong, got %v", arr1.Elements[2])
+	}
+	if arr1.Elements[3].(*evaluator.String).Value != "Default" {
+		t.Errorf("expected fb1 = Default, got %v", arr1.Elements[3])
+	}
+	if arr1.Elements[4].(*evaluator.String).Value != "Bandung" {
+		t.Errorf("expected fb2 = Bandung, got %v", arr1.Elements[4])
+	}
+	if arr1.Elements[5].(*evaluator.String).Value != "Default" {
+		t.Errorf("expected fb3 = Default, got %v", arr1.Elements[5])
+	}
+	if arr1.Elements[6].(*evaluator.Boolean).Value != false {
+		t.Errorf("expected fbFalse = false, got %v", arr1.Elements[6])
+	}
+	if arr1.Elements[7].(*evaluator.Integer).Value != 0 {
+		t.Errorf("expected fbZero = 0, got %v", arr1.Elements[7])
+	}
+
+	// 2. Defer / saat_selesai (LIFO order & early return)
+	inputDefer := `
+	buat log = []
+
+	fungsi tes_defer() {
+		saat_selesai log.tambah("akhir_1")
+		saat_selesai log.tambah("akhir_2")
+		log.tambah("tengah")
+		kembalikan 42
+	}
+
+	buat hasil = tes_defer()
+	[hasil, log]
+	`
+	res2 := testEvalSource(t, inputDefer)
+	arr2, ok := res2.(*evaluator.Array)
+	if !ok {
+		t.Fatalf("expected array, got %s", res2.Inspect())
+	}
+	if arr2.Elements[0].(*evaluator.Integer).Value != 42 {
+		t.Errorf("expected hasil = 42, got %v", arr2.Elements[0])
+	}
+	logArr := arr2.Elements[1].(*evaluator.Array)
+	if len(logArr.Elements) != 3 {
+		t.Fatalf("expected 3 log elements, got %d", len(logArr.Elements))
+	}
+	// LIFO: "tengah", then "akhir_2", then "akhir_1"
+	if logArr.Elements[0].(*evaluator.String).Value != "tengah" {
+		t.Errorf("expected log[0] = tengah, got %v", logArr.Elements[0])
+	}
+	if logArr.Elements[1].(*evaluator.String).Value != "akhir_2" {
+		t.Errorf("expected log[1] = akhir_2, got %v", logArr.Elements[1])
+	}
+	if logArr.Elements[2].(*evaluator.String).Value != "akhir_1" {
+		t.Errorf("expected log[2] = akhir_1, got %v", logArr.Elements[2])
+	}
+
+	// 3. Range & Slicing (1..5, arr[1..3], str[0..2])
+	inputRange := `
+	buat r = 1..5
+
+	buat total = 0
+	untuk x dalam 1..5 {
+		total += x
+	}
+
+	buat data = [10, 20, 30, 40, 50]
+	buat s1 = data[1..3]
+	buat s2 = data[..2]
+	buat s3 = data[3..]
+
+	buat kata = "Celang"
+	buat sub_kata = kata[0..2]
+
+	[r, total, s1, s2, s3, sub_kata]
+	`
+	res3 := testEvalSource(t, inputRange)
+	arr3, ok := res3.(*evaluator.Array)
+	if !ok {
+		t.Fatalf("expected array, got %s", res3.Inspect())
+	}
+	// r = [1, 2, 3, 4, 5]
+	rArr := arr3.Elements[0].(*evaluator.Array)
+	if len(rArr.Elements) != 5 || rArr.Elements[4].(*evaluator.Integer).Value != 5 {
+		t.Errorf("expected r = [1, 2, 3, 4, 5], got %s", rArr.Inspect())
+	}
+	// total = 15
+	if arr3.Elements[1].(*evaluator.Integer).Value != 15 {
+		t.Errorf("expected total = 15, got %v", arr3.Elements[1])
+	}
+	// s1 = [20, 30]
+	s1Arr := arr3.Elements[2].(*evaluator.Array)
+	if len(s1Arr.Elements) != 2 || s1Arr.Elements[0].(*evaluator.Integer).Value != 20 || s1Arr.Elements[1].(*evaluator.Integer).Value != 30 {
+		t.Errorf("expected s1 = [20, 30], got %s", s1Arr.Inspect())
+	}
+	// s2 = [10, 20]
+	s2Arr := arr3.Elements[3].(*evaluator.Array)
+	if len(s2Arr.Elements) != 2 || s2Arr.Elements[0].(*evaluator.Integer).Value != 10 || s2Arr.Elements[1].(*evaluator.Integer).Value != 20 {
+		t.Errorf("expected s2 = [10, 20], got %s", s2Arr.Inspect())
+	}
+	// s3 = [40, 50]
+	s3Arr := arr3.Elements[4].(*evaluator.Array)
+	if len(s3Arr.Elements) != 2 || s3Arr.Elements[0].(*evaluator.Integer).Value != 40 || s3Arr.Elements[1].(*evaluator.Integer).Value != 50 {
+		t.Errorf("expected s3 = [40, 50], got %s", s3Arr.Inspect())
+	}
+	// sub_kata = "Ce"
+	if arr3.Elements[5].(*evaluator.String).Value != "Ce" {
+		t.Errorf("expected sub_kata = Ce, got %v", arr3.Elements[5])
+	}
+}
+
