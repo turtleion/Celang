@@ -1,0 +1,76 @@
+// ==============================================================
+// Demo Fitur Ergonomis & Human-Centric Celang
+// 1. Navigasi Objek Aman: 'mungkin'
+// 2. Nilai Cadangan Instan: 'kalau kosong' / '??'
+// 3. Pembersihan Otomatis (Defer): 'saat_selesai'
+// 4. Sintaks Rentang & Pemotongan: '..', [awal..akhir]
+// ==============================================================
+
+cetak("=== 1. DEMO SAAT_SELESAI (DEFER / HOUSEKEEPING) ===")
+fungsi proses_transaksi() {
+    cetak("1. Membuka koneksi database...")
+    saat_selesai cetak("4. [saat_selesai] Menutup koneksi database (cleanup 1)")
+    saat_selesai cetak("3. [saat_selesai] Melepaskan kunci memori (cleanup 2)")
+
+    cetak("2. Memproses data transaksi...")
+    kembalikan "Transaksi Berhasil!"
+}
+buat hasil_transaksi = proses_transaksi()
+cetak("Status:", hasil_transaksi)
+
+cetak("\n=== 2. DEMO NULL SAFETY ('mungkin') & FALLBACK ('kalau kosong') ===")
+bentuk Alamat {
+    kota: Teks
+}
+
+bentuk Profil {
+    nama: Teks,
+    alamat: Alamat
+}
+
+bentuk AkunPengguna {
+    id: Angka,
+    profil: Profil
+}
+
+// Akun yang lengkap datanya
+buat user_lengkap = AkunPengguna(1, Profil("Budi", Alamat("Bandung")))
+
+// Akun dengan profil kosong / nihil
+buat user_kosong = AkunPengguna(2, kosong)
+
+// Navigasi aman tanpa takut crash null-pointer:
+buat kota_budi = mungkin user_lengkap.profil.alamat.kota kalau kosong "Kota Tidak Diketahui"
+buat kota_anonim = mungkin user_kosong.profil.alamat.kota kalau kosong "Kota Tidak Diketahui"
+
+cetak("Kota User 1:", kota_budi)
+cetak("Kota User 2:", kota_anonim)
+
+// Nilai cadangan singkat:
+buat nama_input = kosong
+buat nama_final = nama_input kalau kosong "Tamu Anonim"
+cetak("Nama pengguna:", nama_final)
+
+cetak("\n=== 3. DEMO RENTANG NATIVE ('..') & SLICING KOLEKSI ===")
+// Perulangan rentang 1 sampai 5
+buat total = 0
+untuk angka dalam 1..5 {
+    total += angka
+}
+cetak("Total penjumlahan 1..5:", total)
+
+// Slicing Array
+buat daftar_nilai = [10, 20, 30, 40, 50]
+buat tengah = daftar_nilai[1..4]   // Ambil indeks 1 sampai sebelum 4 -> [20, 30, 40]
+buat awalan = daftar_nilai[..2]    // Dari awal sampai indeks 2 -> [10, 20]
+buat akhiran = daftar_nilai[3..]   // Dari indeks 3 sampai akhir -> [40, 50]
+
+cetak("Array asli:", daftar_nilai)
+cetak("Potongan tengah [1..4]:", tengah)
+cetak("Potongan awalan [..2]:", awalan)
+cetak("Potongan akhiran [3..]:", akhiran)
+
+// Slicing Teks (String)
+buat bahasa = "Bahasa Celang"
+buat cuplikan = bahasa[7..13]      // "Celang"
+cetak("Cuplikan teks [7..13]:", cuplikan)

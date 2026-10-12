@@ -12,38 +12,43 @@ const (
 	_ int = iota
 	LOWEST
 	PIPELINE_PREC // |>
+	COALESCE_PREC // kalau kosong, ??
 	OR_PREC       // atau, ||
 	AND_PREC      // dan, &&
+	RANGE_PREC    // ..
 	EQUALS        // ==, !=
 	LESSGREATER   // <, >, <=, >=
 	SUM           // +, -
 	PRODUCT       // *, /, %
 	CAST_PREC     // sebagai, as
-	PREFIX        // -x, !x, bukan x
+	PREFIX        // -x, !x, bukan x, mungkin x
 	CALL          // hitung(x)
-	INDEX         // arr[0], map["kunci"], obj.prop
+	INDEX         // arr[0], map["kunci"], obj.prop, obj?.prop
 )
 
 var precedences = map[TokenType]int{
-	PIPE_ARROW: PIPELINE_PREC,
-	OR:         OR_PREC,
-	PIPE:       OR_PREC,
-	AND:        AND_PREC,
-	EQ:         EQUALS,
-	NOT_EQ:     EQUALS,
-	LT:         LESSGREATER,
-	GT:         LESSGREATER,
-	LT_EQ:      LESSGREATER,
-	GT_EQ:      LESSGREATER,
-	PLUS:       SUM,
-	MINUS:      SUM,
-	SLASH:      PRODUCT,
-	ASTERISK:   PRODUCT,
-	PERCENT:    PRODUCT,
-	AS:         CAST_PREC,
-	LPAREN:     CALL,
-	LBRACKET:   INDEX,
-	DOT:        INDEX,
+	PIPE_ARROW:    PIPELINE_PREC,
+	NULL_COALESCE: COALESCE_PREC,
+	OR:            OR_PREC,
+	PIPE:          OR_PREC,
+	AND:           AND_PREC,
+	RANGE:         RANGE_PREC,
+	EQ:            EQUALS,
+	NOT_EQ:        EQUALS,
+	LT:            LESSGREATER,
+	GT:            LESSGREATER,
+	LT_EQ:         LESSGREATER,
+	GT_EQ:         LESSGREATER,
+	PLUS:          SUM,
+	MINUS:         SUM,
+	SLASH:         PRODUCT,
+	ASTERISK:      PRODUCT,
+	PERCENT:       PRODUCT,
+	AS:            CAST_PREC,
+	LPAREN:        CALL,
+	LBRACKET:      INDEX,
+	DOT:           INDEX,
+	OPTIONAL_DOT:  INDEX,
 }
 
 type (
@@ -88,9 +93,13 @@ func NewParser(l *Lexer) *Parser {
 	p.registerPrefix(LBRACE, p.parseMapLiteral)
 	p.registerPrefix(FUNC, p.parseFunctionExpression)
 	p.registerPrefix(AT, p.parseAtExpression)
+	p.registerPrefix(MAYBE, p.parseSafeNavigationExpression)
+	p.registerPrefix(RANGE, p.parsePrefixRangeExpression)
 
 	p.infixParseFns = make(map[TokenType]infixParseFn)
 	p.registerInfix(PIPE_ARROW, p.parsePipelineExpression)
+	p.registerInfix(NULL_COALESCE, p.parseNullCoalesceExpression)
+	p.registerInfix(RANGE, p.parseInfixRangeExpression)
 	p.registerInfix(PLUS, p.parseInfixExpression)
 	p.registerInfix(MINUS, p.parseInfixExpression)
 	p.registerInfix(SLASH, p.parseInfixExpression)
@@ -108,6 +117,7 @@ func NewParser(l *Lexer) *Parser {
 	p.registerInfix(LPAREN, p.parseCallExpression)
 	p.registerInfix(LBRACKET, p.parseIndexExpression)
 	p.registerInfix(DOT, p.parseMemberExpression)
+	p.registerInfix(OPTIONAL_DOT, p.parseOptionalMemberExpression)
 
 	// Read two tokens to populate curToken and peekToken
 	p.nextToken()
@@ -239,6 +249,8 @@ func (p *Parser) parseStatement() uast.Statement {
 		return p.parseTypeDeclaration()
 	case REF_DECL:
 		return p.parseReferenceDeclaration()
+	case DEFER:
+		return p.parseDeferStatement()
 	default:
 		return p.parseExpressionStatement()
 	}
@@ -1937,6 +1949,112 @@ func (p *Parser) parseCastExpression(left uast.Expression) uast.Expression {
 		Metadata:   meta,
 		Value:      left,
 		TargetType: targetType,
+	}
+}
+
+func (p *Parser) parseDeferStatement() *uast.DeferStatement {
+	meta := p.currentMetadata()
+	p.nextToken() // eat 'saat_selesai' / 'defer'
+
+	var body uast.Statement
+	if p.curTokenIs(LBRACE) {
+		body = p.parseBlockStatement()
+	} else {
+		body = p.parseStatement()
+	}
+
+	return &uast.DeferStatement{
+		NodeType: uast.NodeTypeDeferStatement,
+		Metadata: meta,
+		Body:     body,
+	}
+}
+
+func (p *Parser) parseSafeNavigationExpression() uast.Expression {
+	meta := p.currentMetadata()
+	p.nextToken() // eat 'mungkin'
+
+	val := p.parseExpression(PREFIX)
+	if val == nil {
+		p.addError("Diharapkan ekspresi properti atau pemanggilan setelah 'mungkin'")
+		return nil
+	}
+
+	return &uast.SafeNavigationExpression{
+		NodeType: uast.NodeTypeSafeNavigationExpression,
+		Metadata: meta,
+		Value:    val,
+	}
+}
+
+func (p *Parser) parseNullCoalesceExpression(left uast.Expression) uast.Expression {
+	meta := p.currentMetadata()
+	p.nextToken() // eat 'kalau kosong' / '??'
+
+	right := p.parseExpression(COALESCE_PREC)
+	if right == nil {
+		p.addError("Diharapkan ekspresi nilai cadangan setelah 'kalau kosong' atau '??'")
+		return nil
+	}
+
+	return &uast.NullCoalesceExpression{
+		NodeType: uast.NodeTypeNullCoalesceExpression,
+		Metadata: meta,
+		Left:     left,
+		Right:    right,
+	}
+}
+
+func (p *Parser) parsePrefixRangeExpression() uast.Expression {
+	meta := p.currentMetadata()
+	p.nextToken() // eat '..'
+
+	var end uast.Expression
+	if !p.curTokenIs(RBRACKET) && !p.curTokenIs(EOF) && !p.curTokenIs(SEMICOLON) && !p.curTokenIs(RPAREN) {
+		end = p.parseExpression(RANGE_PREC)
+	}
+
+	return &uast.RangeExpression{
+		NodeType:  uast.NodeTypeRangeExpression,
+		Metadata:  meta,
+		Start:     nil,
+		End:       end,
+		Inclusive: true,
+	}
+}
+
+func (p *Parser) parseInfixRangeExpression(left uast.Expression) uast.Expression {
+	meta := p.currentMetadata()
+
+	var end uast.Expression
+	if !p.peekTokenIs(RBRACKET) && !p.peekTokenIs(EOF) && !p.peekTokenIs(SEMICOLON) && !p.peekTokenIs(RPAREN) {
+		p.nextToken() // move to expression after '..'
+		end = p.parseExpression(RANGE_PREC)
+	}
+
+	return &uast.RangeExpression{
+		NodeType:  uast.NodeTypeRangeExpression,
+		Metadata:  meta,
+		Start:     left,
+		End:       end,
+		Inclusive: true,
+	}
+}
+
+func (p *Parser) parseOptionalMemberExpression(left uast.Expression) uast.Expression {
+	meta := p.currentMetadata()
+	if !p.expectPeek(IDENT) {
+		return nil
+	}
+	prop := p.curToken.Literal
+
+	return &uast.MemberExpression{
+		NodeType: uast.NodeTypeMemberExpression,
+		Metadata: meta,
+		Object:   left,
+		Property: prop,
+		Computed: false,
+		Safe:     true,
 	}
 }
 

@@ -97,6 +97,7 @@ type Environment struct {
 	FilePath       string
 	ModuleRoot     string
 	ModuleRegistry *ModuleRegistry
+	defers         []uast.Statement
 }
 
 func NewEnvironment() *Environment {
@@ -104,6 +105,7 @@ func NewEnvironment() *Environment {
 		store:          make(map[string]*VariableEntry),
 		typeAliases:    make(map[string]string),
 		ModuleRegistry: NewModuleRegistry(),
+		defers:         make([]uast.Statement, 0),
 	}
 }
 
@@ -116,6 +118,29 @@ func NewEnclosedEnvironment(outer *Environment) *Environment {
 		env.ModuleRegistry = outer.ModuleRegistry
 	}
 	return env
+}
+
+// PushDefer adds a statement to be executed at scope exit (LIFO).
+func (e *Environment) PushDefer(stmt uast.Statement) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.defers = append(e.defers, stmt)
+}
+
+// PopAllDefers extracts all deferred statements in LIFO (reverse) order and clears the stack.
+func (e *Environment) PopAllDefers() []uast.Statement {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	n := len(e.defers)
+	if n == 0 {
+		return nil
+	}
+	reversed := make([]uast.Statement, n)
+	for i := 0; i < n; i++ {
+		reversed[i] = e.defers[n-1-i]
+	}
+	e.defers = nil
+	return reversed
 }
 
 // Define declares a new variable in the current scope with an initial value and time-travel history.

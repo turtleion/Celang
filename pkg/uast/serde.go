@@ -121,6 +121,27 @@ func UnmarshalExpressionJSON(data []byte) (Expression, error) {
 		}
 		return &cast, nil
 
+	case NodeTypeSafeNavigationExpression:
+		var safe SafeNavigationExpression
+		if err := json.Unmarshal(data, &safe); err != nil {
+			return nil, err
+		}
+		return &safe, nil
+
+	case NodeTypeNullCoalesceExpression:
+		var coalesce NullCoalesceExpression
+		if err := json.Unmarshal(data, &coalesce); err != nil {
+			return nil, err
+		}
+		return &coalesce, nil
+
+	case NodeTypeRangeExpression:
+		var rng RangeExpression
+		if err := json.Unmarshal(data, &rng); err != nil {
+			return nil, err
+		}
+		return &rng, nil
+
 	default:
 		return nil, fmt.Errorf("unrecognized expression type: '%s'", detector.Type)
 	}
@@ -311,6 +332,14 @@ func UnmarshalStatementJSON(data []byte) (Statement, error) {
 		}
 		typeAlias.NodeType = NodeTypeTypeAliasDeclaration
 		return &typeAlias, nil
+
+	case NodeTypeDeferStatement:
+		var def DeferStatement
+		if err := json.Unmarshal(data, &def); err != nil {
+			return nil, err
+		}
+		def.NodeType = NodeTypeDeferStatement
+		return &def, nil
 
 	default:
 		return nil, fmt.Errorf("unrecognized statement type: '%s'", detector.Type)

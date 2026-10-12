@@ -32,6 +32,7 @@ const (
 	NodeTypeStructDeclaration      NodeType = "StructDeclaration"
 	NodeTypeReferenceDeclaration   NodeType = "ReferenceDeclaration"
 	NodeTypeTypeAliasDeclaration   NodeType = "TypeAliasDeclaration"
+	NodeTypeDeferStatement         NodeType = "DeferStatement"
 
 	// Expressions
 	NodeTypeLiteral          NodeType = "Literal"
@@ -46,6 +47,9 @@ const (
 	NodeTypeFunctionExpression  NodeType = "FunctionExpression"
 	NodeTypeTemplateLiteral     NodeType = "TemplateLiteral"
 	NodeTypeCastExpression       NodeType = "CastExpression"
+	NodeTypeSafeNavigationExpression NodeType = "SafeNavigationExpression"
+	NodeTypeNullCoalesceExpression   NodeType = "NullCoalesceExpression"
+	NodeTypeRangeExpression          NodeType = "RangeExpression"
 )
 
 // Position captures source location information for LSP, tooling, and error reporting.

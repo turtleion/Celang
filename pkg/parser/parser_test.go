@@ -440,5 +440,128 @@ func TestParser_StructDeclaration(t *testing.T) {
 	}
 }
 
+func TestParser_ErgonomicFeatures(t *testing.T) {
+	input := `
+	buat kota = mungkin pengguna.profil.alamat.kota
+	buat nama = input_nama kalau kosong "Anonim"
+	buat port = cfg.port ?? 8080
+	saat_selesai tutup_berkas(berkas)
+	buat rentang_angka = 1..10
+	buat sub_arr = arr[1..3]
+	buat open_slice = arr[2..]
+	buat prefix_slice = arr[..4]
+	`
+
+	l := parser.NewLexer(input)
+	p := parser.NewParser(l)
+	prog, err := p.ParseProgram()
+	if err != nil {
+		t.Fatalf("Parser error: %v", err)
+	}
+
+	if len(prog.Body) != 8 {
+		t.Fatalf("Expected 8 statements, got %d", len(prog.Body))
+	}
+
+	// 1. mungkin
+	stmt0, ok := prog.Body[0].(*uast.VariableDeclaration)
+	if !ok {
+		t.Fatalf("Stmt 0 expected VariableDeclaration, got %T", prog.Body[0])
+	}
+	safeNav, ok := stmt0.Value.(*uast.SafeNavigationExpression)
+	if !ok {
+		t.Fatalf("Expected SafeNavigationExpression, got %T", stmt0.Value)
+	}
+	if safeNav.Value == nil {
+		t.Fatal("SafeNavigationExpression.Value is nil")
+	}
+
+	// 2. kalau kosong
+	stmt1, ok := prog.Body[1].(*uast.VariableDeclaration)
+	if !ok {
+		t.Fatalf("Stmt 1 expected VariableDeclaration, got %T", prog.Body[1])
+	}
+	coalesce1, ok := stmt1.Value.(*uast.NullCoalesceExpression)
+	if !ok {
+		t.Fatalf("Expected NullCoalesceExpression, got %T", stmt1.Value)
+	}
+	if coalesce1.Left == nil || coalesce1.Right == nil {
+		t.Fatal("NullCoalesceExpression has nil Left or Right")
+	}
+
+	// 3. ??
+	stmt2, ok := prog.Body[2].(*uast.VariableDeclaration)
+	if !ok {
+		t.Fatalf("Stmt 2 expected VariableDeclaration, got %T", prog.Body[2])
+	}
+	if _, ok := stmt2.Value.(*uast.NullCoalesceExpression); !ok {
+		t.Fatalf("Expected NullCoalesceExpression for ??, got %T", stmt2.Value)
+	}
+
+	// 4. saat_selesai
+	stmt3, ok := prog.Body[3].(*uast.DeferStatement)
+	if !ok {
+		t.Fatalf("Stmt 3 expected DeferStatement, got %T", prog.Body[3])
+	}
+	if stmt3.Body == nil {
+		t.Fatal("DeferStatement.Body is nil")
+	}
+
+	// 5. 1..10
+	stmt4, ok := prog.Body[4].(*uast.VariableDeclaration)
+	if !ok {
+		t.Fatalf("Stmt 4 expected VariableDeclaration, got %T", prog.Body[4])
+	}
+	rng, ok := stmt4.Value.(*uast.RangeExpression)
+	if !ok {
+		t.Fatalf("Expected RangeExpression, got %T", stmt4.Value)
+	}
+	if rng.Start == nil || rng.End == nil {
+		t.Fatal("Expected non-nil Start and End for 1..10")
+	}
+
+	// 6. arr[1..3]
+	stmt5, ok := prog.Body[5].(*uast.VariableDeclaration)
+	if !ok {
+		t.Fatalf("Stmt 5 expected VariableDeclaration, got %T", prog.Body[5])
+	}
+	mem5, ok := stmt5.Value.(*uast.MemberExpression)
+	if !ok {
+		t.Fatalf("Expected MemberExpression for slice, got %T", stmt5.Value)
+	}
+	rng5, ok := mem5.PropertyExpr.(*uast.RangeExpression)
+	if !ok || rng5.Start == nil || rng5.End == nil {
+		t.Fatalf("Expected RangeExpression with start and end, got %#v", mem5.PropertyExpr)
+	}
+
+	// 7. arr[2..]
+	stmt6, ok := prog.Body[6].(*uast.VariableDeclaration)
+	if !ok {
+		t.Fatalf("Stmt 6 expected VariableDeclaration, got %T", prog.Body[6])
+	}
+	mem6, ok := stmt6.Value.(*uast.MemberExpression)
+	if !ok {
+		t.Fatalf("Expected MemberExpression for open slice, got %T", stmt6.Value)
+	}
+	rng6, ok := mem6.PropertyExpr.(*uast.RangeExpression)
+	if !ok || rng6.Start == nil || rng6.End != nil {
+		t.Fatalf("Expected RangeExpression with start and nil end, got %#v", mem6.PropertyExpr)
+	}
+
+	// 8. arr[..4]
+	stmt7, ok := prog.Body[7].(*uast.VariableDeclaration)
+	if !ok {
+		t.Fatalf("Stmt 7 expected VariableDeclaration, got %T", prog.Body[7])
+	}
+	mem7, ok := stmt7.Value.(*uast.MemberExpression)
+	if !ok {
+		t.Fatalf("Expected MemberExpression for prefix slice, got %T", stmt7.Value)
+	}
+	rng7, ok := mem7.PropertyExpr.(*uast.RangeExpression)
+	if !ok || rng7.Start != nil || rng7.End == nil {
+		t.Fatalf("Expected RangeExpression with nil start and non-nil end, got %#v", mem7.PropertyExpr)
+	}
+}
+
 
 

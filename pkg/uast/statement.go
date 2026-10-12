@@ -828,4 +828,36 @@ func (t *TypeAliasDeclaration) Type() NodeType          { return NodeTypeTypeAli
 func (t *TypeAliasDeclaration) GetMetadata() *NodeMetadata { return t.Metadata }
 func (t *TypeAliasDeclaration) statementNode()          {}
 
+// DeferStatement represents scheduled cleanup before function/scope exit (e.g. saat_selesai tutup(f) or defer close(f)).
+type DeferStatement struct {
+	NodeType NodeType      `json:"type"`
+	Metadata *NodeMetadata `json:"metadata,omitempty"`
+	Body     Statement     `json:"body"`
+}
+
+func (d *DeferStatement) Type() NodeType          { return NodeTypeDeferStatement }
+func (d *DeferStatement) GetMetadata() *NodeMetadata { return d.Metadata }
+func (d *DeferStatement) statementNode()          {}
+
+func (d *DeferStatement) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		NodeType NodeType        `json:"type"`
+		Metadata *NodeMetadata   `json:"metadata,omitempty"`
+		Body     json.RawMessage `json:"body"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	d.NodeType = NodeTypeDeferStatement
+	d.Metadata = raw.Metadata
+	if len(raw.Body) > 0 && string(raw.Body) != "null" {
+		bodyStmt, err := UnmarshalStatementJSON(raw.Body)
+		if err != nil {
+			return fmt.Errorf("DeferStatement.body unmarshal error: %w", err)
+		}
+		d.Body = bodyStmt
+	}
+	return nil
+}
+
 

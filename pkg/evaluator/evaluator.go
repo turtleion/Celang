@@ -249,6 +249,26 @@ func Eval(node uast.Node, env *Environment) Object {
 		}
 		return castValueToType(val, n.TargetType, n.GetMetadata(), env)
 
+	case *uast.DeferStatement:
+		env.PushDefer(n.Body)
+		return NULL
+
+	case *uast.SafeNavigationExpression:
+		return evalSafeNavigation(n.Value, env)
+
+	case *uast.NullCoalesceExpression:
+		left := Eval(n.Left, env)
+		if isError(left) {
+			return left
+		}
+		if left != NULL {
+			return left
+		}
+		return Eval(n.Right, env)
+
+	case *uast.RangeExpression:
+		return evalRangeExpression(n, env)
+
 	case *uast.AssignmentStatement:
 		val := Eval(n.Value, env)
 		if isError(val) {
@@ -716,8 +736,11 @@ func Eval(node uast.Node, env *Environment) Object {
 		if isError(obj) {
 			return obj
 		}
+		if n.Safe && (obj == NULL || obj == nil) {
+			return NULL
+		}
 
-		// 1. Array index access (e.g. arr[0] or arr.0) or built-in methods (arr.tambah, arr.push)
+		// 1. Array index access, slicing, or built-in methods (arr.tambah, arr.push)
 		if arr, ok := obj.(*Array); ok {
 			if n.Property == "tambah" || n.Property == "push" {
 				return &Builtin{
@@ -726,6 +749,9 @@ func Eval(node uast.Node, env *Environment) Object {
 						return arr
 					},
 				}
+			}
+			if rng, isRng := n.PropertyExpr.(*uast.RangeExpression); isRng {
+				return evalArraySlice(arr, rng, env, n.GetMetadata())
 			}
 			var intIdx int64
 			var hasInt bool
@@ -750,6 +776,32 @@ func Eval(node uast.Node, env *Environment) Object {
 					return arr.Elements[intIdx]
 				}
 				return newError(n.GetMetadata(), fmt.Sprintf("Indeks array %d di luar jangkauan (panjang: %d)", intIdx, len(arr.Elements)), "Gunakan indeks yang valid antara 0 hingga panjang array - 1.")
+			}
+		}
+
+		// 1b. String index access and slicing (e.g. str[0] or str[0..2])
+		if str, ok := obj.(*String); ok {
+			if rng, isRng := n.PropertyExpr.(*uast.RangeExpression); isRng {
+				return evalStringSlice(str, rng, env, n.GetMetadata())
+			}
+			var intIdx int64
+			var hasInt bool
+			if n.Computed && n.PropertyExpr != nil {
+				idxObj := Eval(n.PropertyExpr, env)
+				if iVal, _, isInt, ok := CoerceToNumeric(idxObj); ok && isInt {
+					intIdx = iVal
+					hasInt = true
+				}
+			} else if parsed, err := strconv.ParseInt(n.Property, 10, 64); err == nil {
+				intIdx = parsed
+				hasInt = true
+			}
+			if hasInt {
+				runes := []rune(str.Value)
+				if intIdx >= 0 && int(intIdx) < len(runes) {
+					return &String{Value: string(runes[intIdx])}
+				}
+				return newError(n.GetMetadata(), fmt.Sprintf("Indeks teks %d di luar jangkauan (panjang: %d)", intIdx, len(runes)), "")
 			}
 		}
 
@@ -984,6 +1036,11 @@ func Eval(node uast.Node, env *Environment) Object {
 }
 
 func evalProgram(stmts []uast.Statement, env *Environment) Object {
+	defer func() {
+		for _, defStmt := range env.PopAllDefers() {
+			Eval(defStmt, env)
+		}
+	}()
 	var result Object = NULL
 	for _, stmt := range stmts {
 		result = Eval(stmt, env)
@@ -1177,6 +1234,11 @@ func applyFunction(callee Object, args []Object, meta *uast.NodeMetadata) Object
 		return fn.Fn(args...)
 	case *Function:
 		fnEnv := NewEnclosedEnvironment(fn.Env)
+		defer func() {
+			for _, defStmt := range fnEnv.PopAllDefers() {
+				Eval(defStmt, fnEnv)
+			}
+		}()
 		for i, param := range fn.Parameters {
 			var argVal Object = NULL
 			if i < len(args) {
@@ -1352,6 +1414,11 @@ func castValueToType(val Object, targetType string, meta *uast.NodeMetadata, env
 
 func applyFunctionWithASTArgs(fn *Function, argNodes []uast.Expression, callerEnv *Environment, meta *uast.NodeMetadata) Object {
 	fnEnv := NewEnclosedEnvironment(fn.Env)
+	defer func() {
+		for _, defStmt := range fnEnv.PopAllDefers() {
+			Eval(defStmt, fnEnv)
+		}
+	}()
 	for i, param := range fn.Parameters {
 		if param.IsReference {
 			if i >= len(argNodes) {
@@ -1391,5 +1458,227 @@ func applyFunctionWithASTArgs(fn *Function, argNodes []uast.Expression, callerEn
 		return ret.Value
 	}
 	return res
+}
+
+func evalSafeNavigation(expr uast.Expression, env *Environment) Object {
+	if expr == nil {
+		return NULL
+	}
+
+	switch e := expr.(type) {
+	case *uast.MemberExpression:
+		obj := evalSafeNavigation(e.Object, env)
+		if obj == NULL || obj == nil || isError(obj) {
+			return NULL
+		}
+
+		// Safe member access on obj
+		if arr, ok := obj.(*Array); ok {
+			if rng, isRng := e.PropertyExpr.(*uast.RangeExpression); isRng {
+				return evalArraySlice(arr, rng, env, e.GetMetadata())
+			}
+			var intIdx int64
+			var hasInt bool
+			if e.Computed && e.PropertyExpr != nil {
+				idxObj := evalSafeNavigation(e.PropertyExpr, env)
+				if iVal, _, isInt, ok := CoerceToNumeric(idxObj); ok && isInt {
+					intIdx = iVal
+					hasInt = true
+				}
+			} else if parsed, err := strconv.ParseInt(e.Property, 10, 64); err == nil {
+				intIdx = parsed
+				hasInt = true
+			}
+			if hasInt && intIdx >= 0 && int(intIdx) < len(arr.Elements) {
+				return arr.Elements[intIdx]
+			}
+			return NULL
+		}
+
+		if str, ok := obj.(*String); ok {
+			if rng, isRng := e.PropertyExpr.(*uast.RangeExpression); isRng {
+				return evalStringSlice(str, rng, env, e.GetMetadata())
+			}
+			return NULL
+		}
+
+		if inst, ok := obj.(*StructInstance); ok {
+			prop := e.Property
+			if val, exists := inst.Fields[prop]; exists {
+				return val
+			}
+			if method, exists := inst.Def.Methods[prop]; exists {
+				boundEnv := NewEnclosedEnvironment(method.Env)
+				boundEnv.Define("diri", inst, false, inst.Def.Name)
+				boundEnv.Define("this", inst, false, inst.Def.Name)
+				boundEnv.Define("self", inst, false, inst.Def.Name)
+				return &Function{
+					Name:       method.Name,
+					Parameters: method.Parameters,
+					Body:       method.Body,
+					Env:        boundEnv,
+				}
+			}
+			return NULL
+		}
+
+		if mp, ok := obj.(*Map); ok {
+			if val, exists := mp.Pairs[e.Property]; exists {
+				return val
+			}
+			return NULL
+		}
+
+		return NULL
+
+	case *uast.CallExpression:
+		callee := evalSafeNavigation(e.Callee, env)
+		if callee == NULL || callee == nil || isError(callee) {
+			return NULL
+		}
+		var args []Object
+		for _, arg := range e.Arguments {
+			argVal := Eval(arg, env)
+			if isError(argVal) {
+				return NULL
+			}
+			args = append(args, argVal)
+		}
+		res := applyFunction(callee, args, e.GetMetadata())
+		if isError(res) {
+			return NULL
+		}
+		return res
+
+	case *uast.Identifier:
+		val, ok := env.Get(e.Name)
+		if !ok || val == nil {
+			return NULL
+		}
+		return val
+
+	default:
+		res := Eval(expr, env)
+		if isError(res) {
+			return NULL
+		}
+		return res
+	}
+}
+
+func evalRangeExpression(rng *uast.RangeExpression, env *Environment) Object {
+	var startVal int64 = 0
+	var endVal int64 = 0
+	if rng.Start != nil {
+		s := Eval(rng.Start, env)
+		if isError(s) {
+			return s
+		}
+		if iVal, _, isInt, ok := CoerceToNumeric(s); ok && isInt {
+			startVal = iVal
+		} else {
+			return newError(rng.GetMetadata(), "Batas awal rentang harus berupa bilangan bulat", "")
+		}
+	}
+	if rng.End != nil {
+		e := Eval(rng.End, env)
+		if isError(e) {
+			return e
+		}
+		if iVal, _, isInt, ok := CoerceToNumeric(e); ok && isInt {
+			endVal = iVal
+		} else {
+			return newError(rng.GetMetadata(), "Batas akhir rentang harus berupa bilangan bulat", "")
+		}
+	}
+
+	var elements []Object
+	if startVal <= endVal {
+		for i := startVal; i <= endVal; i++ {
+			elements = append(elements, &Integer{Value: i})
+		}
+	} else {
+		for i := startVal; i >= endVal; i-- {
+			elements = append(elements, &Integer{Value: i})
+		}
+	}
+	return &Array{Elements: elements}
+}
+
+func evalArraySlice(arr *Array, rng *uast.RangeExpression, env *Environment, meta *uast.NodeMetadata) Object {
+	start := 0
+	end := len(arr.Elements)
+	if rng.Start != nil {
+		sVal := Eval(rng.Start, env)
+		if isError(sVal) {
+			return sVal
+		}
+		if iVal, _, isInt, ok := CoerceToNumeric(sVal); ok && isInt {
+			start = int(iVal)
+		}
+	}
+	if rng.End != nil {
+		eVal := Eval(rng.End, env)
+		if isError(eVal) {
+			return eVal
+		}
+		if iVal, _, isInt, ok := CoerceToNumeric(eVal); ok && isInt {
+			end = int(iVal)
+		}
+	}
+	if start < 0 {
+		start = 0
+	}
+	if start > len(arr.Elements) {
+		start = len(arr.Elements)
+	}
+	if end < start {
+		end = start
+	}
+	if end > len(arr.Elements) {
+		end = len(arr.Elements)
+	}
+
+	sliced := make([]Object, end-start)
+	copy(sliced, arr.Elements[start:end])
+	return &Array{Elements: sliced}
+}
+
+func evalStringSlice(str *String, rng *uast.RangeExpression, env *Environment, meta *uast.NodeMetadata) Object {
+	runes := []rune(str.Value)
+	start := 0
+	end := len(runes)
+	if rng.Start != nil {
+		sVal := Eval(rng.Start, env)
+		if isError(sVal) {
+			return sVal
+		}
+		if iVal, _, isInt, ok := CoerceToNumeric(sVal); ok && isInt {
+			start = int(iVal)
+		}
+	}
+	if rng.End != nil {
+		eVal := Eval(rng.End, env)
+		if isError(eVal) {
+			return eVal
+		}
+		if iVal, _, isInt, ok := CoerceToNumeric(eVal); ok && isInt {
+			end = int(iVal)
+		}
+	}
+	if start < 0 {
+		start = 0
+	}
+	if start > len(runes) {
+		start = len(runes)
+	}
+	if end < start {
+		end = start
+	}
+	if end > len(runes) {
+		end = len(runes)
+	}
+
+	return &String{Value: string(runes[start:end])}
 }
 
