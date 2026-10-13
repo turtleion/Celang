@@ -38,7 +38,7 @@ export default defineConfig({
           },
           {
             name: 'keyword.declaration.celang',
-            match: '\\b(buat|konstanta|fungsi|bentuk|itu|rujuk|sebagai|tipe|let|const|var|function|def|jieun|tetep|struct|ref|as)\\b'
+            match: '\\b(buat|konstanta|fungsi|bentuk|itu|rujuk|sebagai|tipe|privat|let|const|var|function|def|jieun|tetep|struct|ref|as)\\b'
           },
           {
             name: 'constant.language.celang',
@@ -46,7 +46,7 @@ export default defineConfig({
           },
           {
             name: 'support.function.celang',
-            match: '\\b(cetak|masukan|panjang|tipe|rentang|print|input|len|type|range)\\b'
+            match: '\\b(cetak|masukan|panjang|tipe|rentang|saring|petakan|potong_spasi|kapitalisasi|salin|clone|Angka|Teks|Logika|print|input|len|type|range|filter|map|trim)\\b'
           },
           {
             name: 'constant.numeric.celang',
@@ -81,7 +81,8 @@ export default defineConfig({
         items: [
           { text: 'Variabel & Tipe Data', link: '/dasar/variabel-tipe' },
           { text: 'Kontrol Alur (Percabangan & Loop)', link: '/dasar/kontrol-alur' },
-          { text: 'Fungsi & Fungsi Anonim', link: '/dasar/fungsi' }
+          { text: 'Fungsi & Fungsi Anonim', link: '/dasar/fungsi' },
+          { text: 'Fungsi Bawaan (Built-in)', link: '/dasar/fungsi-bawaan' }
         ]
       },
       {
