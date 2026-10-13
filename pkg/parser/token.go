@@ -31,6 +31,7 @@ const (
 	PLUS_ASSIGN  TokenType = "+="
 	MINUS_ASSIGN TokenType = "-="
 	ARROW        TokenType = "->"
+	FAT_ARROW    TokenType = "=>"
 	PIPE         TokenType = "|"
 	PIPE_ARROW   TokenType = "|>"
 	AMPERSAND    TokenType = "&"
@@ -107,6 +108,13 @@ const (
 	NULL_COALESCE TokenType = "NULL_COALESCE" // kalau kosong, bila kosong, ??
 	MAYBE         TokenType = "MAYBE"         // mungkin
 	DEFER         TokenType = "DEFER"         // saat_selesai, defer
+
+	// Modern Concurrency & Generics
+	TITIP     TokenType = "TITIP"     // titip
+	JEMPUT    TokenType = "JEMPUT"    // jemput
+	HARUS     TokenType = "HARUS"     // harus
+	SEMBARANG TokenType = "SEMBARANG" // sembarang
+	SALURAN   TokenType = "SALURAN"   // saluran
 )
 
 type Token struct {

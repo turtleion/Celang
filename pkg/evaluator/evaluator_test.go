@@ -1332,3 +1332,233 @@ func TestEvaluator_ErgonomicFeatures(t *testing.T) {
 	}
 }
 
+func TestEvaluator_ArrowFunctions(t *testing.T) {
+	// 1. Basic arrow functions
+	input := `
+	buat tambah = (a, b) => a + b
+	buat kuadrat = x => x * x
+	buat salam = () => "halo celang"
+	[tambah(10, 5), kuadrat(6), salam()]
+	`
+	res := testEvalSource(t, input)
+	arr, ok := res.(*evaluator.Array)
+	if !ok {
+		t.Fatalf("expected array, got %s", res.Inspect())
+	}
+	if arr.Elements[0].(*evaluator.Integer).Value != 15 {
+		t.Errorf("expected 15, got %v", arr.Elements[0])
+	}
+	if arr.Elements[1].(*evaluator.Integer).Value != 36 {
+		t.Errorf("expected 36, got %v", arr.Elements[1])
+	}
+	if arr.Elements[2].(*evaluator.String).Value != "halo celang" {
+		t.Errorf("expected 'halo celang', got %v", arr.Elements[2])
+	}
+
+	// 2. Higher order functions with arrow and pipeline
+	inputPipeline := `
+	buat angka = [1, 2, 3, 4]
+	buat genap = angka |> saring(x => x % 2 == 0)
+	buat kaliDua = genap |> petakan(x => x * 2)
+	kaliDua
+	`
+	res2 := testEvalSource(t, inputPipeline)
+	arr2, ok := res2.(*evaluator.Array)
+	if !ok {
+		t.Fatalf("expected array, got %s", res2.Inspect())
+	}
+	if len(arr2.Elements) != 2 || arr2.Elements[0].(*evaluator.Integer).Value != 4 || arr2.Elements[1].(*evaluator.Integer).Value != 8 {
+		t.Errorf("expected [4, 8], got %s", arr2.Inspect())
+	}
+}
+
+func TestEvaluator_TitipJemput(t *testing.T) {
+	// 1. Basic titip & jemput
+	input := `
+	fungsi hitungLambat(x) {
+		kembalikan x * 10
+	}
+	buat tiket = titip hitungLambat(5)
+	buat hasil = jemput tiket
+	hasil
+	`
+	res := testEvalSource(t, input)
+	if intVal, ok := res.(*evaluator.Integer); !ok || intVal.Value != 50 {
+		t.Fatalf("expected 50, got %s", res.Inspect())
+	}
+
+	// 2. jemput dengan batas waktu (timeout)
+	inputTimeout := `
+	buat tiket = titip 42
+	buat hasil = jemput tiket dalam 1
+	hasil
+	`
+	resTimeout := testEvalSource(t, inputTimeout)
+	if intVal, ok := resTimeout.(*evaluator.Integer); !ok || intVal.Value != 42 {
+		t.Fatalf("expected 42, got %s", resTimeout.Inspect())
+	}
+
+	// 3. jemput_semua
+	inputSemua := `
+	buat t1 = titip 10
+	buat t2 = titip 20
+	buat hasil = jemput_semua([t1, t2])
+	hasil
+	`
+	resSemua := testEvalSource(t, inputSemua)
+	arrSemua, ok := resSemua.(*evaluator.Array)
+	if !ok || len(arrSemua.Elements) != 2 {
+		t.Fatalf("expected array of 2 elements, got %s", resSemua.Inspect())
+	}
+	if arrSemua.Elements[0].(*evaluator.Integer).Value != 10 || arrSemua.Elements[1].(*evaluator.Integer).Value != 20 {
+		t.Errorf("expected [10, 20], got %s", arrSemua.Inspect())
+	}
+
+	// 4. jemput_pertama
+	inputPertama := `
+	buat t1 = titip "cepat"
+	buat hasil = jemput_pertama([t1])
+	hasil
+	`
+	resPertama := testEvalSource(t, inputPertama)
+	if strVal, ok := resPertama.(*evaluator.String); !ok || strVal.Value != "cepat" {
+		t.Fatalf("expected 'cepat', got %s", resPertama.Inspect())
+	}
+}
+
+func TestEvaluator_Saluran(t *testing.T) {
+	// 1. Saluran buffered send & receive
+	input := `
+	buat ch = Saluran(2)
+	ch.kirim(100)
+	ch.kirim(200)
+	buat a = ch.terima()
+	buat b = ch.terima()
+	[a, b]
+	`
+	res := testEvalSource(t, input)
+	arr, ok := res.(*evaluator.Array)
+	if !ok || len(arr.Elements) != 2 {
+		t.Fatalf("expected array of 2, got %s", res.Inspect())
+	}
+	if arr.Elements[0].(*evaluator.Integer).Value != 100 || arr.Elements[1].(*evaluator.Integer).Value != 200 {
+		t.Errorf("expected [100, 200], got %s", arr.Inspect())
+	}
+
+	// 2. Loop streaming: untuk x dalam ch
+	inputLoop := `
+	buat ch = Saluran(3)
+	ch.kirim("satu")
+	ch.kirim("dua")
+	ch.tutup()
+	buat hasil = []
+	untuk item dalam ch {
+		hasil.tambah(item)
+	}
+	hasil
+	`
+	resLoop := testEvalSource(t, inputLoop)
+	arrLoop, ok := resLoop.(*evaluator.Array)
+	if !ok || len(arrLoop.Elements) != 2 {
+		t.Fatalf("expected [satu, dua], got %s", resLoop.Inspect())
+	}
+	if arrLoop.Elements[0].(*evaluator.String).Value != "satu" || arrLoop.Elements[1].(*evaluator.String).Value != "dua" {
+		t.Errorf("expected ['satu', 'dua'], got %s", arrLoop.Inspect())
+	}
+
+	// 3. Typed Channel constraint
+	inputTyped := `
+	buat ch = Saluran<Angka>(1)
+	ch.kirim(999)
+	ch.terima()
+	`
+	resTyped := testEvalSource(t, inputTyped)
+	if intVal, ok := resTyped.(*evaluator.Integer); !ok || intVal.Value != 999 {
+		t.Fatalf("expected 999, got %s", resTyped.Inspect())
+	}
+
+	inputTypedErr := `
+	buat ch = Saluran<Angka>(1)
+	ch.kirim("bukan angka")
+	`
+	resTypedErr := testEvalSource(t, inputTypedErr)
+	if resTypedErr.Type() != evaluator.ERROR_OBJ {
+		t.Fatalf("expected error sending string to Saluran<Angka>, got %s", resTypedErr.Inspect())
+	}
+}
+
+func TestEvaluator_Generics(t *testing.T) {
+	// 1. Struct generic
+	inputStruct := `
+	bentuk Kotak<T> {
+		isi: T
+	}
+	buat k1 = Kotak<Angka>(123)
+	buat k2 = Kotak<Teks>("rahasia")
+	[k1.isi, k2.isi]
+	`
+	res := testEvalSource(t, inputStruct)
+	arr, ok := res.(*evaluator.Array)
+	if !ok || len(arr.Elements) != 2 {
+		t.Fatalf("expected array, got %s", res.Inspect())
+	}
+	if arr.Elements[0].(*evaluator.Integer).Value != 123 {
+		t.Errorf("expected 123, got %v", arr.Elements[0])
+	}
+	if arr.Elements[1].(*evaluator.String).Value != "rahasia" {
+		t.Errorf("expected 'rahasia', got %v", arr.Elements[1])
+	}
+
+	// 2. Struct with type constraints: Nilai: Angka and Nilai harus Angka
+	inputConstraint := `
+	bentuk Dompet<Nilai: Angka> {
+		saldo: Nilai
+	}
+	bentuk Celengan<Nilai harus Angka> {
+		tabungan: Nilai
+	}
+	buat d = Dompet<Angka>(50000)
+	buat c = Celengan<Angka>(100000)
+	[d.saldo, c.tabungan]
+	`
+	resConst := testEvalSource(t, inputConstraint)
+	arrConst, ok := resConst.(*evaluator.Array)
+	if !ok || len(arrConst.Elements) != 2 {
+		t.Fatalf("expected array of 2, got %s", resConst.Inspect())
+	}
+	if arrConst.Elements[0].(*evaluator.Integer).Value != 50000 || arrConst.Elements[1].(*evaluator.Integer).Value != 100000 {
+		t.Errorf("expected [50000, 100000], got %s", arrConst.Inspect())
+	}
+
+	// 3. Struct type constraint violation returns error
+	inputErr := `
+	bentuk Dompet<Nilai: Angka> {
+		saldo: Nilai
+	}
+	buat d = Dompet<Teks>("uang palsu")
+	`
+	resErr := testEvalSource(t, inputErr)
+	if resErr.Type() != evaluator.ERROR_OBJ {
+		t.Fatalf("expected error when type constraint violated, got %s", resErr.Inspect())
+	}
+
+	// 4. Generic function
+	inputFunc := `
+	fungsi identitas<T>(x: T) {
+		kembalikan x
+	}
+	buat a = identitas<Angka>(77)
+	buat b = identitas<Teks>("selamat")
+	[a, b]
+	`
+	resFunc := testEvalSource(t, inputFunc)
+	arrFunc, ok := resFunc.(*evaluator.Array)
+	if !ok || len(arrFunc.Elements) != 2 {
+		t.Fatalf("expected array of 2, got %s", resFunc.Inspect())
+	}
+	if arrFunc.Elements[0].(*evaluator.Integer).Value != 77 || arrFunc.Elements[1].(*evaluator.String).Value != "selamat" {
+		t.Errorf("expected [77, 'selamat'], got %s", arrFunc.Inspect())
+	}
+}
+
+

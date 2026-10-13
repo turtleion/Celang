@@ -712,6 +712,13 @@ func (c *Compiler) compileExpression(expr uast.Expression) error {
 		return c.compilePipeline(e.Left, e.Right, line)
 
 	case *uast.CallExpression:
+		if len(e.TypeArguments) > 0 {
+			wrapper := &evaluator.ASTNodeWrapper{Node: e}
+			constIdx := c.chunk.AddConstant(wrapper)
+			c.emitOp(bytecode.OpEvalAST, line)
+			c.chunk.WriteUint16(constIdx, line)
+			return nil
+		}
 		if err := c.compileExpression(e.Callee); err != nil {
 			return err
 		}
@@ -749,7 +756,7 @@ func (c *Compiler) compileExpression(expr uast.Expression) error {
 		}
 		return nil
 
-	case *uast.CastExpression, *uast.SafeNavigationExpression, *uast.NullCoalesceExpression, *uast.RangeExpression:
+	case *uast.CastExpression, *uast.SafeNavigationExpression, *uast.NullCoalesceExpression, *uast.RangeExpression, *uast.TitipExpression, *uast.JemputExpression:
 		wrapper := &evaluator.ASTNodeWrapper{Node: e}
 		constIdx := c.chunk.AddConstant(wrapper)
 		c.emitOp(bytecode.OpEvalAST, line)

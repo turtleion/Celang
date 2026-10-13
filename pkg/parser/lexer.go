@@ -121,6 +121,13 @@ var keywords = map[string]TokenType{
 	"bari":         ASYNC,
 	"babarengan":   PARALLEL,
 	"salaku":       AS,
+
+	// Modern Concurrency & Generics
+	"titip":     TITIP,
+	"jemput":    JEMPUT,
+	"harus":     HARUS,
+	"sembarang": SEMBARANG,
+	"saluran":   SALURAN,
 }
 
 type Lexer struct {
@@ -175,6 +182,9 @@ func (l *Lexer) NextToken() Token {
 				l.readChar()
 			}
 			tok = Token{Type: EQ, Literal: "==", Line: tok.Line, Column: tok.Column}
+		} else if l.peekChar() == '>' {
+			l.readChar()
+			tok = Token{Type: FAT_ARROW, Literal: "=>", Line: tok.Line, Column: tok.Column}
 		} else {
 			tok = Token{Type: ASSIGN, Literal: "=", Line: tok.Line, Column: tok.Column}
 		}

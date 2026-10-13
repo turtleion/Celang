@@ -563,5 +563,199 @@ func TestParser_ErgonomicFeatures(t *testing.T) {
 	}
 }
 
+func TestParser_ArrowFunctions(t *testing.T) {
+	input := `
+	buat f1 = x => x * 2
+	buat f2 = (a, b) => a + b
+	buat f3 = () => "halo"
+	buat f4 = (x: Angka) => x + 1
+	buat f5 = x => { cetak(x) }
+	`
+
+	l := parser.NewLexer(input)
+	p := parser.NewParser(l)
+	prog, err := p.ParseProgram()
+	if err != nil {
+		t.Fatalf("Parser error: %v", err)
+	}
+	if len(p.Errors()) > 0 {
+		t.Fatalf("Parser had errors: %v", p.Errors())
+	}
+	if len(prog.Body) != 5 {
+		t.Fatalf("Expected 5 statements, got %d", len(prog.Body))
+	}
+
+	// f1: x => x * 2
+	decl1 := prog.Body[0].(*uast.VariableDeclaration)
+	fn1, ok := decl1.Value.(*uast.FunctionExpression)
+	if !ok || len(fn1.Parameters) != 1 || fn1.Parameters[0].Name != "x" {
+		t.Fatalf("Expected 1 param 'x' for f1, got %#v", fn1)
+	}
+
+	// f2: (a, b) => a + b
+	decl2 := prog.Body[1].(*uast.VariableDeclaration)
+	fn2, ok := decl2.Value.(*uast.FunctionExpression)
+	if !ok || len(fn2.Parameters) != 2 || fn2.Parameters[0].Name != "a" || fn2.Parameters[1].Name != "b" {
+		t.Fatalf("Expected 2 params 'a','b' for f2, got %#v", fn2)
+	}
+
+	// f3: () => "halo"
+	decl3 := prog.Body[2].(*uast.VariableDeclaration)
+	fn3, ok := decl3.Value.(*uast.FunctionExpression)
+	if !ok || len(fn3.Parameters) != 0 {
+		t.Fatalf("Expected 0 params for f3, got %#v", fn3)
+	}
+
+	// f4: (x: Angka) => x + 1
+	decl4 := prog.Body[3].(*uast.VariableDeclaration)
+	fn4, ok := decl4.Value.(*uast.FunctionExpression)
+	if !ok || len(fn4.Parameters) != 1 || fn4.Parameters[0].TypeHint != "Angka" {
+		t.Fatalf("Expected 1 typed param for f4, got %#v", fn4)
+	}
+
+	// f5: x => { cetak(x) }
+	decl5 := prog.Body[4].(*uast.VariableDeclaration)
+	fn5, ok := decl5.Value.(*uast.FunctionExpression)
+	if !ok || len(fn5.Body.Statements) != 1 {
+		t.Fatalf("Expected block with 1 stmt for f5, got %#v", fn5)
+	}
+}
+
+func TestParser_Generics(t *testing.T) {
+	input := `
+	bentuk Kotak<T> {
+		isi: T
+	}
+
+	bentuk Pasangan<K, V> {
+		kunci: K,
+		nilai: V
+	}
+
+	bentuk Terikat<Nilai: Angka> {
+		angka: Nilai
+	}
+
+	bentuk Harus<Nilai harus Angka> {
+		angka: Nilai
+	}
+
+	fungsi tukar<T>(a: T, b: T) {
+		kembalikan [b, a]
+	}
+
+	buat k = Kotak<Angka>(42)
+	buat p = Pasangan<Teks, Angka>("umur", 25)
+	buat sal = Saluran<Angka>(5)
+	`
+
+	l := parser.NewLexer(input)
+	p := parser.NewParser(l)
+	prog, err := p.ParseProgram()
+	if err != nil {
+		t.Fatalf("Parser error: %v", err)
+	}
+	if len(p.Errors()) > 0 {
+		t.Fatalf("Parser had errors: %v", p.Errors())
+	}
+
+	// 1. Kotak<T>
+	st1 := prog.Body[0].(*uast.StructDeclaration)
+	if len(st1.TypeParameters) != 1 || st1.TypeParameters[0].Name != "T" {
+		t.Fatalf("Expected 1 type parameter 'T', got %#v", st1.TypeParameters)
+	}
+
+	// 2. Pasangan<K, V>
+	st2 := prog.Body[1].(*uast.StructDeclaration)
+	if len(st2.TypeParameters) != 2 || st2.TypeParameters[0].Name != "K" || st2.TypeParameters[1].Name != "V" {
+		t.Fatalf("Expected 2 type parameters 'K', 'V', got %#v", st2.TypeParameters)
+	}
+
+	// 3. Terikat<Nilai: Angka>
+	st3 := prog.Body[2].(*uast.StructDeclaration)
+	if len(st3.TypeParameters) != 1 || st3.TypeParameters[0].Constraint != "Angka" {
+		t.Fatalf("Expected constraint 'Angka', got %#v", st3.TypeParameters)
+	}
+
+	// 4. Harus<Nilai harus Angka>
+	st4 := prog.Body[3].(*uast.StructDeclaration)
+	if len(st4.TypeParameters) != 1 || st4.TypeParameters[0].Constraint != "Angka" {
+		t.Fatalf("Expected constraint 'Angka' for Harus, got %#v", st4.TypeParameters)
+	}
+
+	// 5. fungsi tukar<T>
+	fn1 := prog.Body[4].(*uast.FunctionDeclaration)
+	if len(fn1.TypeParameters) != 1 || fn1.TypeParameters[0].Name != "T" {
+		t.Fatalf("Expected type parameter 'T' on function, got %#v", fn1.TypeParameters)
+	}
+
+	// 6. Kotak<Angka>(42)
+	call1 := prog.Body[5].(*uast.VariableDeclaration).Value.(*uast.CallExpression)
+	if len(call1.TypeArguments) != 1 || call1.TypeArguments[0] != "Angka" {
+		t.Fatalf("Expected 1 type argument 'Angka', got %#v", call1.TypeArguments)
+	}
+
+	// 7. Pasangan<Teks, Angka>("umur", 25)
+	call2 := prog.Body[6].(*uast.VariableDeclaration).Value.(*uast.CallExpression)
+	if len(call2.TypeArguments) != 2 || call2.TypeArguments[0] != "Teks" || call2.TypeArguments[1] != "Angka" {
+		t.Fatalf("Expected type arguments ['Teks', 'Angka'], got %#v", call2.TypeArguments)
+	}
+
+	// 8. Saluran<Angka>(5)
+	call3 := prog.Body[7].(*uast.VariableDeclaration).Value.(*uast.CallExpression)
+	if len(call3.TypeArguments) != 1 || call3.TypeArguments[0] != "Angka" {
+		t.Fatalf("Expected type argument 'Angka' on Saluran, got %#v", call3.TypeArguments)
+	}
+}
+
+func TestParser_TitipJemput(t *testing.T) {
+	input := `
+	buat tiket = titip hitung(10)
+	buat hasil = jemput tiket
+	buat hasil2 = jemput tiket dalam 3
+	`
+
+	l := parser.NewLexer(input)
+	p := parser.NewParser(l)
+	prog, err := p.ParseProgram()
+	if err != nil {
+		t.Fatalf("Parser error: %v", err)
+	}
+	if len(p.Errors()) > 0 {
+		t.Fatalf("Parser had errors: %v", p.Errors())
+	}
+
+	// 1. titip hitung(10)
+	v1 := prog.Body[0].(*uast.VariableDeclaration)
+	t1, ok := v1.Value.(*uast.TitipExpression)
+	if !ok {
+		t.Fatalf("Expected TitipExpression, got %T", v1.Value)
+	}
+	if _, isCall := t1.Argument.(*uast.CallExpression); !isCall {
+		t.Fatalf("Expected CallExpression as titip argument, got %T", t1.Argument)
+	}
+
+	// 2. jemput tiket
+	v2 := prog.Body[1].(*uast.VariableDeclaration)
+	j1, ok := v2.Value.(*uast.JemputExpression)
+	if !ok {
+		t.Fatalf("Expected JemputExpression, got %T", v2.Value)
+	}
+	if j1.Timeout != nil {
+		t.Fatalf("Expected nil timeout, got %#v", j1.Timeout)
+	}
+
+	// 3. jemput tiket dalam 3
+	v3 := prog.Body[2].(*uast.VariableDeclaration)
+	j2, ok := v3.Value.(*uast.JemputExpression)
+	if !ok {
+		t.Fatalf("Expected JemputExpression, got %T", v3.Value)
+	}
+	if j2.Timeout == nil {
+		t.Fatalf("Expected non-nil timeout")
+	}
+}
+
+
 
 

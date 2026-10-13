@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"celang/pkg/uast"
 )
@@ -198,6 +199,7 @@ func Eval(node uast.Node, env *Environment) Object {
 
 		structDef := &StructDefinition{
 			Name:           n.Name,
+			TypeParameters: n.TypeParameters,
 			Fields:         allFields,
 			Methods:        methods,
 			PrivateFields:  privateFields,
@@ -508,8 +510,19 @@ func Eval(node uast.Node, env *Environment) Object {
 			for _, k := range mp.Order {
 				elements = append(elements, &String{Value: k})
 			}
+		} else if ch, ok := iterVal.(*Channel); ok {
+			forEnv := NewEnclosedEnvironment(env)
+			var result Object = NULL
+			for el := range ch.Ch {
+				forEnv.Define(n.Item, el, true, "")
+				result = Eval(n.Body, forEnv)
+				if result != nil && (result.Type() == RETURN_VALUE_OBJ || result.Type() == ERROR_OBJ) {
+					return result
+				}
+			}
+			return result
 		} else {
-			return newError(n.GetMetadata(), fmt.Sprintf("Objek tipe %s tidak dapat diiterasi", iterVal.Type()), "Pastikan menggunakan Array, String, atau Map.")
+			return newError(n.GetMetadata(), fmt.Sprintf("Objek tipe %s tidak dapat diiterasi", iterVal.Type()), "Pastikan menggunakan Array, String, Map, atau Saluran.")
 		}
 
 		forEnv := NewEnclosedEnvironment(env)
@@ -525,10 +538,11 @@ func Eval(node uast.Node, env *Environment) Object {
 
 	case *uast.FunctionDeclaration:
 		fn := &Function{
-			Name:       n.Name,
-			Parameters: n.Parameters,
-			Body:       n.Body,
-			Env:        env,
+			Name:           n.Name,
+			TypeParameters: n.TypeParameters,
+			Parameters:     n.Parameters,
+			Body:           n.Body,
+			Env:            env,
 		}
 		env.DefineWithVisibility(n.Name, fn, false, "function", n.Visibility)
 		return fn
@@ -843,6 +857,84 @@ func Eval(node uast.Node, env *Environment) Object {
 			}
 		}
 
+		// 3b. Channel member access
+		if ch, ok := obj.(*Channel); ok {
+			switch n.Property {
+			case "kirim":
+				return &Builtin{
+					Fn: func(args ...Object) Object {
+						if len(args) == 0 {
+							return newError(n.GetMetadata(), "Metode kirim() membutuhkan 1 argumen data", "Contoh: saluran.kirim(data)")
+						}
+						return ch.Send(args[0], n.GetMetadata())
+					},
+				}
+			case "terima":
+				return &Builtin{
+					Fn: func(args ...Object) Object {
+						var to time.Duration = 0
+						if len(args) > 0 {
+							to = parseTimeoutValue(args[0])
+						}
+						return ch.Receive(to)
+					},
+				}
+			case "tutup":
+				return &Builtin{
+					Fn: func(args ...Object) Object {
+						return ch.Close()
+					},
+				}
+			case "panjang":
+				return &Integer{Value: int64(len(ch.Ch))}
+			case "kapasitas":
+				return &Integer{Value: int64(ch.Capacity)}
+			}
+		}
+
+		// 3c. Ticket member access
+		if t, ok := obj.(*Ticket); ok {
+			switch n.Property {
+			case "selesai":
+				t.mu.Lock()
+				done := t.isDone
+				t.mu.Unlock()
+				return nativeBool(done)
+			case "hasil", "jemput":
+				return &Builtin{
+					Fn: func(args ...Object) Object {
+						var to time.Duration = 0
+						if len(args) > 0 {
+							to = parseTimeoutValue(args[0])
+						}
+						return t.Await(to, n.GetMetadata())
+					},
+				}
+			}
+		}
+
+		// 3d. Duration helpers on numeric types: e.g. 3.detik, 500.milidetik
+		if num, ok := obj.(*Integer); ok {
+			switch n.Property {
+			case "detik":
+				return &Integer{Value: num.Value * 1000}
+			case "milidetik":
+				return &Integer{Value: num.Value}
+			case "menit":
+				return &Integer{Value: num.Value * 60 * 1000}
+			}
+		}
+		if flt, ok := obj.(*Float); ok {
+			switch n.Property {
+			case "detik":
+				return &Float{Value: flt.Value * 1000}
+			case "milidetik":
+				return &Float{Value: flt.Value}
+			case "menit":
+				return &Float{Value: flt.Value * 60 * 1000}
+			}
+		}
+
 		// 4. Time-Travel Variable access fallback (e.g. x.sebelumnya, x.awal, x.histori)
 		if id, ok := n.Object.(*uast.Identifier); ok {
 			entry, exists := env.GetEntry(id.Name)
@@ -983,7 +1075,7 @@ func Eval(node uast.Node, env *Environment) Object {
 			return callee
 		}
 		if fn, ok := callee.(*Function); ok {
-			return applyFunctionWithASTArgs(fn, n.Arguments, env, n.GetMetadata())
+			return applyFunctionWithASTArgs(fn, n.Arguments, env, n.GetMetadata(), n.TypeArguments)
 		}
 		args := make([]Object, len(n.Arguments))
 		for i, argNode := range n.Arguments {
@@ -993,7 +1085,7 @@ func Eval(node uast.Node, env *Environment) Object {
 			}
 			args[i] = argVal
 		}
-		return applyFunction(callee, args, n.GetMetadata())
+		return applyFunctionWithGenerics(callee, args, n.TypeArguments, n.GetMetadata())
 
 	case *uast.ArrayLiteral:
 		elems := make([]Object, len(n.Elements))
@@ -1030,6 +1122,40 @@ func Eval(node uast.Node, env *Environment) Object {
 			m.Pairs[keyStr] = valVal
 		}
 		return m
+
+	case *uast.TitipExpression:
+		ticket := NewTicket()
+		subEnv := NewEnclosedEnvironment(env)
+		go func() {
+			res := Eval(n.Argument, subEnv)
+			if isError(res) {
+				ticket.Fail(res.(*Error))
+			} else {
+				ticket.Resolve(res)
+			}
+		}()
+		return ticket
+
+	case *uast.JemputExpression:
+		target := Eval(n.Argument, env)
+		if isError(target) {
+			return target
+		}
+		ticket, ok := target.(*Ticket)
+		if !ok {
+			return newError(n.GetMetadata(),
+				fmt.Sprintf("Target jemput harus berupa Tiket, bukan %s", target.Type()),
+				"Pastikan menggunakan 'titip' untuk menghasilkan tiket.")
+		}
+		var timeoutDuration time.Duration = 0
+		if n.Timeout != nil {
+			tVal := Eval(n.Timeout, env)
+			if isError(tVal) {
+				return tVal
+			}
+			timeoutDuration = parseTimeoutValue(tVal)
+		}
+		return ticket.Await(timeoutDuration, n.GetMetadata())
 	}
 
 	return newError(node.GetMetadata(), fmt.Sprintf("Node AST tipe '%s' belum didukung oleh evaluator", node.Type()), "Pastikan node U-AST valid.")
@@ -1229,9 +1355,19 @@ func ApplyFunction(callee Object, args []Object, meta *uast.NodeMetadata) Object
 }
 
 func applyFunction(callee Object, args []Object, meta *uast.NodeMetadata) Object {
+	return applyFunctionWithGenerics(callee, args, nil, meta)
+}
+
+func applyFunctionWithGenerics(callee Object, args []Object, typeArgs []string, meta *uast.NodeMetadata) Object {
 	switch fn := callee.(type) {
 	case *Builtin:
-		return fn.Fn(args...)
+		res := fn.Fn(args...)
+		if len(typeArgs) > 0 {
+			if ch, ok := res.(*Channel); ok {
+				ch.ElemType = typeArgs[0]
+			}
+		}
+		return res
 	case *Function:
 		fnEnv := NewEnclosedEnvironment(fn.Env)
 		defer func() {
@@ -1239,6 +1375,23 @@ func applyFunction(callee Object, args []Object, meta *uast.NodeMetadata) Object
 				Eval(defStmt, fnEnv)
 			}
 		}()
+
+		concreteTypes := make(map[string]string)
+		if len(fn.TypeParameters) > 0 {
+			if len(typeArgs) > 0 && len(typeArgs) != len(fn.TypeParameters) {
+				return newError(meta, fmt.Sprintf("Fungsi '%s' mengharapkan %d parameter tipe generik, tetapi diberikan %d", fn.Name, len(fn.TypeParameters), len(typeArgs)), "")
+			}
+			if len(typeArgs) > 0 {
+				for i, tp := range fn.TypeParameters {
+					argT := typeArgs[i]
+					if tp.Constraint != "" && !isTypeCompatible(argT, tp.Constraint) {
+						return newError(meta, fmt.Sprintf("Argumen tipe '%s' tidak memenuhi batasan '%s' pada fungsi '%s'", argT, tp.Constraint, fn.Name), fmt.Sprintf("Gunakan tipe yang memenuhi batasan %s.", tp.Constraint))
+					}
+					concreteTypes[tp.Name] = argT
+				}
+			}
+		}
+
 		for i, param := range fn.Parameters {
 			var argVal Object = NULL
 			if i < len(args) {
@@ -1246,6 +1399,22 @@ func applyFunction(callee Object, args []Object, meta *uast.NodeMetadata) Object
 			} else if param.DefaultValue != nil {
 				argVal = Eval(param.DefaultValue, fnEnv)
 			}
+
+			if expectedT, ok := concreteTypes[param.TypeHint]; ok {
+				if argVal != NULL && !checkValueMatchesType(argVal, expectedT) {
+					return newError(meta, fmt.Sprintf("Argumen '%s' bertipe %s, tetapi parameter generik '%s' mengharuskan tipe %s", param.Name, objectTypeName(argVal), param.TypeHint, expectedT), fmt.Sprintf("Gunakan nilai bertipe %s.", expectedT))
+				}
+			} else if len(fn.TypeParameters) > 0 && len(typeArgs) == 0 {
+				for _, tp := range fn.TypeParameters {
+					if param.TypeHint == tp.Name {
+						if tp.Constraint != "" && !checkValueMatchesType(argVal, tp.Constraint) {
+							return newError(meta, fmt.Sprintf("Argumen '%s' bertipe %s tidak memenuhi batasan '%s' pada fungsi '%s'", param.Name, objectTypeName(argVal), tp.Constraint, fn.Name), fmt.Sprintf("Gunakan nilai bertipe %s.", tp.Constraint))
+						}
+						concreteTypes[tp.Name] = objectTypeName(argVal)
+					}
+				}
+			}
+
 			fnEnv.Define(param.Name, argVal, true, param.TypeHint)
 		}
 		res := Eval(fn.Body, fnEnv)
@@ -1256,13 +1425,30 @@ func applyFunction(callee Object, args []Object, meta *uast.NodeMetadata) Object
 	case *StructDefinition:
 		instEnv := NewEnclosedEnvironment(fn.Env)
 		instance := &StructInstance{
-			Def:    fn,
-			Fields: make(map[string]Object),
-			Env:    instEnv,
+			Def:           fn,
+			TypeArguments: typeArgs,
+			Fields:        make(map[string]Object),
+			Env:           instEnv,
 		}
 		instEnv.Define("diri", instance, false, fn.Name)
 		instEnv.Define("this", instance, false, fn.Name)
 		instEnv.Define("self", instance, false, fn.Name)
+
+		concreteTypes := make(map[string]string)
+		if len(fn.TypeParameters) > 0 {
+			if len(typeArgs) > 0 && len(typeArgs) != len(fn.TypeParameters) {
+				return newError(meta, fmt.Sprintf("Bentuk '%s' mengharapkan %d parameter tipe generik, tetapi diberikan %d", fn.Name, len(fn.TypeParameters), len(typeArgs)), "")
+			}
+			if len(typeArgs) > 0 {
+				for i, tp := range fn.TypeParameters {
+					argT := typeArgs[i]
+					if tp.Constraint != "" && !isTypeCompatible(argT, tp.Constraint) {
+						return newError(meta, fmt.Sprintf("Argumen tipe '%s' tidak memenuhi batasan '%s' pada bentuk '%s'", argT, tp.Constraint, fn.Name), fmt.Sprintf("Gunakan tipe yang memenuhi batasan %s.", tp.Constraint))
+					}
+					concreteTypes[tp.Name] = argT
+				}
+			}
+		}
 
 		if len(args) == 1 && args[0].Type() == MAP_OBJ {
 			mp := args[0].(*Map)
@@ -1294,6 +1480,38 @@ func applyFunction(callee Object, args []Object, meta *uast.NodeMetadata) Object
 				}
 			}
 		}
+
+		// Validate generic type constraints on fields
+		for _, f := range fn.Fields {
+			val := instance.Fields[f.Name]
+			if expectedT, ok := concreteTypes[f.TypeHint]; ok {
+				if val != NULL && val != nil && !checkValueMatchesType(val, expectedT) {
+					return newError(meta, fmt.Sprintf("Nilai untuk bidang '%s' bertipe %s, tetapi parameter generik '%s' mengharuskan tipe %s", f.Name, objectTypeName(val), f.TypeHint, expectedT), fmt.Sprintf("Gunakan nilai bertipe %s.", expectedT))
+				}
+			} else if len(fn.TypeParameters) > 0 && len(typeArgs) == 0 {
+				for _, tp := range fn.TypeParameters {
+					if f.TypeHint == tp.Name {
+						if tp.Constraint != "" && !checkValueMatchesType(val, tp.Constraint) {
+							return newError(meta, fmt.Sprintf("Nilai untuk bidang '%s' bertipe %s tidak memenuhi batasan '%s' pada bentuk '%s'", f.Name, objectTypeName(val), tp.Constraint, fn.Name), fmt.Sprintf("Gunakan nilai bertipe %s.", tp.Constraint))
+						}
+						concreteTypes[tp.Name] = objectTypeName(val)
+					}
+				}
+			}
+		}
+
+		if len(typeArgs) == 0 && len(fn.TypeParameters) > 0 {
+			var inferred []string
+			for _, tp := range fn.TypeParameters {
+				if ct, ok := concreteTypes[tp.Name]; ok {
+					inferred = append(inferred, ct)
+				}
+			}
+			if len(inferred) == len(fn.TypeParameters) {
+				instance.TypeArguments = inferred
+			}
+		}
+
 		return instance
 	case Callable:
 		return fn.Call(args...)
@@ -1412,13 +1630,30 @@ func castValueToType(val Object, targetType string, meta *uast.NodeMetadata, env
 	}
 }
 
-func applyFunctionWithASTArgs(fn *Function, argNodes []uast.Expression, callerEnv *Environment, meta *uast.NodeMetadata) Object {
+func applyFunctionWithASTArgs(fn *Function, argNodes []uast.Expression, callerEnv *Environment, meta *uast.NodeMetadata, typeArgs []string) Object {
 	fnEnv := NewEnclosedEnvironment(fn.Env)
 	defer func() {
 		for _, defStmt := range fnEnv.PopAllDefers() {
 			Eval(defStmt, fnEnv)
 		}
 	}()
+
+	concreteTypes := make(map[string]string)
+	if len(fn.TypeParameters) > 0 {
+		if len(typeArgs) > 0 && len(typeArgs) != len(fn.TypeParameters) {
+			return newError(meta, fmt.Sprintf("Fungsi '%s' mengharapkan %d parameter tipe generik, tetapi diberikan %d", fn.Name, len(fn.TypeParameters), len(typeArgs)), "")
+		}
+		if len(typeArgs) > 0 {
+			for i, tp := range fn.TypeParameters {
+				argT := typeArgs[i]
+				if tp.Constraint != "" && !isTypeCompatible(argT, tp.Constraint) {
+					return newError(meta, fmt.Sprintf("Argumen tipe '%s' tidak memenuhi batasan '%s' pada fungsi '%s'", argT, tp.Constraint, fn.Name), fmt.Sprintf("Gunakan tipe yang memenuhi batasan %s.", tp.Constraint))
+				}
+				concreteTypes[tp.Name] = argT
+			}
+		}
+	}
+
 	for i, param := range fn.Parameters {
 		if param.IsReference {
 			if i >= len(argNodes) {
@@ -1450,6 +1685,22 @@ func applyFunctionWithASTArgs(fn *Function, argNodes []uast.Expression, callerEn
 					return argVal
 				}
 			}
+
+			if expectedT, ok := concreteTypes[param.TypeHint]; ok {
+				if argVal != NULL && !checkValueMatchesType(argVal, expectedT) {
+					return newError(meta, fmt.Sprintf("Argumen '%s' bertipe %s, tetapi parameter generik '%s' mengharuskan tipe %s", param.Name, objectTypeName(argVal), param.TypeHint, expectedT), fmt.Sprintf("Gunakan nilai bertipe %s.", expectedT))
+				}
+			} else if len(fn.TypeParameters) > 0 && len(typeArgs) == 0 {
+				for _, tp := range fn.TypeParameters {
+					if param.TypeHint == tp.Name {
+						if tp.Constraint != "" && !checkValueMatchesType(argVal, tp.Constraint) {
+							return newError(meta, fmt.Sprintf("Argumen '%s' bertipe %s tidak memenuhi batasan '%s' pada fungsi '%s'", param.Name, objectTypeName(argVal), tp.Constraint, fn.Name), fmt.Sprintf("Gunakan nilai bertipe %s.", tp.Constraint))
+						}
+						concreteTypes[tp.Name] = objectTypeName(argVal)
+					}
+				}
+			}
+
 			fnEnv.Define(param.Name, argVal, true, param.TypeHint)
 		}
 	}

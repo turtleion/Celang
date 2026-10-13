@@ -164,12 +164,13 @@ func (u *UnaryExpression) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// CallExpression represents invoking a function/routine (e.g. cetak("Halo"), hitung(1, 2)).
+// CallExpression represents invoking a function/routine (e.g. cetak("Halo"), hitung(1, 2), Kotak<Angka>(10)).
 type CallExpression struct {
-	NodeType  NodeType      `json:"type"`
-	Metadata  *NodeMetadata `json:"metadata,omitempty"`
-	Callee    Expression    `json:"callee"`
-	Arguments []Expression  `json:"arguments"`
+	NodeType      NodeType      `json:"type"`
+	Metadata      *NodeMetadata `json:"metadata,omitempty"`
+	Callee        Expression    `json:"callee"`
+	TypeArguments []string      `json:"type_arguments,omitempty"`
+	Arguments     []Expression  `json:"arguments"`
 }
 
 func (c *CallExpression) Type() NodeType          { return NodeTypeCallExpression }
@@ -178,10 +179,11 @@ func (c *CallExpression) expressionNode()         {}
 
 func (c *CallExpression) UnmarshalJSON(data []byte) error {
 	var raw struct {
-		NodeType  NodeType          `json:"type"`
-		Metadata  *NodeMetadata     `json:"metadata,omitempty"`
-		Callee    json.RawMessage   `json:"callee"`
-		Arguments []json.RawMessage `json:"arguments"`
+		NodeType      NodeType          `json:"type"`
+		Metadata      *NodeMetadata     `json:"metadata,omitempty"`
+		Callee        json.RawMessage   `json:"callee"`
+		TypeArguments []string          `json:"type_arguments,omitempty"`
+		Arguments     []json.RawMessage `json:"arguments"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
@@ -201,6 +203,7 @@ func (c *CallExpression) UnmarshalJSON(data []byte) error {
 	c.NodeType = NodeTypeCallExpression
 	c.Metadata = raw.Metadata
 	c.Callee = calleeExpr
+	c.TypeArguments = raw.TypeArguments
 	c.Arguments = args
 	return nil
 }
@@ -593,6 +596,75 @@ func (r *RangeExpression) UnmarshalJSON(data []byte) error {
 			return fmt.Errorf("RangeExpression.end unmarshal error: %w", err)
 		}
 		r.End = endExpr
+	}
+	return nil
+}
+
+// TitipExpression represents: titip <ekspresi>
+type TitipExpression struct {
+	NodeType NodeType      `json:"type"`
+	Metadata *NodeMetadata `json:"metadata,omitempty"`
+	Argument Expression    `json:"argument"`
+}
+
+func (t *TitipExpression) Type() NodeType          { return NodeTypeTitipExpression }
+func (t *TitipExpression) GetMetadata() *NodeMetadata { return t.Metadata }
+func (t *TitipExpression) expressionNode()         {}
+
+func (t *TitipExpression) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		NodeType NodeType        `json:"type"`
+		Metadata *NodeMetadata   `json:"metadata,omitempty"`
+		Argument json.RawMessage `json:"argument"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	arg, err := UnmarshalExpressionJSON(raw.Argument)
+	if err != nil {
+		return fmt.Errorf("TitipExpression.argument unmarshal error: %w", err)
+	}
+	t.NodeType = NodeTypeTitipExpression
+	t.Metadata = raw.Metadata
+	t.Argument = arg
+	return nil
+}
+
+// JemputExpression represents: jemput <tiket> [dalam <timeout>]
+type JemputExpression struct {
+	NodeType NodeType      `json:"type"`
+	Metadata *NodeMetadata `json:"metadata,omitempty"`
+	Argument Expression    `json:"argument"`
+	Timeout  Expression    `json:"timeout,omitempty"`
+}
+
+func (j *JemputExpression) Type() NodeType          { return NodeTypeJemputExpression }
+func (j *JemputExpression) GetMetadata() *NodeMetadata { return j.Metadata }
+func (j *JemputExpression) expressionNode()         {}
+
+func (j *JemputExpression) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		NodeType NodeType        `json:"type"`
+		Metadata *NodeMetadata   `json:"metadata,omitempty"`
+		Argument json.RawMessage `json:"argument"`
+		Timeout  json.RawMessage `json:"timeout,omitempty"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	arg, err := UnmarshalExpressionJSON(raw.Argument)
+	if err != nil {
+		return fmt.Errorf("JemputExpression.argument unmarshal error: %w", err)
+	}
+	j.NodeType = NodeTypeJemputExpression
+	j.Metadata = raw.Metadata
+	j.Argument = arg
+	if len(raw.Timeout) > 0 && string(raw.Timeout) != "null" {
+		tExpr, err := UnmarshalExpressionJSON(raw.Timeout)
+		if err != nil {
+			return fmt.Errorf("JemputExpression.timeout unmarshal error: %w", err)
+		}
+		j.Timeout = tExpr
 	}
 	return nil
 }

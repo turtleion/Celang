@@ -142,6 +142,20 @@ func UnmarshalExpressionJSON(data []byte) (Expression, error) {
 		}
 		return &rng, nil
 
+	case NodeTypeTitipExpression:
+		var tExpr TitipExpression
+		if err := json.Unmarshal(data, &tExpr); err != nil {
+			return nil, err
+		}
+		return &tExpr, nil
+
+	case NodeTypeJemputExpression:
+		var jExpr JemputExpression
+		if err := json.Unmarshal(data, &jExpr); err != nil {
+			return nil, err
+		}
+		return &jExpr, nil
+
 	default:
 		return nil, fmt.Errorf("unrecognized expression type: '%s'", detector.Type)
 	}

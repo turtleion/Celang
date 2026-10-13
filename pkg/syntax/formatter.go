@@ -225,6 +225,17 @@ func (f *Formatter) formatStatement(stmt uast.Statement, indent int) string {
 		sb.WriteString(f.profile.Func)
 		sb.WriteString(" ")
 		sb.WriteString(s.Name)
+		if len(s.TypeParameters) > 0 {
+			var tpStrs []string
+			for _, tp := range s.TypeParameters {
+				if tp.Constraint != "" {
+					tpStrs = append(tpStrs, fmt.Sprintf("%s: %s", tp.Name, tp.Constraint))
+				} else {
+					tpStrs = append(tpStrs, tp.Name)
+				}
+			}
+			sb.WriteString(fmt.Sprintf("<%s>", strings.Join(tpStrs, ", ")))
+		}
 		sb.WriteString("(")
 
 		params := make([]string, len(s.Parameters))
@@ -562,7 +573,19 @@ func (f *Formatter) formatStatement(stmt uast.Statement, indent int) string {
 		} else if f.profile.Name == "javascript" || f.profile.Name == "classic" {
 			structKeyword = "struct"
 		}
-		sb.WriteString(fmt.Sprintf("%s %s {\n", structKeyword, s.Name))
+		typeParamsStr := ""
+		if len(s.TypeParameters) > 0 {
+			var tpStrs []string
+			for _, tp := range s.TypeParameters {
+				if tp.Constraint != "" {
+					tpStrs = append(tpStrs, fmt.Sprintf("%s: %s", tp.Name, tp.Constraint))
+				} else {
+					tpStrs = append(tpStrs, tp.Name)
+				}
+			}
+			typeParamsStr = fmt.Sprintf("<%s>", strings.Join(tpStrs, ", "))
+		}
+		sb.WriteString(fmt.Sprintf("%s %s%s {\n", structKeyword, s.Name, typeParamsStr))
 		for _, field := range s.Fields {
 			sb.WriteString(strings.Repeat(" ", (indent+1)*f.profile.IndentWidth))
 			sb.WriteString(field.Name)
@@ -678,6 +701,10 @@ func (f *Formatter) formatExpression(expr uast.Expression) string {
 			calleeStr = "print"
 		} else if calleeStr == "print" && f.profile.Name == "indonesian" {
 			calleeStr = "cetak"
+		}
+
+		if len(e.TypeArguments) > 0 {
+			calleeStr += fmt.Sprintf("<%s>", strings.Join(e.TypeArguments, ", "))
 		}
 
 		args := make([]string, len(e.Arguments))
@@ -802,6 +829,16 @@ func (f *Formatter) formatExpression(expr uast.Expression) string {
 			sb.WriteString(f.formatExpression(e.End))
 		}
 		return sb.String()
+
+	case *uast.TitipExpression:
+		return "titip " + f.formatExpression(e.Argument)
+
+	case *uast.JemputExpression:
+		res := "jemput " + f.formatExpression(e.Argument)
+		if e.Timeout != nil {
+			res += " dalam " + f.formatExpression(e.Timeout)
+		}
+		return res
 	}
 
 	return ""

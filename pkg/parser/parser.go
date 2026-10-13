@@ -95,6 +95,8 @@ func NewParser(l *Lexer) *Parser {
 	p.registerPrefix(AT, p.parseAtExpression)
 	p.registerPrefix(MAYBE, p.parseSafeNavigationExpression)
 	p.registerPrefix(RANGE, p.parsePrefixRangeExpression)
+	p.registerPrefix(TITIP, p.parseTitipExpression)
+	p.registerPrefix(JEMPUT, p.parseJemputExpression)
 
 	p.infixParseFns = make(map[TokenType]infixParseFn)
 	p.registerInfix(PIPE_ARROW, p.parsePipelineExpression)
@@ -705,7 +707,15 @@ func (p *Parser) parseStructDeclaration() *uast.StructDeclaration {
 	}
 
 	name := p.curToken.Literal
-	return p.parseStructBody(meta, name)
+	var typeParams []uast.TypeParameter
+	if p.peekTokenIs(LT) {
+		typeParams = p.parseTypeParameters()
+	}
+	decl := p.parseStructBody(meta, name)
+	if decl != nil {
+		decl.TypeParameters = typeParams
+	}
+	return decl
 }
 
 func (p *Parser) parseTypeDeclaration() uast.Statement {
@@ -716,6 +726,11 @@ func (p *Parser) parseTypeDeclaration() uast.Statement {
 		return nil
 	}
 	name := p.curToken.Literal
+
+	var typeParams []uast.TypeParameter
+	if p.peekTokenIs(LT) {
+		typeParams = p.parseTypeParameters()
+	}
 
 	if p.peekTokenIs(ASSIGN) {
 		p.nextToken() // eat '='
@@ -733,7 +748,11 @@ func (p *Parser) parseTypeDeclaration() uast.Statement {
 	if p.peekTokenIs(STRUCT_DECL) {
 		p.nextToken() // eat 'struct'
 	}
-	return p.parseStructBody(meta, name)
+	decl := p.parseStructBody(meta, name)
+	if decl != nil {
+		decl.TypeParameters = typeParams
+	}
+	return decl
 }
 
 func (p *Parser) parseReferenceDeclaration() *uast.ReferenceDeclaration {
@@ -1179,6 +1198,11 @@ func (p *Parser) parseFunctionDeclaration() *uast.FunctionDeclaration {
 	}
 	funcName := p.curToken.Literal
 
+	var typeParams []uast.TypeParameter
+	if p.peekTokenIs(LT) {
+		typeParams = p.parseTypeParameters()
+	}
+
 	if !p.expectPeek(LPAREN) {
 		return nil
 	}
@@ -1203,12 +1227,13 @@ func (p *Parser) parseFunctionDeclaration() *uast.FunctionDeclaration {
 	body := p.parseBlockStatement()
 
 	return &uast.FunctionDeclaration{
-		NodeType:   uast.NodeTypeFunctionDeclaration,
-		Metadata:   meta,
-		Name:       funcName,
-		Parameters: params,
-		Body:       body,
-		ReturnType: returnType,
+		NodeType:       uast.NodeTypeFunctionDeclaration,
+		Metadata:       meta,
+		Name:           funcName,
+		TypeParameters: typeParams,
+		Parameters:     params,
+		Body:           body,
+		ReturnType:     returnType,
 	}
 }
 
@@ -1272,6 +1297,22 @@ func (p *Parser) parseParameter() uast.Parameter {
 func (p *Parser) parseTypeHint() string {
 	var parts []string
 	parts = append(parts, p.curToken.Literal)
+
+	if p.peekTokenIs(LT) {
+		p.nextToken() // eat '<'
+		parts = append(parts, "<")
+		p.nextToken() // move to inner type
+		parts = append(parts, p.curToken.Literal)
+		for p.peekTokenIs(COMMA) {
+			p.nextToken()
+			parts = append(parts, ", ")
+			p.nextToken()
+			parts = append(parts, p.curToken.Literal)
+		}
+		if p.expectPeek(GT) {
+			parts = append(parts, ">")
+		}
+	}
 
 	// Support union types: "Angka|Pecahan" or "Angka atau Pecahan"
 	for p.peekTokenIs(PIPE) || p.peekTokenIs(OR) {
@@ -1437,10 +1478,41 @@ func (p *Parser) parseExpression(precedence int) uast.Expression {
 }
 
 func (p *Parser) parseIdentifier() uast.Expression {
+	meta := p.currentMetadata()
+	name := p.curToken.Literal
+
+	// 1. Single-param arrow function: x => ...
+	if p.peekTokenIs(FAT_ARROW) {
+		p.nextToken() // move to '=>'
+		p.nextToken() // move past '=>' to body
+		body := p.parseArrowFunctionBody()
+		return &uast.FunctionExpression{
+			NodeType:   uast.NodeTypeFunctionExpression,
+			Metadata:   meta,
+			Parameters: []uast.Parameter{{Name: name}},
+			Body:       body,
+		}
+	}
+
+	// 2. Generic call: Kotak<Angka>(10)
+	if p.isGenericCallAhead() {
+		ident := &uast.Identifier{
+			NodeType: uast.NodeTypeIdentifier,
+			Metadata: meta,
+			Name:     name,
+		}
+		p.nextToken() // move to '<'
+		typeArgs := p.parseTypeArguments()
+		if !p.expectPeek(LPAREN) {
+			return nil
+		}
+		return p.parseCallArguments(ident, typeArgs)
+	}
+
 	return &uast.Identifier{
 		NodeType: uast.NodeTypeIdentifier,
-		Metadata: p.currentMetadata(),
-		Name:     p.curToken.Literal,
+		Metadata: meta,
+		Name:     name,
 	}
 }
 
@@ -1718,6 +1790,22 @@ func (p *Parser) parseFunctionExpression() uast.Expression {
 
 
 func (p *Parser) parseGroupedExpression() uast.Expression {
+	if p.isArrowAheadFromParen() {
+		meta := p.currentMetadata()
+		params := p.parseFunctionParameters()
+		if !p.expectPeek(FAT_ARROW) {
+			return nil
+		}
+		p.nextToken() // move past '=>' to body
+		body := p.parseArrowFunctionBody()
+		return &uast.FunctionExpression{
+			NodeType:   uast.NodeTypeFunctionExpression,
+			Metadata:   meta,
+			Parameters: params,
+			Body:       body,
+		}
+	}
+
 	p.parenDepth++
 	defer func() { p.parenDepth-- }()
 	p.nextToken() // eat '('
@@ -1828,17 +1916,18 @@ func (p *Parser) parseMapLiteral() uast.Expression {
 	}
 }
 
-func (p *Parser) parseCallExpression(callee uast.Expression) uast.Expression {
+func (p *Parser) parseCallArguments(callee uast.Expression, typeArgs []string) uast.Expression {
 	meta := p.currentMetadata()
 	args := []uast.Expression{}
 
 	if p.peekTokenIs(RPAREN) {
 		p.nextToken()
 		return &uast.CallExpression{
-			NodeType:  uast.NodeTypeCallExpression,
-			Metadata:  meta,
-			Callee:    callee,
-			Arguments: args,
+			NodeType:      uast.NodeTypeCallExpression,
+			Metadata:      meta,
+			Callee:        callee,
+			TypeArguments: typeArgs,
+			Arguments:     args,
 		}
 	}
 
@@ -1856,11 +1945,16 @@ func (p *Parser) parseCallExpression(callee uast.Expression) uast.Expression {
 	}
 
 	return &uast.CallExpression{
-		NodeType:  uast.NodeTypeCallExpression,
-		Metadata:  meta,
-		Callee:    callee,
-		Arguments: args,
+		NodeType:      uast.NodeTypeCallExpression,
+		Metadata:      meta,
+		Callee:        callee,
+		TypeArguments: typeArgs,
+		Arguments:     args,
 	}
+}
+
+func (p *Parser) parseCallExpression(callee uast.Expression) uast.Expression {
+	return p.parseCallArguments(callee, nil)
 }
 
 func (p *Parser) parseIndexExpression(left uast.Expression) uast.Expression {
@@ -1900,13 +1994,24 @@ func (p *Parser) parseMemberExpression(left uast.Expression) uast.Expression {
 	}
 	prop := p.curToken.Literal
 
-	return &uast.MemberExpression{
+	memExpr := &uast.MemberExpression{
 		NodeType: uast.NodeTypeMemberExpression,
 		Metadata: meta,
 		Object:   left,
 		Property: prop,
 		Computed: false,
 	}
+
+	if p.isGenericCallAhead() {
+		p.nextToken() // move to '<'
+		typeArgs := p.parseTypeArguments()
+		if !p.expectPeek(LPAREN) {
+			return nil
+		}
+		return p.parseCallArguments(memExpr, typeArgs)
+	}
+
+	return memExpr
 }
 
 func (p *Parser) currentMetadata() *uast.NodeMetadata {
@@ -2055,6 +2160,147 @@ func (p *Parser) parseOptionalMemberExpression(left uast.Expression) uast.Expres
 		Property: prop,
 		Computed: false,
 		Safe:     true,
+	}
+}
+
+func (p *Parser) parseArrowFunctionBody() *uast.BlockStatement {
+	if p.curTokenIs(LBRACE) {
+		return p.parseBlockStatement()
+	}
+	meta := p.currentMetadata()
+	expr := p.parseExpression(LOWEST)
+	if expr == nil {
+		return nil
+	}
+	return &uast.BlockStatement{
+		NodeType: uast.NodeTypeBlockStatement,
+		Metadata: meta,
+		Statements: []uast.Statement{
+			&uast.ReturnStatement{
+				NodeType: uast.NodeTypeReturnStatement,
+				Metadata: meta,
+				Value:    expr,
+			},
+		},
+	}
+}
+
+func (p *Parser) isArrowAheadFromParen() bool {
+	lClone := *p.l
+	tok := p.peekToken // the token after '('
+	depth := 1
+	for tok.Type != EOF {
+		if tok.Type == LPAREN {
+			depth++
+		} else if tok.Type == RPAREN {
+			depth--
+			if depth == 0 {
+				nextTok := lClone.NextToken()
+				return nextTok.Type == FAT_ARROW
+			}
+		}
+		tok = lClone.NextToken()
+	}
+	return false
+}
+
+func (p *Parser) isGenericCallAhead() bool {
+	if !p.peekTokenIs(LT) {
+		return false
+	}
+	lClone := *p.l
+	tok := lClone.NextToken() // token after '<'
+	hasTypeArg := false
+	for tok.Type != EOF {
+		if tok.Type == IDENT || tok.Type == SEMBARANG || tok.Type == COMMA {
+			if tok.Type == IDENT || tok.Type == SEMBARANG {
+				hasTypeArg = true
+			}
+		} else if tok.Type == GT {
+			if !hasTypeArg {
+				return false
+			}
+			nextTok := lClone.NextToken()
+			return nextTok.Type == LPAREN
+		} else {
+			return false
+		}
+		tok = lClone.NextToken()
+	}
+	return false
+}
+
+func (p *Parser) parseTypeArguments() []string {
+	// curToken is '<'
+	typeArgs := []string{}
+	p.nextToken() // move to first type
+	for !p.curTokenIs(GT) && !p.curTokenIs(EOF) {
+		if p.curTokenIs(IDENT) || p.curTokenIs(SEMBARANG) {
+			typeArgs = append(typeArgs, p.curToken.Literal)
+		}
+		if p.peekTokenIs(COMMA) {
+			p.nextToken() // eat ','
+		}
+		p.nextToken()
+	}
+	return typeArgs
+}
+
+func (p *Parser) parseTypeParameters() []uast.TypeParameter {
+	p.nextToken() // eat '<'
+	typeParams := []uast.TypeParameter{}
+	p.nextToken() // move to first type parameter
+
+	for !p.curTokenIs(GT) && !p.curTokenIs(EOF) {
+		if p.curTokenIs(IDENT) || p.curTokenIs(SEMBARANG) {
+			name := p.curToken.Literal
+			constraint := ""
+			if p.peekTokenIs(COLON) || p.peekTokenIs(HARUS) || p.peekTokenIs(TYPE_ASSIGN) {
+				p.nextToken() // eat ':', 'harus', or 'itu'
+				if p.peekTokenIs(IDENT) || p.peekTokenIs(SEMBARANG) {
+					p.nextToken()
+					constraint = p.curToken.Literal
+				}
+			}
+			typeParams = append(typeParams, uast.TypeParameter{
+				Name:       name,
+				Constraint: constraint,
+			})
+		}
+		if p.peekTokenIs(COMMA) {
+			p.nextToken() // eat ','
+		}
+		p.nextToken()
+	}
+	return typeParams
+}
+
+func (p *Parser) parseTitipExpression() uast.Expression {
+	meta := p.currentMetadata()
+	p.nextToken() // move to argument expression
+	arg := p.parseExpression(PREFIX)
+	return &uast.TitipExpression{
+		NodeType: uast.NodeTypeTitipExpression,
+		Metadata: meta,
+		Argument: arg,
+	}
+}
+
+func (p *Parser) parseJemputExpression() uast.Expression {
+	meta := p.currentMetadata()
+	p.nextToken() // move to argument expression
+	arg := p.parseExpression(PREFIX)
+	var timeout uast.Expression
+	if p.peekTokenIs(IN) {
+		p.nextToken() // eat 'dalam'
+		p.nextToken() // move to timeout expr
+		timeout = p.parseExpression(PREFIX)
+	}
+	return &uast.JemputExpression{
+		NodeType: uast.NodeTypeJemputExpression,
+		Metadata: meta,
+		Argument: arg,
+		Timeout:  timeout,
 	}
 }
 

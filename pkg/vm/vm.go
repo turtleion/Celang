@@ -635,6 +635,55 @@ func (vm *VM) evalIndex(targetObj, indexObj evaluator.Object) (evaluator.Object,
 		}
 		return &evaluator.Null{}, nil
 
+	case *evaluator.Channel:
+		key := indexObj.Inspect()
+		if s, ok := indexObj.(*evaluator.String); ok {
+			key = s.Value
+		}
+		switch key {
+		case "kirim":
+			return &evaluator.Builtin{
+				Fn: func(args ...evaluator.Object) evaluator.Object {
+					if len(args) == 0 {
+						return &evaluator.Error{Message: "kirim() membutuhkan 1 argumen data"}
+					}
+					return obj.Send(args[0], nil)
+				},
+			}, nil
+		case "terima":
+			return &evaluator.Builtin{
+				Fn: func(args ...evaluator.Object) evaluator.Object {
+					return obj.Receive(0)
+				},
+			}, nil
+		case "tutup":
+			return &evaluator.Builtin{
+				Fn: func(args ...evaluator.Object) evaluator.Object {
+					return obj.Close()
+				},
+			}, nil
+		case "panjang":
+			return &evaluator.Integer{Value: int64(len(obj.Ch))}, nil
+		case "kapasitas":
+			return &evaluator.Integer{Value: int64(obj.Capacity)}, nil
+		}
+		return &evaluator.Null{}, nil
+
+	case *evaluator.Ticket:
+		key := indexObj.Inspect()
+		if s, ok := indexObj.(*evaluator.String); ok {
+			key = s.Value
+		}
+		switch key {
+		case "hasil", "jemput":
+			return &evaluator.Builtin{
+				Fn: func(args ...evaluator.Object) evaluator.Object {
+					return obj.Await(0, nil)
+				},
+			}, nil
+		}
+		return &evaluator.Null{}, nil
+
 	default:
 		return nil, fmt.Errorf("tipe %s tidak mendukung operasi indeks", targetObj.Type())
 	}

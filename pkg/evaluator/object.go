@@ -25,6 +25,8 @@ const (
 	POINTER_OBJ         ObjectType = "POINTER"
 	STRUCT_DEF_OBJ      ObjectType = "STRUCT_DEF"
 	STRUCT_INSTANCE_OBJ ObjectType = "STRUCT_INSTANCE"
+	TICKET_OBJ          ObjectType = "TIKET"
+	CHANNEL_OBJ         ObjectType = "SALURAN"
 )
 
 type Object interface {
@@ -114,10 +116,11 @@ func (e *Error) Inspect() string {
 
 // Function represents a user-defined function.
 type Function struct {
-	Name       string
-	Parameters []uast.Parameter
-	Body       *uast.BlockStatement
-	Env        *Environment
+	Name           string
+	TypeParameters []uast.TypeParameter
+	Parameters     []uast.Parameter
+	Body           *uast.BlockStatement
+	Env            *Environment
 }
 
 func (f *Function) Type() ObjectType { return FUNCTION_OBJ }
@@ -126,7 +129,19 @@ func (f *Function) Inspect() string {
 	for _, p := range f.Parameters {
 		params = append(params, p.Name)
 	}
-	return fmt.Sprintf("fungsi %s(%s)", f.Name, strings.Join(params, ", "))
+	tpStr := ""
+	if len(f.TypeParameters) > 0 {
+		var tpStrs []string
+		for _, tp := range f.TypeParameters {
+			if tp.Constraint != "" {
+				tpStrs = append(tpStrs, fmt.Sprintf("%s: %s", tp.Name, tp.Constraint))
+			} else {
+				tpStrs = append(tpStrs, tp.Name)
+			}
+		}
+		tpStr = fmt.Sprintf("<%s>", strings.Join(tpStrs, ", "))
+	}
+	return fmt.Sprintf("fungsi %s%s(%s)", f.Name, tpStr, strings.Join(params, ", "))
 }
 
 // BuiltinFunction is a native Go function exposed to Celang.
@@ -178,6 +193,7 @@ func (p *Pointer) Inspect() string {
 // StructDefinition represents the blueprint of a custom data type (bentuk).
 type StructDefinition struct {
 	Name           string
+	TypeParameters []uast.TypeParameter
 	Fields         []uast.StructField
 	Methods        map[string]*Function
 	PrivateFields  map[string]bool
@@ -187,13 +203,27 @@ type StructDefinition struct {
 }
 
 func (s *StructDefinition) Type() ObjectType { return STRUCT_DEF_OBJ }
-func (s *StructDefinition) Inspect() string  { return fmt.Sprintf("bentuk %s", s.Name) }
+func (s *StructDefinition) Inspect() string {
+	if len(s.TypeParameters) > 0 {
+		var tpStrs []string
+		for _, tp := range s.TypeParameters {
+			if tp.Constraint != "" {
+				tpStrs = append(tpStrs, fmt.Sprintf("%s: %s", tp.Name, tp.Constraint))
+			} else {
+				tpStrs = append(tpStrs, tp.Name)
+			}
+		}
+		return fmt.Sprintf("bentuk %s<%s>", s.Name, strings.Join(tpStrs, ", "))
+	}
+	return fmt.Sprintf("bentuk %s", s.Name)
+}
 
 // StructInstance represents an instantiated struct object with fields and methods.
 type StructInstance struct {
-	Def    *StructDefinition
-	Fields map[string]Object
-	Env    *Environment
+	Def           *StructDefinition
+	TypeArguments []string
+	Fields        map[string]Object
+	Env           *Environment
 }
 
 func (s *StructInstance) Type() ObjectType { return STRUCT_INSTANCE_OBJ }
@@ -207,8 +237,12 @@ func inspectObjectWithVisited(obj Object, visited map[any]bool) string {
 	}
 	switch o := obj.(type) {
 	case *StructInstance:
+		name := o.Def.Name
+		if len(o.TypeArguments) > 0 {
+			name += fmt.Sprintf("<%s>", strings.Join(o.TypeArguments, ", "))
+		}
 		if visited[o] {
-			return fmt.Sprintf("%s{...}", o.Def.Name)
+			return fmt.Sprintf("%s{...}", name)
 		}
 		visited[o] = true
 		defer delete(visited, o)
@@ -220,7 +254,7 @@ func inspectObjectWithVisited(obj Object, visited map[any]bool) string {
 			}
 			parts = append(parts, fmt.Sprintf("%s: %s", f.Name, inspectObjectWithVisited(val, visited)))
 		}
-		return fmt.Sprintf("%s{%s}", o.Def.Name, strings.Join(parts, ", "))
+		return fmt.Sprintf("%s{%s}", name, strings.Join(parts, ", "))
 
 	case *Array:
 		if visited[o] {

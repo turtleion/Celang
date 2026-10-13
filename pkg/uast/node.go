@@ -50,6 +50,8 @@ const (
 	NodeTypeSafeNavigationExpression NodeType = "SafeNavigationExpression"
 	NodeTypeNullCoalesceExpression   NodeType = "NullCoalesceExpression"
 	NodeTypeRangeExpression          NodeType = "RangeExpression"
+	NodeTypeTitipExpression          NodeType = "TitipExpression"
+	NodeTypeJemputExpression         NodeType = "JemputExpression"
 )
 
 // Position captures source location information for LSP, tooling, and error reporting.

@@ -6,6 +6,8 @@ import (
 	"io"
 	"os"
 	"strings"
+	"sync"
+	"time"
 )
 
 func RegisterBuiltins(env *Environment, out io.Writer) {
@@ -260,6 +262,107 @@ func RegisterBuiltinsWithIO(env *Environment, in io.Reader, out io.Writer) {
 	}
 	env.Define("salin", salinFn, false, "function")
 	env.Define("clone", salinFn, false, "function")
+
+	// Modern Concurrency Builtins (Saluran, jemput, jemput_semua, jemput_pertama)
+	saluranFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			cap := 0
+			if len(args) > 0 {
+				if iVal, _, isInt, ok := CoerceToNumeric(args[0]); ok && isInt {
+					cap = int(iVal)
+				}
+			}
+			return NewChannel(cap, "")
+		},
+	}
+	env.Define("Saluran", saluranFn, false, "function")
+	env.Define("saluran", saluranFn, false, "function")
+
+	jemputFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) == 0 {
+				return &Error{Message: "jemput mengharapkan setidaknya 1 argumen (tiket)"}
+			}
+			ticket, ok := args[0].(*Ticket)
+			if !ok {
+				return &Error{Message: fmt.Sprintf("Target jemput harus berupa Tiket, bukan %s", args[0].Type())}
+			}
+			var timeout time.Duration = 0
+			if len(args) > 1 {
+				timeout = parseTimeoutValue(args[1])
+			}
+			return ticket.Await(timeout, nil)
+		},
+	}
+	env.Define("jemput", jemputFn, false, "function")
+
+	jemputSemuaFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) == 0 {
+				return &Error{Message: "jemput_semua mengharapkan sebuah array berisi tiket"}
+			}
+			arr, ok := args[0].(*Array)
+			if !ok {
+				return &Error{Message: "argumen jemput_semua harus berupa Daftar (Array)"}
+			}
+			results := make([]Object, len(arr.Elements))
+			var firstErr *Error
+			var mu sync.Mutex
+			var wg sync.WaitGroup
+
+			for i, el := range arr.Elements {
+				ticket, ok := el.(*Ticket)
+				if !ok {
+					return &Error{Message: fmt.Sprintf("Elemen ke-%d bukan merupakan Tiket", i)}
+				}
+				wg.Add(1)
+				idx := i
+				t := ticket
+				go func() {
+					defer wg.Done()
+					res := t.Await(0, nil)
+					mu.Lock()
+					defer mu.Unlock()
+					if isError(res) && firstErr == nil {
+						firstErr = res.(*Error)
+					}
+					results[idx] = res
+				}()
+			}
+			wg.Wait()
+
+			if firstErr != nil {
+				return firstErr
+			}
+			return &Array{Elements: results}
+		},
+	}
+	env.Define("jemput_semua", jemputSemuaFn, false, "function")
+
+	jemputPertamaFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) == 0 {
+				return &Error{Message: "jemput_pertama mengharapkan sebuah array berisi tiket"}
+			}
+			arr, ok := args[0].(*Array)
+			if !ok || len(arr.Elements) == 0 {
+				return &Error{Message: "argumen jemput_pertama harus berupa Daftar tiket yang tidak kosong"}
+			}
+			resChan := make(chan Object, len(arr.Elements))
+			for _, el := range arr.Elements {
+				ticket, ok := el.(*Ticket)
+				if !ok {
+					return &Error{Message: "Semua elemen harus berupa Tiket"}
+				}
+				t := ticket
+				go func() {
+					resChan <- t.Await(0, nil)
+				}()
+			}
+			return <-resChan
+		},
+	}
+	env.Define("jemput_pertama", jemputPertamaFn, false, "function")
 
 	// Register Standard Library global objects (berkas, fs, matematika, math, teks, strings, waktu, time, json)
 	RegisterStdlibGlobals(env)

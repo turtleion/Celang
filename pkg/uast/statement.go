@@ -437,14 +437,21 @@ func (p *Parameter) UnmarshalJSON(data []byte) error {
 }
 
 // FunctionDeclaration represents a named function definition.
+// TypeParameter represents a generic type parameter (e.g. T, K, Nilai: Angka).
+type TypeParameter struct {
+	Name       string `json:"name"`
+	Constraint string `json:"constraint,omitempty"`
+}
+
 type FunctionDeclaration struct {
-	NodeType   NodeType        `json:"type"`
-	Metadata   *NodeMetadata   `json:"metadata,omitempty"`
-	Name       string          `json:"name"`
-	Parameters []Parameter     `json:"parameters"`
-	Body       *BlockStatement `json:"body"`
-	ReturnType string          `json:"return_type,omitempty"`
-	Visibility *Visibility     `json:"visibility,omitempty"`
+	NodeType       NodeType        `json:"type"`
+	Metadata       *NodeMetadata   `json:"metadata,omitempty"`
+	Name           string          `json:"name"`
+	TypeParameters []TypeParameter `json:"type_parameters,omitempty"`
+	Parameters     []Parameter     `json:"parameters"`
+	Body           *BlockStatement `json:"body"`
+	ReturnType     string          `json:"return_type,omitempty"`
+	Visibility     *Visibility     `json:"visibility,omitempty"`
 }
 
 func (f *FunctionDeclaration) Type() NodeType          { return NodeTypeFunctionDeclaration }
@@ -768,13 +775,14 @@ type StructMethod struct {
 
 // StructDeclaration represents: bentuk RekeningBank { ... } or struct Point { ... }
 type StructDeclaration struct {
-	NodeType   NodeType        `json:"type"`
-	Metadata   *NodeMetadata   `json:"metadata,omitempty"`
-	Name       string          `json:"name"`
-	Fields     []StructField   `json:"fields"`
-	Methods    []StructMethod  `json:"methods"`
-	Embeds     []string        `json:"embeds,omitempty"` // Embedded structs
-	Visibility *Visibility     `json:"visibility,omitempty"`
+	NodeType       NodeType        `json:"type"`
+	Metadata       *NodeMetadata   `json:"metadata,omitempty"`
+	Name           string          `json:"name"`
+	TypeParameters []TypeParameter `json:"type_parameters,omitempty"`
+	Fields         []StructField   `json:"fields"`
+	Methods        []StructMethod  `json:"methods"`
+	Embeds         []string        `json:"embeds,omitempty"` // Embedded structs
+	Visibility     *Visibility     `json:"visibility,omitempty"`
 }
 
 func (s *StructDeclaration) Type() NodeType          { return NodeTypeStructDeclaration }
