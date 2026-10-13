@@ -572,6 +572,32 @@ func (vm *VM) evalIndex(targetObj, indexObj evaluator.Object) (evaluator.Object,
 		}
 		return nil, fmt.Errorf("indeks array %d di luar jangkauan (panjang: %d)", idx, len(obj.Elements))
 
+	case *evaluator.String:
+		var idx int = -1
+		if iVal, ok := indexObj.(*evaluator.Integer); ok {
+			idx = int(iVal.Value)
+		} else if sVal, ok := indexObj.(*evaluator.String); ok {
+			if parsed, err := strconv.Atoi(sVal.Value); err == nil {
+				idx = parsed
+			} else {
+				varObj, exists := vm.globals[sVal.Value]
+				if !exists && vm.env != nil {
+					varObj, exists = vm.env.Get(sVal.Value)
+				}
+				if exists {
+					if nVal, _, isInt, ok := evaluator.CoerceToNumeric(varObj); ok && isInt {
+						idx = int(nVal)
+					}
+				}
+			}
+		}
+
+		runes := []rune(obj.Value)
+		if idx >= 0 && idx < len(runes) {
+			return &evaluator.String{Value: string(runes[idx])}, nil
+		}
+		return nil, fmt.Errorf("indeks teks %d di luar jangkauan (panjang: %d)", idx, len(runes))
+
 	case *evaluator.Map:
 		key := indexObj.Inspect()
 		if val, exists := obj.Pairs[key]; exists {

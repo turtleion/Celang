@@ -418,7 +418,14 @@ func (c *Compiler) compileStatement(stmt uast.Statement) error {
 		return nil
 
 	case *uast.FunctionDeclaration:
-		if containsInnerFunction(s.Body) {
+		hasSpecialParams := false
+		for _, p := range s.Parameters {
+			if p.DefaultValue != nil || p.IsReference {
+				hasSpecialParams = true
+				break
+			}
+		}
+		if containsInnerFunction(s.Body) || hasSpecialParams {
 			wrapper := &evaluator.ASTNodeWrapper{Node: s}
 			constIdx := c.chunk.AddConstant(wrapper)
 			c.emitOp(bytecode.OpEvalAST, line)
@@ -470,7 +477,7 @@ func (c *Compiler) compileStatement(stmt uast.Statement) error {
 
 	case *uast.ImportDeclaration, *uast.StructDeclaration, *uast.ConcurrencyStatement,
 		*uast.DestructureDeclaration, *uast.DestructureAssignment, *uast.TryCatchStatement, *uast.ThrowStatement,
-		*uast.ReferenceDeclaration, *uast.TypeAliasDeclaration, *uast.DeferStatement:
+		*uast.ReferenceDeclaration, *uast.TypeAliasDeclaration, *uast.DeferStatement, *uast.SwitchStatement:
 		wrapper := &evaluator.ASTNodeWrapper{Node: s}
 		constIdx := c.chunk.AddConstant(wrapper)
 		c.emitOp(bytecode.OpEvalAST, line)

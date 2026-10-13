@@ -34,7 +34,7 @@ export default defineConfig({
           },
           {
             name: 'keyword.control.celang',
-            match: '\\b(jika|selain jika|selain|selama|untuk|dalam|kembalikan|berhenti|lanjut|sambil|bersamaan|mundur ke|lempar|tangkap|gaya|mungkin|saat_selesai|kalau|bila|defer|if|else|while|for|return|break|continue|async|parallel|lamun|salami|pikeun|balikkeun)\\b'
+            match: '\\b(jika|selain jika|selain|maka|cocok|kasus|lainnya|switch|case|default|selama|untuk|dalam|kembalikan|mengembalikan|berhenti|lanjut|sambil|bersamaan|mundur ke|coba|tangkap|akhirnya|lempar|try|catch|finally|throw|gaya|mungkin|saat_selesai|kalau|bila|defer|if|else|while|for|return|break|continue|async|parallel|lamun|salami|pikeun|balikkeun)\\b'
           },
           {
             name: 'keyword.declaration.celang',
@@ -46,7 +46,7 @@ export default defineConfig({
           },
           {
             name: 'support.function.celang',
-            match: '\\b(cetak|masukan|panjang|tipe|rentang|saring|petakan|potong_spasi|kapitalisasi|salin|clone|Angka|Teks|Logika|print|input|len|type|range|filter|map|trim)\\b'
+            match: '\\b(cetak|masukan|panjang|tipe|rentang|saring|petakan|potong_spasi|kapitalisasi|salin|clone|Angka|Pecahan|Teks|Logika|print|input|len|type|range|filter|map|trim)\\b'
           },
           {
             name: 'constant.numeric.celang',
@@ -80,7 +80,8 @@ export default defineConfig({
         text: '🧠 Dasar Bahasa',
         items: [
           { text: 'Variabel & Tipe Data', link: '/dasar/variabel-tipe' },
-          { text: 'Kontrol Alur (Percabangan & Loop)', link: '/dasar/kontrol-alur' },
+          { text: 'Operator & Ekspresi', link: '/dasar/operator' },
+          { text: 'Kontrol Alur & Penanganan Galat', link: '/dasar/kontrol-alur' },
           { text: 'Fungsi & Fungsi Anonim', link: '/dasar/fungsi' },
           { text: 'Fungsi Bawaan (Built-in)', link: '/dasar/fungsi-bawaan' }
         ]

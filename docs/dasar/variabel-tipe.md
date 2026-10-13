@@ -1,12 +1,12 @@
 # Variabel & Tipe Data
 
-Celang dirancang agar deklarasi variabel terasa natural, manusiawi, dan fleksibel. Anda dapat menulis kode secara dinamis (*dynamically-typed*) atau menyertakan tipe data opsional (*gradual typing*) saat menginginkan kejelasan arsitektur.
+Celang dirancang agar deklarasi variabel terasa alami, intuitif, dan aman. Bahasa ini mendukung pendekatan dinamis yang ringkas (*dynamic typing*) sekaligus deklarasi tipe bertahap (*gradual typing*) untuk kejelasan arsitektur proyek skala besar.
 
 ---
 
-## 1. Deklarasi Variabel
+## 1. Deklarasi Variabel (`buat`)
 
-Gunakan kata kunci `buat` untuk mendeklarasikan variabel baru yang nilainya dapat diubah (*mutable*).
+Gunakan kata kunci `buat` untuk mendeklarasikan variabel baru yang nilainya dapat diubah (*mutable*):
 
 ```celang
 buat nama = "Budi Santoso"
@@ -15,11 +15,11 @@ buat aktif = benar
 
 // Mengubah nilai variabel
 umur = 25
-cetak("Umur Budi sekarang:", umur)
+cetak("Umur sekarang:", umur) // 25
 ```
 
 ::: tip Nilai Awal Default
-Jika variabel dideklarasikan tanpa nilai inisialisasi, nilainya adalah `kosong` (*null*).
+Jika suatu variabel dideklarasikan tanpa memberikan nilai awal, nilainya secara otomatis adalah `kosong` (*null*):
 ```celang
 buat alamat
 cetak(alamat) // Output: kosong
@@ -28,138 +28,181 @@ cetak(alamat) // Output: kosong
 
 ---
 
-## 2. Konstanta
+## 2. Konstanta (`konstanta`)
 
-Jika Anda memiliki nilai tetap yang tidak boleh diubah selama eksekusi program, gunakan kata kunci `konstanta`.
+Gunakan kata kunci `konstanta` untuk nilai tetap yang tidak boleh diubah selama eksekusi program:
 
 ```celang
 konstanta PAJAK = 0.11
-konstanta KOTA_ASAL = "Bandung"
+konstanta NAMA_APLIKASI = "CelangApp"
 
-// Mencoba mengubah konstanta akan memunculkan error waktu kompilasi/eksekusi
-// PAJAK = 0.15 ❌ (Error: tidak dapat menetapkan ulang nilai konstanta)
+// Mencoba mengubah nilai konstanta akan memicu error:
+// PAJAK = 0.15 ❌ (Galat: tidak dapat menetapkan ulang nilai konstanta)
 ```
 
 ---
 
-## 3. Tipe Data Primitif
+## 3. Ruang Lingkup Variabel (*Scope & Shadowing*)
 
-Celang memiliki tipe data dasar berikut:
+Celang menerapkan aturan ruang lingkup leksikal (*lexical block scope*):
+
+```celang
+buat x = "Global"
+
+{
+    // Variabel dalam blok terisolasi dari luar
+    buat y = "Lokal Blok"
+    cetak(x) // "Global" (bisa membaca lingkup luar)
+    cetak(y) // "Lokal Blok"
+
+    // Shadowing: mendeklarasikan ulang variabel dengan nama yang sama di dalam blok
+    buat x = "Shadowed"
+    cetak(x) // "Shadowed"
+}
+
+// cetak(y) ❌ (Galat: variabel 'y' tidak ditemukan di luar blok)
+cetak(x) // "Global" (nilai luar tetap aman)
+```
+
+---
+
+## 4. Tipe Data Primitif
+
+Celang menyediakan tipe data dasar yang teroptimasi:
 
 | Tipe Data | Kata Kunci | Contoh Nilai | Keterangan |
 | :--- | :--- | :--- | :--- |
-| **Angka** | `Angka` | `42`, `-10`, `3.14159` | Bilangan bulat maupun pecahan |
+| **Bilangan Bulat** | `Angka` | `42`, `-10`, `1_000_000` | Integer 64-bit (mendukung pemisah visual `_`) |
+| **Bilangan Desimal**| `Pecahan` / `Angka` | `3.14159`, `-0.05` | Float 64-bit berpresisi tinggi |
 | **Teks** | `Teks` | `"Halo"`, `'Dunia'`, `` `Format` `` | Deretan karakter UTF-8 |
-| **Logika** | `Logika` | `benar`, `salah` | Boolean |
-| **Kosong** | - | `kosong` | Representasi ketiadaan nilai (*null*) |
+| **Logika** | `Logika` | `benar`, `salah` | Nilai kebenaran boolean |
+| **Ketiadaan Nilai**| - | `kosong` / `nihil` | Representasi objek null / kosong |
+
+### Penulisan Teks & Escape Karakter
+Teks di Celang dapat ditulis menggunakan tanda kutip ganda (`"..."`), kutip tunggal (`'...'`), atau *backtick* (`` `...` ``):
 
 ```celang
-buat bilanganBulat = 100
-buat bilanganDesimal = 99.95
-buat statusAktif = benar
-buat pesan = "Selamat pagi!"
-buat belumDiisi = kosong
+buat teksBiasa = "Baris pertama\nBaris kedua\t(dengan tab)"
+buat kutipDalam = 'Dia berkata: "Celang sangat mudah!"'
 ```
+
+### Pengindeksan & Pemotongan Teks (*String Slicing*)
+Teks dapat diindeks per karakter atau dipotong menggunakan operator rentang `..`:
+```celang
+buat bahasa = "Celang"
+cetak(bahasa[0])      // "C"
+cetak(bahasa[0..2])    // "Ce" (indeks 0 sampai sebelum 2)
+cetak(bahasa[2..])     // "lang" (dari indeks 2 ke akhir)
+```
+*(Pemotongan teks di Celang bersifat rune-safe / mendukung karakter Unicode dan emoji).*
 
 ---
 
-## 4. Tipe Data Koleksi
+## 5. Tipe Data Koleksi
 
-### Daftar / Array
-
-Array di Celang dinamis dan dapat menampung elemen dengan berbagai tipe data:
+### A. Daftar / Array (`[...]`)
+Array di Celang dinamis, fleksibel, dan dapat menampung elemen dengan tipe data campuran:
 
 ```celang
 buat buah = ["Apel", "Mangga", "Jeruk", "Pisang"]
 
-// Mengakses elemen berdasarkan indeks (mulai dari 0)
-cetak("Buah pertama:", buah[0]) // Apel
+// Akses indeks (dimulai dari 0)
+cetak("Buah pertama:", buah[0]) // "Apel"
 
 // Mengetahui panjang array
-cetak("Jumlah buah:", panjang(buah)) // 4
+cetak("Total item:", panjang(buah)) // 4
 
 // Menambahkan elemen baru
-buah.tambah("Durian")
+buah.tambah("Durian") // atau buah.push("Durian")
+
+// Pemotongan Array (Slicing)
+buat pilihan = buah[1..3]  // ["Mangga", "Jeruk"]
+buat awal = buah[..2]      // ["Apel", "Mangga"]
 ```
 
-### Kamus / Map / Objek
-
-Map menyimpan data dalam pasangan kunci (*key*) dan nilai (*value*):
+### B. Kamus / Map (`{...}`)
+Map menyimpan data dalam pasangan kunci (*key*) dan nilai (*value*). Celang mendukung format standar (`"kunci": nilai`) maupun format deskriptif khas Celang (`"kunci" itu nilai`):
 
 ```celang
-buat dataPengguna = {
+buat pengguna = {
     "nama": "Siti Rahma",
-    "divisi": "Teknologi",
+    "divisi" itu "Teknologi", // Gaya khas Celang
     "gaji": 15000000,
     "aktif": benar
 }
 
-// Mengakses data menggunakan bracket atau notasi titik
-cetak(dataPengguna["nama"]) // Siti Rahma
-cetak(dataPengguna.divisi)   // Teknologi
+// Mengakses nilai via notasi titik atau bracket
+cetak(pengguna.nama)        // "Siti Rahma"
+cetak(pengguna["divisi"])   // "Teknologi"
+
+// Mengakses kunci yang tidak ada menghasilkan 'kosong' tanpa crash:
+cetak(pengguna.alamat)      // kosong
 ```
 
 ---
 
-## 5. Anotasi Tipe Data (Opsional)
+## 6. Anotasi Tipe Data (*Gradual Typing*)
 
-Celang mendukung *type hints* agar kode Anda lebih mudah dibaca oleh tim dan editor:
+Anda dapat menambahkan keterangan tipe eksplisit menggunakan simbol titik dua (`:`) atau kata hubung `itu`:
 
 ```celang
-// Menggunakan tanda titik dua (:)
+// Menggunakan simbol titik dua (:)
 buat namaLengkap: Teks = "Ahmad Dani"
 buat saldo: Angka = 500000
 
-// Atau menggunakan kata sambung 'itu'
+// Atau menggunakan kata hubung 'itu'
 buat batasKredit itu Angka = 10000000
 buat statusVerifikasi itu Logika = benar
-```
-
-Jika terjadi ketidaksesuaian tipe saat penetapan nilai statis, Celang akan memberikan pesan peringatan atau kesalahan yang jelas dan ramah pengguna.
-
----
-
-## 6. Pemeriksaan Tipe Data Bawaan
-
-Gunakan fungsi bawaan `tipe(nilai)` untuk mengecek tipe objek saat runtime:
-
-```celang
-cetak(tipe(100))          // Output: Angka
-cetak(tipe("Celang"))     // Output: Teks
-cetak(tipe(benar))        // Output: Logika
-cetak(tipe([1, 2, 3]))    // Output: Array
-cetak(tipe({"a": 1}))     // Output: Map
 ```
 
 ---
 
 ## 7. Referensi Transparan (`rujuk` / `ref`)
 
-Celang menyediakan pengikatan referensi memori (*reference binding*) yang aman dan transparan tanpa kerumitan pointer (`*`, `&`, atau bahaya *dangling pointer*). Fitur ini bekerja untuk semua tipe data, termasuk tipe primitif:
+Secara *default*, penetapan variabel primitif di Celang menyalin nilai (*pass-by-value*). Jika Anda ingin dua variabel merujuk pada alamat memori yang sama tanpa kerumitan pointer, gunakan kata kunci `rujuk`:
 
 ```celang
 buat angkaUtama = 10
-rujuk aliasAngka = angkaUtama
+rujuk aliasAngka = angkaUtama // aliasAngka terhubung ke angkaUtama
 
-// Mengubah nilai melalui alias secara otomatis mengubah sumbernya
+// Mengubah alias otomatis mengubah variabel sumber:
 aliasAngka = 25
-cetak(angkaUtama) // Output: 25
+cetak(angkaUtama) // 25
+```
 
-// Melalui parameter fungsi
-fungsi kalikanDua(rujuk x: Angka) {
+Bekerja secara sangat mulus pada parameter fungsi:
+```celang
+fungsi kaliDua(rujuk x: Angka) {
     x *= 2
 }
 
 buat skor = 50
-kalikanDua(skor)
-cetak(skor) // Output: 100
+kaliDua(skor)
+cetak(skor) // 100
 ```
 
 ---
 
-## 8. Alias Tipe (`tipe`)
+## 8. Duplikasi Mendalam (*Deep Memory Clone*) dengan `salin`
 
-Anda dapat mendefinisikan alias tipe untuk memperjelas domain data program:
+Jika Anda bekerja dengan objek kompleks (Array bersarang, Map, atau Struct) dan ingin menyalinnya secara independen tanpa berbagi referensi memori, gunakan fungsi bawaan `salin` (atau `clone`):
+
+```celang
+buat daftarAsli = [1, 2, [10, 20]]
+buat daftarKloning = salin(daftarAsli)
+
+daftarKloning[0] = 99
+daftarKloning[2][0] = 999
+
+cetak(daftarAsli[0])       // 1 (tidak terpengaruh)
+cetak(daftarAsli[2][0])    // 10 (elemen bersarang tetap aman!)
+```
+
+---
+
+## 9. Alias Tipe (`tipe`)
+
+Membuat nama alias semantik untuk tipe data agar kode lebih deskriptif:
 
 ```celang
 tipe IDPengguna = Angka
@@ -169,30 +212,28 @@ buat id: IDPengguna = 1001
 buat kontak: Surel = "pengguna@celang.id"
 ```
 
-Setiap alias tipe secara otomatis berfungsi ganda sebagai fungsi konstruktor / casting:
-
+Setiap alias tipe dapat langsung dipanggil sebagai fungsi konstruktor/casting:
 ```celang
-buat idBaru = IDPengguna("2026")
-cetak(idBaru) // Output: 2026 (Angka)
+buat idBaru = IDPengguna("2026") // Mengonversi teks "2026" -> Angka 2026
 ```
 
 ---
 
-## 9. Konversi Tipe Eksplisit (*Type Casting*)
+## 10. Konversi Tipe Eksplisit (*Type Casting*)
 
-Celang mendukung konversi tipe eksplisit menggunakan operator `sebagai` (atau `as`) serta fungsi konstruktor bawaan:
+Celang mendukung konversi tipe eksplisit melalui dua pendekatan:
 
-### Operator `sebagai` / `as`
+### A. Operator `sebagai` (atau `as`)
 ```celang
-buat bilangan = "123" sebagai Angka   // 123
-buat bulat = 3.99 sebagai Angka        // 3 (pemotongan desimal)
-buat string = 450 sebagai Teks         // "450"
-buat id = "789" sebagai IDPengguna     // 789
+buat bilangan = "123" sebagai Angka    // 123
+buat bulat = 3.99 sebagai Angka         // 3 (pemotongan desimal)
+buat teks = 450 sebagai Teks            // "450"
+buat id = "789" sebagai IDPengguna      // 789
 ```
 
-### Konstruktor Bawaan
+### B. Konstruktor Tipe Bawaan
 ```celang
-buat a = Angka("100")
-buat t = Teks(500)
-buat b = Logika(1) // benar
+buat a = Angka("100")   // 100
+buat t = Teks(500)       // "500"
+buat b = Logika(1)       // benar
 ```
