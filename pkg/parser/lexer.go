@@ -93,6 +93,34 @@ var keywords = map[string]TokenType{
 	"ketika_selesai": DEFER,
 	"kalau_kosong":   NULL_COALESCE,
 	"bila_kosong":    NULL_COALESCE,
+
+	// Sunda Dialect keywords
+	"jieun":        VAR_DECL,
+	"tetep":        CONST_DECL,
+	"nyaeta":       TYPE_ASSIGN,
+	"wangun":       STRUCT_DECL,
+	"lamun":        IF,
+	"cocogkeun":    SWITCH,
+	"bisi":         CASE,
+	"lianna":       DEFAULT,
+	"salami":       WHILE,
+	"pikeun":       FOR,
+	"dina":         IN,
+	"balikkeun":    RETURN,
+	"ngahasilkeun": RETURN_TYPE,
+	"pas_rengse":   DEFER,
+	"cobi":         TRY,
+	"tewak":        CATCH,
+	"pamungkas":    FINALLY,
+	"alungkeun":    THROW,
+	"sareng":       AND,
+	"sanes":        NOT,
+	"mun_kosong":   NULL_COALESCE,
+	"meureun":      MAYBE,
+	"bener":        TRUE,
+	"bari":         ASYNC,
+	"babarengan":   PARALLEL,
+	"salaku":       AS,
 }
 
 type Lexer struct {
@@ -264,24 +292,34 @@ func (l *Lexer) NextToken() Token {
 			tok.Literal = l.readIdentifier()
 			tok.Type = lookupIdent(tok.Literal)
 
-			// Handle compound keywords: "selain jika" and "else if"
-			if (tok.Literal == "selain" || tok.Literal == "else") && l.peekNextWord() == "jika" || (tok.Literal == "else" && l.peekNextWord() == "if") {
+			// Handle compound keywords: "selain jika", "else if", "atawa lamun"
+			if ((tok.Literal == "selain" || tok.Literal == "else") && l.peekNextWord() == "jika") ||
+				(tok.Literal == "else" && l.peekNextWord() == "if") ||
+				(tok.Literal == "atawa" && l.peekNextWord() == "lamun") {
 				l.skipWhitespaceAndComments()
 				secondWord := l.readIdentifier()
 				tok.Type = ELSE_IF
 				tok.Literal = tok.Literal + " " + secondWord
 			}
 
-			// Handle compound keywords: "kalau kosong", "bila kosong"
-			if (tok.Literal == "kalau" || tok.Literal == "bila") && (l.peekNextWord() == "kosong" || l.peekNextWord() == "nihil" || l.peekNextWord() == "null") {
+			// Handle compound keywords: "lamun henteu" (ELSE)
+			if tok.Literal == "lamun" && l.peekNextWord() == "henteu" {
+				l.skipWhitespaceAndComments()
+				secondWord := l.readIdentifier()
+				tok.Type = ELSE
+				tok.Literal = tok.Literal + " " + secondWord
+			}
+
+			// Handle compound keywords: "kalau kosong", "bila kosong", "mun kosong"
+			if (tok.Literal == "kalau" || tok.Literal == "bila" || tok.Literal == "mun") && (l.peekNextWord() == "kosong" || l.peekNextWord() == "nihil" || l.peekNextWord() == "null") {
 				l.skipWhitespaceAndComments()
 				secondWord := l.readIdentifier()
 				tok.Type = NULL_COALESCE
 				tok.Literal = tok.Literal + " " + secondWord
 			}
 
-			// Handle compound keywords: "saat selesai"
-			if tok.Literal == "saat" && l.peekNextWord() == "selesai" {
+			// Handle compound keywords: "saat selesai", "pas rengse"
+			if (tok.Literal == "saat" && l.peekNextWord() == "selesai") || (tok.Literal == "pas" && l.peekNextWord() == "rengse") {
 				l.skipWhitespaceAndComments()
 				secondWord := l.readIdentifier()
 				tok.Type = DEFER

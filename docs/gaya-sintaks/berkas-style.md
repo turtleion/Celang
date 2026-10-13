@@ -1,89 +1,181 @@
 # Membuat Berkas .style Kustom
 
-Celang tidak membatasi Anda hanya pada dialek bawaan. Anda dapat membuat dialek Anda sendiri — baik itu bahasa daerah (Jawa, Sunda, Minang, Bali), bahasa internasional lainnya, atau istilah teknis spesifik tim Anda — menggunakan berkas konfigurasi berekstensi `.style`.
+Celang tidak membatasi Anda hanya pada dialek bawaan. Anda dapat membuat dialek Anda sendiri — baik itu bahasa daerah (Sunda, Jawa, Minang, Bali), bahasa internasional lainnya, atau istilah teknis spesifik tim Anda — menggunakan berkas konfigurasi berekstensi `.style`.
+
+Format `.style` di Celang dirancang secara **terstruktur per bab/bagian logis**, sehingga sangat mudah dibaca, dirawat, dan dikembangkan seiring bertambahnya fitur bahasa.
 
 ---
 
-## 1. Struktur Berkas `.style`
+## 1. Struktur Berkas `.style` (Format Per Bab)
 
-Berkas `.style` adalah dokumen JSON yang memetakan konsep semantik bahasa ke kata kunci yang Anda inginkan.
+Berkas `.style` adalah dokumen JSON yang memetakan konsep semantik U-AST ke kata kunci pilihan Anda. Konfigurasi dibagi ke dalam beberapa bab kategori:
 
 Berikut adalah contoh lengkap berkas [examples/sunda.style](file:///home/yosatsu/Coding/Celang/examples/sunda.style):
 
 ```json
 {
-  "name": "sunda",
-  "display_name": "Bahasa Sunda",
-  "var_decl": "jieun",
-  "const_decl": "tetep",
-  "type_assign": "nyaeta",
-  "if": "lamun",
-  "else_if": "atawa lamun",
-  "else": "lamun henteu",
-  "switch": "cocogkeun",
-  "case": "bisi",
-  "default": "lianna",
-  "while": "salami",
-  "for": "pikeun",
-  "in": "dina",
-  "func": "fungsi",
-  "return": "balikkeun",
-  "async": "bari",
-  "parallel": "babarengan",
-  "true": "bener",
-  "false": "salah",
-  "null": "kosong",
-  "and": "sareng",
-  "or": "atawa",
-  "not": "sanes",
-  "return_arrow": "ngahasilkeun",
-  "block_style": "brace",
-  "indent_width": 4
+  "metadata": {
+    "name": "sunda",
+    "display_name": "Basa Sunda",
+    "version": "1.0.0",
+    "author": "Komunitas Celang",
+    "description": "Dialek basa Sunda pikeun basa pamrograman Celang"
+  },
+  "deklarasi": {
+    "var": "jieun",
+    "const": "tetep",
+    "type_assign": "nyaeta",
+    "struct": "wangun",
+    "ref": "rujuk",
+    "as": "salaku"
+  },
+  "percabangan": {
+    "if": "lamun",
+    "else_if": "atawa lamun",
+    "else": "lamun henteu",
+    "then": "maka",
+    "switch": "cocogkeun",
+    "case": "bisi",
+    "default": "lianna"
+  },
+  "perulangan": {
+    "while": "salami",
+    "for": "pikeun",
+    "in": "dina"
+  },
+  "fungsi": {
+    "def": "fungsi",
+    "return": "balikkeun",
+    "return_type": "ngahasilkeun",
+    "defer": "pas_rengse"
+  },
+  "penanganan_galat": {
+    "try": "cobi",
+    "catch": "tewak",
+    "finally": "pamungkas",
+    "throw": "alungkeun"
+  },
+  "operator_logika": {
+    "and": "sareng",
+    "or": "atawa",
+    "not": "sanes",
+    "null_coalesce": "mun_kosong",
+    "maybe": "meureun"
+  },
+  "literal": {
+    "true": "bener",
+    "false": "salah",
+    "null": "kosong"
+  },
+  "konkurensi": {
+    "async": "bari",
+    "parallel": "babarengan"
+  },
+  "format": {
+    "block_style": "brace",
+    "indent_width": 4,
+    "quote_style": "double"
+  }
 }
 ```
 
 ---
 
-## 2. Penjelasan Kunci Konfigurasi
+## 2. Rincian Bab & Kunci Konfigurasi
 
-| Kunci (*Key*) | Deskripsi | Nilai Default (ID) |
+### 2.1 `metadata` (Informasi Profil)
+| Kunci | Deskripsi | Contoh |
 | :--- | :--- | :--- |
-| `name` | Pengidentifikasi unik profil gaya (string singkat). | `"indonesian"` |
-| `display_name` | Nama yang ditampilkan pada log dan dokumentasi. | `"Bahasa Indonesia"` |
-| `var_decl` | Kata kunci pembuatan variabel baru. | `"buat"` |
-| `const_decl` | Kata kunci deklarasi konstanta. | `"konstanta"` |
-| `type_assign` | Kata kunci / simbol penetapan tipe eksplisit. | `"itu"` |
-| `if` | Kata kunci kondisi percabangan utama. | `"jika"` |
-| `else_if` | Kata kunci cabang kondisi lanjutan. | `"selain jika"` |
-| `else` | Kata kunci cabang kondisi penutup. | `"selain"` |
-| `while` | Kata kunci perulangan selama kondisi benar. | `"selama"` |
-| `for` | Kata kunci perulangan koleksi/rentang. | `"untuk"` |
-| `in` | Kata hubung anggota iterasi perulangan. | `"dalam"` |
-| `func` | Kata kunci deklarasi fungsi. | `"fungsi"` |
-| `return` | Kata kunci pengembalian nilai dari fungsi. | `"kembalikan"` |
-| `async` | Kata kunci konkurensi non-blocking di latar. | `"sambil"` |
-| `parallel` | Kata kunci eksekusi banyak tugas bersamaan. | `"bersamaan"` |
-| `true` / `false` | Literal nilai kebenaran logika (*boolean*). | `"benar"` / `"salah"` |
-| `null` | Literal ketiadaan nilai (*null*). | `"kosong"` |
-| `and` / `or` / `not`| Operator logika deskriptif. | `"dan"` / `"atau"` / `"bukan"` |
+| `name` | Pengidentifikasi unik gaya (huruf kecil tanpa spasi). | `"sunda"` |
+| `display_name` | Nama resmi gaya untuk log terminal dan format. | `"Basa Sunda"` |
+| `version` | Versi dialek/gaya sintaks. | `"1.0.0"` |
+| `author` | Penulis atau pemelihara dialek. | `"Komunitas Celang"` |
+| `description` | Deskripsi singkat kegunaan dialek. | `"Dialek basa Sunda"` |
+
+### 2.2 `deklarasi` (Variabel, Tipe & Struktur)
+| Kunci | Makna Semantik | Bawaan (ID) |
+| :--- | :--- | :--- |
+| `var` | Deklarasi variabel yang dapat diubah. | `"buat"` |
+| `const` | Deklarasi konstanta nilai tetap. | `"konstanta"` |
+| `type_assign` | Penetapan tipe data eksplisit. | `"itu"` (atau `:`) |
+| `struct` | Deklarasi bentuk/struktur objek. | `"bentuk"` |
+| `ref` | Deklarasi parameter rujukan (*pass-by-reference*). | `"rujuk"` |
+| `as` | Konversi tipe eksplisit (*type casting*). | `"sebagai"` |
+
+### 2.3 `percabangan` (Kondisi & Kasus)
+| Kunci | Makna Semantik | Bawaan (ID) |
+| :--- | :--- | :--- |
+| `if` | Kondisi percabangan utama. | `"jika"` |
+| `else_if` | Cabang kondisi berikutnya. | `"selain jika"` |
+| `else` | Cabang kondisi terakhir. | `"selain"` |
+| `then` | Kata hubung opsional penegas blok. | `"maka"` |
+| `switch` | Pencocokan pola kasus. | `"cocok"` |
+| `case` | Klausul nilai pencocokan kasus. | `"kasus"` |
+| `default` | Klausul bawaan jika tidak ada kasus cocok. | `"lainnya"` |
+
+### 2.4 `perulangan` (Iterasi & Koleksi)
+| Kunci | Makna Semantik | Bawaan (ID) |
+| :--- | :--- | :--- |
+| `while` | Perulangan selama kondisi bernilai benar. | `"selama"` |
+| `for` | Perulangan koleksi/rentang. | `"untuk"` |
+| `in` | Kata hubung anggota iterasi. | `"dalam"` |
+
+### 2.5 `fungsi` (Subrutin & Eksekusi Tertunda)
+| Kunci | Makna Semantik | Bawaan (ID) |
+| :--- | :--- | :--- |
+| `def` | Deklarasi pembuatan fungsi. | `"fungsi"` |
+| `return` | Pengembalian nilai dari fungsi. | `"kembalikan"` |
+| `return_type` | Anotasi tipe kembalian fungsi. | `"mengembalikan"` (atau `->`) |
+| `defer` | Eksekusi tertunda tepat sebelum fungsi keluar. | `"saat_selesai"` |
+
+### 2.6 `penanganan_galat` (Try-Catch-Finally-Throw)
+| Kunci | Makna Semantik | Bawaan (ID) |
+| :--- | :--- | :--- |
+| `try` | Blok percobaan eksekusi yang rawan galat. | `"coba"` |
+| `catch` | Blok penangkap objek galat. | `"tangkap"` |
+| `finally` | Blok pembersihan yang dijamin selalu berjalan. | `"akhirnya"` |
+| `throw` | Melempar galat kustom secara sengaja. | `"lempar"` |
+
+### 2.7 `operator_logika` & `literal`
+| Kategori | Kunci | Makna Semantik | Bawaan (ID) |
+| :--- | :--- | :--- | :--- |
+| **Operator** | `and`, `or`, `not` | Logika kebenaran. | `"dan"`, `"atau"`, `"bukan"` |
+| | `null_coalesce` | Nilai fallback jika kosong. | `"kalau kosong"` (atau `??`) |
+| | `maybe` | Navigasi aman null (*safe navigation*). | `"mungkin"` (atau `?.`) |
+| **Literal** | `true`, `false` | Nilai kebenaran boolean. | `"benar"`, `"salah"` |
+| | `null` | Ketiadaan nilai. | `"kosong"` |
+
+### 2.8 `konkurensi` & `format`
+| Kategori | Kunci | Makna Semantik | Bawaan (ID) |
+| :--- | :--- | :--- | :--- |
+| **Konkurensi** | `async` | Eksekusi asinkron latar belakang. | `"sambil"` |
+| | `parallel` | Eksekusi tugas serentak. | `"bersamaan"` |
+| **Format** | `block_style` | Gaya blok kode: `"brace"` (`{}`) atau `"keyword"`. | `"brace"` |
+| | `indent_width` | Jumlah spasi per tingkat indentasi. | `4` |
+| | `quote_style` | Gaya kutipan teks: `"double"` atau `"single"`. | `"double"` |
+
+::: tip Kompatibilitas Mundur (*Backward Compatibility*)
+Celang mendukung format berbab ini secara native, namun tetap dapat membaca format lama (*flat JSON*) secara otomatis jika Anda memiliki berkas `.style` versi sebelumnya.
+:::
 
 ---
 
 ## 3. Cara Menggunakan Berkas `.style`
 
-### A. Menjalankan Kode dengan Style Kustom
-Gunakan bendera `--style` dan arahkan ke path berkas `.style`:
+### A. Menjalankan Kode dengan Dialek Kustom
+Cukup arahkan bendera `--style` ke lokasi berkas `.style`:
 
 ```bash
-celang run --style ./sunda.style program_sunda.ce
+celang run --style ./examples/sunda.style program_sunda.ce
 ```
 
-### B. Memformat dan Mengonversi Kode
-Anda dapat mengonversi kode yang sudah ada ke style baru:
+### B. Memformat dan Mengonversi Kode Antar-Dialek
+Anda dapat mengonversi kode yang ada dari bahasa Indonesia ke dialek kustom Anda secara otomatis menggunakan perintah `format`:
 
 ```bash
-celang format --to ./sunda.style program_utama.ce -o program_versi_sunda.ce
-```
+# Menampilkan hasil format ke terminal
+celang format --style ./examples/sunda.style program_indo.ce
 
-### C. Mendaftarkan Secara Global
-Simpan berkas style Anda di direktori profil Celang atau sertakan dalam repositori proyek untuk dibagikan ke seluruh anggota tim.
+# Mengonversi dan menyimpan langsung ke file baru
+celang format --style ./examples/sunda.style program_indo.ce -w
+```

@@ -377,11 +377,15 @@ func (f *Formatter) formatStatement(stmt uast.Statement, indent int) string {
 
 	case *uast.ThrowStatement:
 		throwKeyword := "lempar"
-		switch f.profile.Name {
-		case "javascript":
-			throwKeyword = "throw"
-		case "pythonic":
-			throwKeyword = "raise"
+		if f.profile.Throw != "" {
+			throwKeyword = f.profile.Throw
+		} else {
+			switch f.profile.Name {
+			case "javascript":
+				throwKeyword = "throw"
+			case "pythonic":
+				throwKeyword = "raise"
+			}
 		}
 		return fmt.Sprintf("%s%s %s", prefix, throwKeyword, f.formatExpression(s.Argument))
 
@@ -390,15 +394,31 @@ func (f *Formatter) formatStatement(stmt uast.Statement, indent int) string {
 		tryKeyword := "coba"
 		catchKeyword := "tangkap"
 		finallyKeyword := "akhirnya"
-		switch f.profile.Name {
-		case "javascript":
-			tryKeyword = "try"
-			catchKeyword = "catch"
-			finallyKeyword = "finally"
-		case "pythonic":
-			tryKeyword = "try"
-			catchKeyword = "except"
-			finallyKeyword = "finally"
+		if f.profile.Try != "" {
+			tryKeyword = f.profile.Try
+		} else {
+			switch f.profile.Name {
+			case "javascript", "pythonic":
+				tryKeyword = "try"
+			}
+		}
+		if f.profile.Catch != "" {
+			catchKeyword = f.profile.Catch
+		} else {
+			switch f.profile.Name {
+			case "javascript":
+				catchKeyword = "catch"
+			case "pythonic":
+				catchKeyword = "except"
+			}
+		}
+		if f.profile.Finally != "" {
+			finallyKeyword = f.profile.Finally
+		} else {
+			switch f.profile.Name {
+			case "javascript", "pythonic":
+				finallyKeyword = "finally"
+			}
 		}
 
 		sb.WriteString(prefix)
@@ -537,7 +557,9 @@ func (f *Formatter) formatStatement(stmt uast.Statement, indent int) string {
 		sb.WriteString(prefix)
 		sb.WriteString(f.formatVisibility(s.Visibility))
 		structKeyword := "bentuk"
-		if f.profile.Name == "javascript" || f.profile.Name == "classic" {
+		if f.profile.Struct != "" {
+			structKeyword = f.profile.Struct
+		} else if f.profile.Name == "javascript" || f.profile.Name == "classic" {
 			structKeyword = "struct"
 		}
 		sb.WriteString(fmt.Sprintf("%s %s {\n", structKeyword, s.Name))
@@ -591,7 +613,11 @@ func (f *Formatter) formatStatement(stmt uast.Statement, indent int) string {
 	case *uast.DeferStatement:
 		var sb strings.Builder
 		sb.WriteString(prefix)
-		sb.WriteString("saat_selesai ")
+		deferKeyword := "saat_selesai"
+		if f.profile.Defer != "" {
+			deferKeyword = f.profile.Defer
+		}
+		sb.WriteString(deferKeyword + " ")
 		sb.WriteString(strings.TrimSpace(f.formatStatement(s.Body, indent)))
 		return sb.String()
 	}
