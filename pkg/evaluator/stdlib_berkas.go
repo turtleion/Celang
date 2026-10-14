@@ -1,12 +1,20 @@
 package evaluator
 
 import (
+	"bufio"
+	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 func initStdlibBerkas(env *Environment) {
+	// -------------------------------------------------------------
+	// 1. Membaca & Menulis (I/O)
+	// -------------------------------------------------------------
+
 	// baca / read
 	bacaFn := &Builtin{
 		Fn: func(args ...Object) Object {
@@ -20,7 +28,14 @@ func initStdlibBerkas(env *Environment) {
 
 			data, err := os.ReadFile(pathStr.Value)
 			if err != nil {
-				return newError(nil, fmt.Sprintf("Gagal membaca berkas '%s': %v", pathStr.Value, err), "Pastikan path berkas sudah benar dan berkas tersebut ada di disk.")
+				suggestion := suggestSimilarFile(pathStr.Value)
+				hint := "Pastikan path berkas sudah benar dan berkas tersebut ada di disk."
+				msg := fmt.Sprintf("Gagal membaca berkas '%s': %v", pathStr.Value, err)
+				if suggestion != "" {
+					hint = fmt.Sprintf("Maksud Anda mungkin '%s'? Berkas serupa ditemukan di direktori target.", suggestion)
+					msg = fmt.Sprintf("Berkas '%s' tidak ditemukan. Maksud Anda mungkin: '%s'?", pathStr.Value, suggestion)
+				}
+				return newError(nil, msg, hint)
 			}
 			return &String{Value: string(data)}
 		},
@@ -28,7 +43,7 @@ func initStdlibBerkas(env *Environment) {
 	definePublicFunction(env, "baca", bacaFn)
 	definePublicFunction(env, "read", bacaFn)
 
-	// tulis / write
+	// tulis / write (Atomic Write)
 	tulisFn := &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 2 {
@@ -43,12 +58,7 @@ func initStdlibBerkas(env *Environment) {
 				data = s.Value
 			}
 
-			dir := filepath.Dir(pathStr.Value)
-			if dir != "" && dir != "." {
-				_ = os.MkdirAll(dir, 0755)
-			}
-
-			if err := os.WriteFile(pathStr.Value, []byte(data), 0644); err != nil {
+			if err := atomicWriteFile(pathStr.Value, []byte(data), 0644); err != nil {
 				return newError(nil, fmt.Sprintf("Gagal menulis berkas '%s': %v", pathStr.Value, err), "Pastikan Anda memiliki izin tulis di direktori target.")
 			}
 			return TRUE
@@ -92,6 +102,148 @@ func initStdlibBerkas(env *Environment) {
 	definePublicFunction(env, "tambah", tambahFn)
 	definePublicFunction(env, "append", tambahFn)
 
+	// -------------------------------------------------------------
+	// 2. Fitur Cerdas: muat & simpan (Auto JSON / Text)
+	// -------------------------------------------------------------
+
+	// muat / load
+	muatFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 {
+				return newError(nil, "berkas.muat mengharapkan 1 argumen: path berkas", "Contoh: berkas.muat(\"./data.json\")")
+			}
+			pathStr, ok := args[0].(*String)
+			if !ok {
+				return newError(nil, fmt.Sprintf("argumen path berkas.muat harus teks, menerima %s", args[0].Type()), "")
+			}
+
+			dataBytes, err := os.ReadFile(pathStr.Value)
+			if err != nil {
+				suggestion := suggestSimilarFile(pathStr.Value)
+				hint := "Pastikan path berkas sudah benar dan berkas tersebut ada."
+				msg := fmt.Sprintf("Gagal memuat berkas '%s': %v", pathStr.Value, err)
+				if suggestion != "" {
+					hint = fmt.Sprintf("Maksud Anda mungkin '%s'? Berkas serupa ditemukan di direktori target.", suggestion)
+					msg = fmt.Sprintf("Berkas '%s' tidak ditemukan. Maksud Anda mungkin: '%s'?", pathStr.Value, suggestion)
+				}
+				return newError(nil, msg, hint)
+			}
+
+			ext := strings.ToLower(filepath.Ext(pathStr.Value))
+			if ext == ".json" {
+				decoder := json.NewDecoder(strings.NewReader(string(dataBytes)))
+				decoder.UseNumber()
+				var raw any
+				if err := decoder.Decode(&raw); err != nil {
+					return newError(nil, fmt.Sprintf("Gagal mengurai JSON dari berkas '%s': %v", pathStr.Value, err), "Periksa kevalidan format JSON di dalam berkas.")
+				}
+				return convertGoJSONToCelang(raw)
+			}
+
+			return &String{Value: string(dataBytes)}
+		},
+	}
+	definePublicFunction(env, "muat", muatFn)
+	definePublicFunction(env, "load", muatFn)
+
+	// simpan / save (Auto JSON formatting if Map/Array or .json extension)
+	simpanFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 2 {
+				return newError(nil, "berkas.simpan mengharapkan 2 argumen: path berkas dan data", "Contoh: berkas.simpan(\"./data.json\", objekData)")
+			}
+			pathStr, ok := args[0].(*String)
+			if !ok {
+				return newError(nil, fmt.Sprintf("argumen path berkas.simpan harus teks, menerima %s", args[0].Type()), "")
+			}
+
+			ext := strings.ToLower(filepath.Ext(pathStr.Value))
+			var contentBytes []byte
+
+			if ext == ".json" || args[1].Type() == MAP_OBJ || args[1].Type() == ARRAY_OBJ {
+				nativeVal, err := convertCelangToJSONNative(args[1])
+				if err != nil {
+					return newError(nil, fmt.Sprintf("Gagal mengubah data ke JSON: %v", err), "")
+				}
+				jsonBytes, err := json.MarshalIndent(nativeVal, "", "  ")
+				if err != nil {
+					return newError(nil, fmt.Sprintf("Gagal memformat JSON: %v", err), "")
+				}
+				contentBytes = jsonBytes
+			} else if s, ok := args[1].(*String); ok {
+				contentBytes = []byte(s.Value)
+			} else {
+				contentBytes = []byte(args[1].Inspect())
+			}
+
+			if err := atomicWriteFile(pathStr.Value, contentBytes, 0644); err != nil {
+				return newError(nil, fmt.Sprintf("Gagal menyimpan berkas '%s': %v", pathStr.Value, err), "")
+			}
+			return TRUE
+		},
+	}
+	definePublicFunction(env, "simpan", simpanFn)
+	definePublicFunction(env, "save", simpanFn)
+
+	// -------------------------------------------------------------
+	// 3. Streaming Jalur Data: alir / stream (CSP Channel)
+	// -------------------------------------------------------------
+
+	alirFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) < 1 {
+				return newError(nil, "berkas.alir mengharapkan 1 argumen: path berkas", "Contoh: untuk baris dalam berkas.alir(\"./log.txt\") { ... }")
+			}
+			pathStr, ok := args[0].(*String)
+			if !ok {
+				return newError(nil, fmt.Sprintf("argumen path berkas.alir harus teks, menerima %s", args[0].Type()), "")
+			}
+
+			f, err := os.Open(pathStr.Value)
+			if err != nil {
+				suggestion := suggestSimilarFile(pathStr.Value)
+				hint := "Pastikan berkas ada dan dapat dibaca."
+				if suggestion != "" {
+					hint = fmt.Sprintf("Maksud Anda mungkin '%s'? Berkas tersebut ditemukan di direktori target.", suggestion)
+				}
+				return newError(nil, fmt.Sprintf("Gagal membuka aliran berkas '%s': %v", pathStr.Value, err), hint)
+			}
+
+			// Buffer 64 baris untuk streaming lancar
+			ch := NewChannel(64, "Teks")
+
+			go func() {
+				defer f.Close()
+				defer ch.Close()
+
+				scanner := bufio.NewScanner(f)
+				// Buffer maksimum baris hingga 1MB
+				buf := make([]byte, 64*1024)
+				scanner.Buffer(buf, 1024*1024)
+
+				for scanner.Scan() {
+					ch.mu.Lock()
+					closed := ch.Closed
+					ch.mu.Unlock()
+					if closed {
+						return
+					}
+
+					lineText := scanner.Text()
+					ch.Ch <- &String{Value: lineText}
+				}
+			}()
+
+			return ch
+		},
+	}
+	definePublicFunction(env, "alir", alirFn)
+	definePublicFunction(env, "stream", alirFn)
+
+	// -------------------------------------------------------------
+	// 4. Manajemen Direktori & Berkas
+	// -------------------------------------------------------------
+
 	// ada / exists
 	adaFn := &Builtin{
 		Fn: func(args ...Object) Object {
@@ -106,9 +258,6 @@ func initStdlibBerkas(env *Environment) {
 			_, err := os.Stat(pathStr.Value)
 			if err == nil {
 				return TRUE
-			}
-			if os.IsNotExist(err) {
-				return FALSE
 			}
 			return FALSE
 		},
@@ -128,11 +277,543 @@ func initStdlibBerkas(env *Environment) {
 			}
 
 			if err := os.Remove(pathStr.Value); err != nil {
-				return newError(nil, fmt.Sprintf("Gagal menghapus berkas '%s': %v", pathStr.Value, err), "Pastikan berkas ada dan Anda memiliki izin untuk menghapusnya.")
+				suggestion := suggestSimilarFile(pathStr.Value)
+				hint := "Pastikan berkas ada dan Anda memiliki izin untuk menghapusnya."
+				if suggestion != "" {
+					hint = fmt.Sprintf("Maksud Anda mungkin '%s'? Berkas tersebut ditemukan di direktori target.", suggestion)
+				}
+				return newError(nil, fmt.Sprintf("Gagal menghapus berkas '%s': %v", pathStr.Value, err), hint)
 			}
 			return TRUE
 		},
 	}
 	definePublicFunction(env, "hapus", hapusFn)
 	definePublicFunction(env, "remove", hapusFn)
+
+	// hapus_semua / remove_all
+	hapusSemuaFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 {
+				return newError(nil, "berkas.hapus_semua mengharapkan 1 argumen: path direktori", "Contoh: berkas.hapus_semua(\"./folder_lama\")")
+			}
+			pathStr, ok := args[0].(*String)
+			if !ok {
+				return newError(nil, fmt.Sprintf("argumen path berkas.hapus_semua harus teks, menerima %s", args[0].Type()), "")
+			}
+
+			if err := os.RemoveAll(pathStr.Value); err != nil {
+				return newError(nil, fmt.Sprintf("Gagal menghapus folder '%s': %v", pathStr.Value, err), "")
+			}
+			return TRUE
+		},
+	}
+	definePublicFunction(env, "hapus_semua", hapusSemuaFn)
+	definePublicFunction(env, "remove_all", hapusSemuaFn)
+
+	// buat_folder / mkdir
+	buatFolderFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 {
+				return newError(nil, "berkas.buat_folder mengharapkan 1 argumen: path folder", "Contoh: berkas.buat_folder(\"./data/laporan\")")
+			}
+			pathStr, ok := args[0].(*String)
+			if !ok {
+				return newError(nil, fmt.Sprintf("argumen path berkas.buat_folder harus teks, menerima %s", args[0].Type()), "")
+			}
+
+			if err := os.MkdirAll(pathStr.Value, 0755); err != nil {
+				return newError(nil, fmt.Sprintf("Gagal membuat folder '%s': %v", pathStr.Value, err), "")
+			}
+			return TRUE
+		},
+	}
+	definePublicFunction(env, "buat_folder", buatFolderFn)
+	definePublicFunction(env, "mkdir", buatFolderFn)
+
+	// daftar / list / ls
+	daftarFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			targetDir := "."
+			if len(args) > 0 {
+				if s, ok := args[0].(*String); ok {
+					targetDir = s.Value
+				}
+			}
+
+			entries, err := os.ReadDir(targetDir)
+			if err != nil {
+				suggestion := suggestSimilarFile(targetDir)
+				hint := "Pastikan direktori target ada."
+				if suggestion != "" {
+					hint = fmt.Sprintf("Maksud Anda mungkin folder '%s'?", suggestion)
+				}
+				return newError(nil, fmt.Sprintf("Gagal membaca direktori '%s': %v", targetDir, err), hint)
+			}
+
+			elements := make([]Object, 0, len(entries))
+			for _, entry := range entries {
+				elements = append(elements, &String{Value: entry.Name()})
+			}
+			return &Array{Elements: elements}
+		},
+	}
+	definePublicFunction(env, "daftar", daftarFn)
+	definePublicFunction(env, "list", daftarFn)
+	definePublicFunction(env, "ls", daftarFn)
+
+	// salin / copy
+	salinFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 2 {
+				return newError(nil, "berkas.salin mengharapkan 2 argumen: asal dan tujuan", "Contoh: berkas.salin(\"./asal.txt\", \"./tujuan.txt\")")
+			}
+			srcStr, ok1 := args[0].(*String)
+			dstStr, ok2 := args[1].(*String)
+			if !ok1 || !ok2 {
+				return newError(nil, "argumen berkas.salin harus berupa teks", "")
+			}
+
+			fi, err := os.Stat(srcStr.Value)
+			if err != nil {
+				suggestion := suggestSimilarFile(srcStr.Value)
+				hint := "Pastikan berkas atau folder asal ada."
+				if suggestion != "" {
+					hint = fmt.Sprintf("Maksud Anda mungkin '%s'?", suggestion)
+				}
+				return newError(nil, fmt.Sprintf("Gagal menyalin '%s': %v", srcStr.Value, err), hint)
+			}
+
+			if fi.IsDir() {
+				if err := copyDir(srcStr.Value, dstStr.Value); err != nil {
+					return newError(nil, fmt.Sprintf("Gagal menyalin folder: %v", err), "")
+				}
+			} else {
+				if err := copyFile(srcStr.Value, dstStr.Value); err != nil {
+					return newError(nil, fmt.Sprintf("Gagal menyalin berkas: %v", err), "")
+				}
+			}
+			return TRUE
+		},
+	}
+	definePublicFunction(env, "salin", salinFn)
+	definePublicFunction(env, "copy", salinFn)
+
+	// pindah / move / ganti_nama / rename
+	pindahFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 2 {
+				return newError(nil, "berkas.pindah mengharapkan 2 argumen: asal dan tujuan", "Contoh: berkas.pindah(\"./lama.txt\", \"./baru.txt\")")
+			}
+			srcStr, ok1 := args[0].(*String)
+			dstStr, ok2 := args[1].(*String)
+			if !ok1 || !ok2 {
+				return newError(nil, "argumen berkas.pindah harus berupa teks", "")
+			}
+
+			dstDir := filepath.Dir(dstStr.Value)
+			if dstDir != "" && dstDir != "." {
+				_ = os.MkdirAll(dstDir, 0755)
+			}
+
+			err := os.Rename(srcStr.Value, dstStr.Value)
+			if err != nil {
+				// Fallback jika lintas filesystem: copy lalu remove
+				fi, statErr := os.Stat(srcStr.Value)
+				if statErr != nil {
+					return newError(nil, fmt.Sprintf("Gagal memindahkan '%s': %v", srcStr.Value, err), "")
+				}
+				if fi.IsDir() {
+					if cErr := copyDir(srcStr.Value, dstStr.Value); cErr != nil {
+						return newError(nil, fmt.Sprintf("Gagal memindahkan folder: %v", cErr), "")
+					}
+					_ = os.RemoveAll(srcStr.Value)
+				} else {
+					if cErr := copyFile(srcStr.Value, dstStr.Value); cErr != nil {
+						return newError(nil, fmt.Sprintf("Gagal memindahkan berkas: %v", cErr), "")
+					}
+					_ = os.Remove(srcStr.Value)
+				}
+			}
+			return TRUE
+		},
+	}
+	definePublicFunction(env, "pindah", pindahFn)
+	definePublicFunction(env, "move", pindahFn)
+	definePublicFunction(env, "ganti_nama", pindahFn)
+	definePublicFunction(env, "rename", pindahFn)
+
+	// -------------------------------------------------------------
+	// 5. Pemeriksaan Tipe & Metadata
+	// -------------------------------------------------------------
+
+	// apakah_folder / is_dir
+	apakahFolderFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 {
+				return newError(nil, "berkas.apakah_folder mengharapkan 1 argumen: path", "")
+			}
+			pathStr, ok := args[0].(*String)
+			if !ok {
+				return FALSE
+			}
+			fi, err := os.Stat(pathStr.Value)
+			if err != nil {
+				return FALSE
+			}
+			if fi.IsDir() {
+				return TRUE
+			}
+			return FALSE
+		},
+	}
+	definePublicFunction(env, "apakah_folder", apakahFolderFn)
+	definePublicFunction(env, "is_dir", apakahFolderFn)
+
+	// apakah_berkas / is_file
+	apakahBerkasFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 {
+				return newError(nil, "berkas.apakah_berkas mengharapkan 1 argumen: path", "")
+			}
+			pathStr, ok := args[0].(*String)
+			if !ok {
+				return FALSE
+			}
+			fi, err := os.Stat(pathStr.Value)
+			if err != nil {
+				return FALSE
+			}
+			if !fi.IsDir() {
+				return TRUE
+			}
+			return FALSE
+		},
+	}
+	definePublicFunction(env, "apakah_berkas", apakahBerkasFn)
+	definePublicFunction(env, "is_file", apakahBerkasFn)
+
+	// ukuran / size
+	ukuranFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 {
+				return newError(nil, "berkas.ukuran mengharapkan 1 argumen: path berkas", "")
+			}
+			pathStr, ok := args[0].(*String)
+			if !ok {
+				return newError(nil, "argumen berkas.ukuran harus berupa teks", "")
+			}
+			fi, err := os.Stat(pathStr.Value)
+			if err != nil {
+				suggestion := suggestSimilarFile(pathStr.Value)
+				hint := "Pastikan berkas ada."
+				if suggestion != "" {
+					hint = fmt.Sprintf("Maksud Anda mungkin '%s'?", suggestion)
+				}
+				return newError(nil, fmt.Sprintf("Gagal mendapatkan ukuran berkas '%s': %v", pathStr.Value, err), hint)
+			}
+			return &Integer{Value: fi.Size()}
+		},
+	}
+	definePublicFunction(env, "ukuran", ukuranFn)
+	definePublicFunction(env, "size", ukuranFn)
+
+	// info / stat
+	infoFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 {
+				return newError(nil, "berkas.info mengharapkan 1 argumen: path", "")
+			}
+			pathStr, ok := args[0].(*String)
+			if !ok {
+				return newError(nil, "argumen berkas.info harus berupa teks", "")
+			}
+			fi, err := os.Stat(pathStr.Value)
+			if err != nil {
+				suggestion := suggestSimilarFile(pathStr.Value)
+				hint := "Pastikan path berkas atau folder ada."
+				if suggestion != "" {
+					hint = fmt.Sprintf("Maksud Anda mungkin '%s'?", suggestion)
+				}
+				return newError(nil, fmt.Sprintf("Gagal memeriksa info '%s': %v", pathStr.Value, err), hint)
+			}
+
+			pairs := map[string]Object{
+				"nama":          &String{Value: fi.Name()},
+				"ukuran":        &Integer{Value: fi.Size()},
+				"apakah_folder": nativeBoolToBoolean(fi.IsDir()),
+				"apakah_berkas": nativeBoolToBoolean(!fi.IsDir()),
+				"diubah_pada":   &String{Value: fi.ModTime().Format("2006-01-02 15:04:05")},
+				"izin":          &String{Value: fi.Mode().String()},
+			}
+			order := []string{"nama", "ukuran", "apakah_folder", "apakah_berkas", "diubah_pada", "izin"}
+			return &Map{Pairs: pairs, Order: order}
+		},
+	}
+	definePublicFunction(env, "info", infoFn)
+	definePublicFunction(env, "stat", infoFn)
+
+	// -------------------------------------------------------------
+	// 6. Utilitas Jalur (Path Helpers)
+	// -------------------------------------------------------------
+
+	// gabung / join
+	gabungFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) == 0 {
+				return &String{Value: ""}
+			}
+			parts := make([]string, 0, len(args))
+			for _, arg := range args {
+				if s, ok := arg.(*String); ok {
+					parts = append(parts, s.Value)
+				} else {
+					parts = append(parts, arg.Inspect())
+				}
+			}
+			return &String{Value: filepath.Join(parts...)}
+		},
+	}
+	definePublicFunction(env, "gabung", gabungFn)
+	definePublicFunction(env, "join", gabungFn)
+
+	// nama / basename
+	namaFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 {
+				return newError(nil, "berkas.nama mengharapkan 1 argumen path", "")
+			}
+			s, ok := args[0].(*String)
+			if !ok {
+				return &String{Value: ""}
+			}
+			return &String{Value: filepath.Base(s.Value)}
+		},
+	}
+	definePublicFunction(env, "nama", namaFn)
+	definePublicFunction(env, "basename", namaFn)
+
+	// induk / dirname
+	indukFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 {
+				return newError(nil, "berkas.induk mengharapkan 1 argumen path", "")
+			}
+			s, ok := args[0].(*String)
+			if !ok {
+				return &String{Value: ""}
+			}
+			return &String{Value: filepath.Dir(s.Value)}
+		},
+	}
+	definePublicFunction(env, "induk", indukFn)
+	definePublicFunction(env, "dirname", indukFn)
+
+	// ekstensi / extname
+	ekstensiFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 {
+				return newError(nil, "berkas.ekstensi mengharapkan 1 argumen path", "")
+			}
+			s, ok := args[0].(*String)
+			if !ok {
+				return &String{Value: ""}
+			}
+			return &String{Value: filepath.Ext(s.Value)}
+		},
+	}
+	definePublicFunction(env, "ekstensi", ekstensiFn)
+	definePublicFunction(env, "extname", ekstensiFn)
+
+	// bersihkan_jalur / clean
+	bersihkanFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 {
+				return newError(nil, "berkas.bersihkan_jalur mengharapkan 1 argumen path", "")
+			}
+			s, ok := args[0].(*String)
+			if !ok {
+				return &String{Value: ""}
+			}
+			return &String{Value: filepath.Clean(s.Value)}
+		},
+	}
+	definePublicFunction(env, "bersihkan_jalur", bersihkanFn)
+	definePublicFunction(env, "clean", bersihkanFn)
+
+	// jalur_mutlak / absolute
+	mutlakFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 {
+				return newError(nil, "berkas.jalur_mutlak mengharapkan 1 argumen path", "")
+			}
+			s, ok := args[0].(*String)
+			if !ok {
+				return &String{Value: ""}
+			}
+			abs, err := filepath.Abs(s.Value)
+			if err != nil {
+				return &String{Value: s.Value}
+			}
+			return &String{Value: abs}
+		},
+	}
+	definePublicFunction(env, "jalur_mutlak", mutlakFn)
+	definePublicFunction(env, "absolute", mutlakFn)
+}
+
+// -------------------------------------------------------------
+// Helper Functions (Atomic Write, Copy, Typo Suggestion)
+// -------------------------------------------------------------
+
+func nativeBoolToBoolean(b bool) *Boolean {
+	if b {
+		return TRUE
+	}
+	return FALSE
+}
+
+func atomicWriteFile(filePath string, data []byte, perm os.FileMode) error {
+	dir := filepath.Dir(filePath)
+	if dir != "" && dir != "." {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return err
+		}
+	}
+
+	tmpFile, err := os.CreateTemp(dir, ".celang-tmp-*")
+	if err != nil {
+		return os.WriteFile(filePath, data, perm)
+	}
+	tmpName := tmpFile.Name()
+	defer func() {
+		_ = os.Remove(tmpName)
+	}()
+
+	if _, err := tmpFile.Write(data); err != nil {
+		tmpFile.Close()
+		return err
+	}
+	if err := tmpFile.Sync(); err != nil {
+		tmpFile.Close()
+		return err
+	}
+	if err := tmpFile.Close(); err != nil {
+		return err
+	}
+
+	_ = os.Chmod(tmpName, perm)
+	return os.Rename(tmpName, filePath)
+}
+
+func copyFile(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	dstDir := filepath.Dir(dst)
+	if dstDir != "" && dstDir != "." {
+		_ = os.MkdirAll(dstDir, 0755)
+	}
+
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	if _, err := io.Copy(out, in); err != nil {
+		return err
+	}
+	return out.Sync()
+}
+
+func copyDir(src, dst string) error {
+	entries, err := os.ReadDir(src)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(dst, 0755); err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		srcPath := filepath.Join(src, entry.Name())
+		dstPath := filepath.Join(dst, entry.Name())
+		if entry.IsDir() {
+			if err := copyDir(srcPath, dstPath); err != nil {
+				return err
+			}
+		} else {
+			if err := copyFile(srcPath, dstPath); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func levenshtein(s1, s2 string) int {
+	r1, r2 := []rune(strings.ToLower(s1)), []rune(strings.ToLower(s2))
+	n, m := len(r1), len(r2)
+	if n == 0 {
+		return m
+	}
+	if m == 0 {
+		return n
+	}
+	dp := make([][]int, n+1)
+	for i := range dp {
+		dp[i] = make([]int, m+1)
+		dp[i][0] = i
+	}
+	for j := 0; j <= m; j++ {
+		dp[0][j] = j
+	}
+	for i := 1; i <= n; i++ {
+		for j := 1; j <= m; j++ {
+			cost := 0
+			if r1[i-1] != r2[j-1] {
+				cost = 1
+			}
+			dp[i][j] = minInt(dp[i-1][j]+1, minInt(dp[i][j-1]+1, dp[i-1][j-1]+cost))
+		}
+	}
+	return dp[n][m]
+}
+
+func minInt(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func suggestSimilarFile(targetPath string) string {
+	dir := filepath.Dir(targetPath)
+	targetBase := filepath.Base(targetPath)
+	if dir == "" {
+		dir = "."
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return ""
+	}
+	bestMatch := ""
+	bestDist := 4
+	for _, entry := range entries {
+		name := entry.Name()
+		dist := levenshtein(targetBase, name)
+		if dist < bestDist {
+			bestDist = dist
+			bestMatch = name
+		}
+	}
+	if bestMatch != "" {
+		if dir == "." || dir == "" {
+			return bestMatch
+		}
+		return filepath.Join(dir, bestMatch)
+	}
+	return ""
 }

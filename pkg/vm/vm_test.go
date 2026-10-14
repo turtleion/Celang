@@ -2,6 +2,8 @@ package vm_test
 
 import (
 	"bytes"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"celang/pkg/compiler"
@@ -399,4 +401,24 @@ func TestVM_Channel_Panjang(t *testing.T) {
 		t.Errorf("expected '2 - 2', got %s", res.Inspect())
 	}
 }
+
+func TestVM_Berkas_StreamAndJSON(t *testing.T) {
+	tmpDir := t.TempDir()
+	logFile := filepath.Join(tmpDir, "vm_stream.log")
+	content := "data 1\ndata 2\n"
+	_ = os.WriteFile(logFile, []byte(content), 0644)
+
+	input := `
+	buat list = []
+	untuk baris dalam berkas.alir("` + logFile + `") {
+		list.tambah(baris)
+	}
+	list[0] + " & " + list[1]
+	`
+	res, _, _ := runVM(t, input)
+	if res.Inspect() != "\"data 1 & data 2\"" && res.Inspect() != "data 1 & data 2" {
+		t.Errorf("expected 'data 1 & data 2', got %s", res.Inspect())
+	}
+}
+
 

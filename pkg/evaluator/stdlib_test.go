@@ -90,6 +90,185 @@ func TestStdlib_BerkasAndFS(t *testing.T) {
 	}
 }
 
+func TestStdlib_Berkas_AdvancedOperations(t *testing.T) {
+	tmpDir := t.TempDir()
+	folder1 := filepath.Join(tmpDir, "folder1")
+	subFolder := filepath.Join(folder1, "sub")
+	fileA := filepath.Join(subFolder, "a.txt")
+	fileB := filepath.Join(subFolder, "b.txt")
+
+	// 1. Buat folder rekursif
+	codeMkdir := `
+	berkas.buat_folder("` + subFolder + `")
+	berkas.apakah_folder("` + subFolder + `")
+	`
+	res := runCelangTestCode(t, codeMkdir)
+	if boolVal, ok := res.(*Boolean); !ok || !boolVal.Value {
+		t.Fatalf("buat_folder failed: %s", res.Inspect())
+	}
+
+	// 2. Tulis file dan cek ukuran & apakah_berkas
+	codeWrite := `
+	berkas.tulis("` + fileA + `", "12345")
+	buat uk = berkas.ukuran("` + fileA + `")
+	buat isF = berkas.apakah_berkas("` + fileA + `")
+	buat isDir = berkas.apakah_folder("` + fileA + `")
+	[uk, isF, isDir]
+	`
+	res = runCelangTestCode(t, codeWrite)
+	if arr, ok := res.(*Array); !ok || arr.Elements[0].Inspect() != "5" || arr.Elements[1].Inspect() != "true" || arr.Elements[2].Inspect() != "false" {
+		t.Fatalf("ukuran / check failed: %s", res.Inspect())
+	}
+
+	// 3. Salin file
+	codeCopy := `
+	berkas.salin("` + fileA + `", "` + fileB + `")
+	berkas.baca("` + fileB + `")
+	`
+	res = runCelangTestCode(t, codeCopy)
+	if s, ok := res.(*String); !ok || s.Value != "12345" {
+		t.Fatalf("salin failed: %s", res.Inspect())
+	}
+
+	// 4. Daftar isi folder
+	codeList := `
+	buat d = berkas.daftar("` + subFolder + `")
+	d
+	`
+	res = runCelangTestCode(t, codeList)
+	arr, ok := res.(*Array)
+	if !ok || len(arr.Elements) != 2 {
+		t.Fatalf("daftar expected 2 files, got: %s", res.Inspect())
+	}
+
+	// 5. Pindah file
+	fileC := filepath.Join(subFolder, "c.txt")
+	codeMove := `
+	berkas.pindah("` + fileB + `", "` + fileC + `")
+	[berkas.ada("` + fileB + `"), berkas.ada("` + fileC + `")]
+	`
+	res = runCelangTestCode(t, codeMove)
+	arrMove, ok := res.(*Array)
+	if !ok || arrMove.Elements[0].Inspect() != "false" || arrMove.Elements[1].Inspect() != "true" {
+		t.Fatalf("pindah failed: %s", res.Inspect())
+	}
+
+	// 6. Info / stat
+	codeInfo := `
+	buat inf = berkas.info("` + fileC + `")
+	[inf["nama"], inf["ukuran"], inf["apakah_berkas"]]
+	`
+	res = runCelangTestCode(t, codeInfo)
+	arrInfo, ok := res.(*Array)
+	if !ok || arrInfo.Elements[0].Inspect() != "c.txt" || arrInfo.Elements[1].Inspect() != "5" || arrInfo.Elements[2].Inspect() != "true" {
+		t.Fatalf("info failed: %s", res.Inspect())
+	}
+
+	// 7. Hapus semua rekursif
+	codeRmall := `
+	berkas.hapus_semua("` + folder1 + `")
+	berkas.ada("` + folder1 + `")
+	`
+	res = runCelangTestCode(t, codeRmall)
+	if boolVal, ok := res.(*Boolean); !ok || boolVal.Value {
+		t.Fatalf("hapus_semua failed, folder still exists: %s", res.Inspect())
+	}
+}
+
+func TestStdlib_Berkas_PathHelpers(t *testing.T) {
+	code := `
+	buat g = berkas.gabung("folder", "sub", "file.txt")
+	buat n = berkas.nama(g)
+	buat ext = berkas.ekstensi(g)
+	buat ind = berkas.induk(g)
+	[n, ext, ind]
+	`
+	res := runCelangTestCode(t, code)
+	arr, ok := res.(*Array)
+	if !ok {
+		t.Fatalf("path helpers failed: %s", res.Inspect())
+	}
+	if arr.Elements[0].Inspect() != "file.txt" {
+		t.Errorf("expected file.txt, got %s", arr.Elements[0].Inspect())
+	}
+	if arr.Elements[1].Inspect() != ".txt" {
+		t.Errorf("expected .txt, got %s", arr.Elements[1].Inspect())
+	}
+	if arr.Elements[2].Inspect() != "folder/sub" && arr.Elements[2].Inspect() != "folder\\sub" {
+		t.Errorf("expected folder/sub, got %s", arr.Elements[2].Inspect())
+	}
+}
+
+func TestStdlib_Berkas_SmartLoadSaveJSON(t *testing.T) {
+	tmpDir := t.TempDir()
+	jsonFile := filepath.Join(tmpDir, "config.json")
+
+	// 1. Simpan objek Map langsung ke .json
+	codeSave := `
+	buat cfg = {"nama": "Celang", "versi": 2, "fitur": ["fs", "concurrency"]}
+	berkas.simpan("` + jsonFile + `", cfg)
+	`
+	res := runCelangTestCode(t, codeSave)
+	if boolVal, ok := res.(*Boolean); !ok || !boolVal.Value {
+		t.Fatalf("simpan failed: %s", res.Inspect())
+	}
+
+	// 2. Muat otomatis dari .json langsung menjadi Objek Celang tanpa parse manual!
+	codeLoad := `
+	buat dimuat = berkas.muat("` + jsonFile + `")
+	[dimuat["nama"], dimuat["versi"], dimuat["fitur"][0]]
+	`
+	res = runCelangTestCode(t, codeLoad)
+	arr, ok := res.(*Array)
+	if !ok || arr.Elements[0].Inspect() != "Celang" || arr.Elements[1].Inspect() != "2" || arr.Elements[2].Inspect() != "fs" {
+		t.Fatalf("muat json failed: %s", res.Inspect())
+	}
+}
+
+func TestStdlib_Berkas_TypoSuggestion(t *testing.T) {
+	tmpDir := t.TempDir()
+	actualFile := filepath.Join(tmpDir, "pengaturan_sistem.json")
+	typoPath := filepath.Join(tmpDir, "pengaturan_sistemm.json")
+
+	_ = os.WriteFile(actualFile, []byte("{}"), 0644)
+
+	code := `
+	coba {
+		berkas.baca("` + typoPath + `")
+	} tangkap (err) {
+		err
+	}
+	`
+	res := runCelangTestCode(t, code)
+	errMsg := res.Inspect()
+	if !strings.Contains(errMsg, "pengaturan_sistem.json") {
+		t.Errorf("expected typo suggestion for pengaturan_sistem.json, got: %s", errMsg)
+	}
+}
+
+func TestStdlib_Berkas_StreamCSP(t *testing.T) {
+	tmpDir := t.TempDir()
+	logFile := filepath.Join(tmpDir, "stream.log")
+	content := "baris 1: mulai\nbaris 2: proses\nbaris 3: selesai\n"
+	_ = os.WriteFile(logFile, []byte(content), 0644)
+
+	code := `
+	buat hasil = []
+	untuk baris dalam berkas.alir("` + logFile + `") {
+		hasil.tambah(baris)
+	}
+	hasil
+	`
+	res := runCelangTestCode(t, code)
+	arr, ok := res.(*Array)
+	if !ok || len(arr.Elements) != 3 {
+		t.Fatalf("stream CSP expected 3 lines, got: %s", res.Inspect())
+	}
+	if arr.Elements[0].Inspect() != "baris 1: mulai" || arr.Elements[2].Inspect() != "baris 3: selesai" {
+		t.Errorf("unexpected stream content: %s", res.Inspect())
+	}
+}
+
 func TestStdlib_MatematikaAndMath(t *testing.T) {
 	code := `
 	buat r_akar = matematika.akar(25)
