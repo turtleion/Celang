@@ -454,6 +454,172 @@ func TestStdlib_MatematikaAndMath(t *testing.T) {
 	}
 }
 
+func TestStdlib_Matematika_TrigonometryAndAngles(t *testing.T) {
+	code := `
+	buat rad90 = matematika.ke_radian(90)
+	buat sin90 = matematika.bulat(matematika.sin(rad90), 2)
+	buat cos90 = matematika.bulat(matematika.cos(rad90), 2)
+	buat deg180 = math.to_degrees(math.PI)
+	buat atanVal = matematika.atan2(0, 10)
+
+	[sin90, cos90, matematika.bulat(deg180, 0), atanVal]
+	`
+	res := runCelangTestCode(t, code)
+	arr, ok := res.(*Array)
+	if !ok {
+		t.Fatalf("expected array, got %s", res.Inspect())
+	}
+	if arr.Elements[0].Inspect() != "1" && arr.Elements[0].Inspect() != "1.0" {
+		t.Errorf("sin(90 deg) expected 1, got %s", arr.Elements[0].Inspect())
+	}
+	if arr.Elements[1].Inspect() != "0" && arr.Elements[1].Inspect() != "0.0" {
+		t.Errorf("cos(90 deg) expected 0, got %s", arr.Elements[1].Inspect())
+	}
+	if arr.Elements[2].Inspect() != "180" {
+		t.Errorf("to_degrees(PI) expected 180, got %s", arr.Elements[2].Inspect())
+	}
+	if arr.Elements[3].Inspect() != "0" && arr.Elements[3].Inspect() != "0.0" {
+		t.Errorf("atan2(0, 10) expected 0, got %s", arr.Elements[3].Inspect())
+	}
+}
+
+func TestStdlib_Matematika_PrecisionAndAritmatika(t *testing.T) {
+	code := `
+	buat r_bulat = matematika.bulat(3.14159, 2)
+	buat r_trunc = matematika.potong_desimal(3.89, 1)
+	buat r_clamp1 = matematika.jepit(150, 0, 100)
+	buat r_clamp2 = matematika.jepit(-20, 0, 100)
+	buat r_sign = matematika.tanda(-42)
+	buat r_fact = matematika.faktorial(5)
+	buat r_gcd = matematika.fpb(24, 36)
+	buat r_lcm = matematika.kpk(4, 6)
+	buat r_log = math.log10(100)
+
+	[r_bulat, r_trunc, r_clamp1, r_clamp2, r_sign, r_fact, r_gcd, r_lcm, r_log]
+	`
+	res := runCelangTestCode(t, code)
+	arr, ok := res.(*Array)
+	if !ok {
+		t.Fatalf("expected array, got %s", res.Inspect())
+	}
+	if arr.Elements[0].Inspect() != "3.14" {
+		t.Errorf("bulat(3.14159, 2) expected 3.14, got %s", arr.Elements[0].Inspect())
+	}
+	if arr.Elements[1].Inspect() != "3.8" {
+		t.Errorf("potong_desimal(3.89, 1) expected 3.8, got %s", arr.Elements[1].Inspect())
+	}
+	if arr.Elements[2].Inspect() != "100" {
+		t.Errorf("jepit(150, 0, 100) expected 100, got %s", arr.Elements[2].Inspect())
+	}
+	if arr.Elements[3].Inspect() != "0" {
+		t.Errorf("jepit(-20, 0, 100) expected 0, got %s", arr.Elements[3].Inspect())
+	}
+	if arr.Elements[4].Inspect() != "-1" {
+		t.Errorf("tanda(-42) expected -1, got %s", arr.Elements[4].Inspect())
+	}
+	if arr.Elements[5].Inspect() != "120" {
+		t.Errorf("faktorial(5) expected 120, got %s", arr.Elements[5].Inspect())
+	}
+	if arr.Elements[6].Inspect() != "12" {
+		t.Errorf("fpb(24, 36) expected 12, got %s", arr.Elements[6].Inspect())
+	}
+	if arr.Elements[7].Inspect() != "12" {
+		t.Errorf("kpk(4, 6) expected 12, got %s", arr.Elements[7].Inspect())
+	}
+	if arr.Elements[8].Inspect() != "2" && arr.Elements[8].Inspect() != "2.0" {
+		t.Errorf("log10(100) expected 2, got %s", arr.Elements[8].Inspect())
+	}
+}
+
+func TestStdlib_Matematika_Statistics(t *testing.T) {
+	code := `
+	buat data = [2, 4, 4, 4, 5, 5, 7, 9]
+	buat total = matematika.jumlah(data)
+	buat rata = matematika.rata_rata(data)
+	buat med = matematika.median([1, 5, 2, 8, 7])
+	buat mod = matematika.modus(data)
+	buat std = matematika.standar_deviasi(data)
+
+	[total, rata, med, mod, matematika.bulat(std, 1)]
+	`
+	res := runCelangTestCode(t, code)
+	arr, ok := res.(*Array)
+	if !ok {
+		t.Fatalf("expected array, got %s", res.Inspect())
+	}
+	if arr.Elements[0].Inspect() != "40" {
+		t.Errorf("jumlah expected 40, got %s", arr.Elements[0].Inspect())
+	}
+	if arr.Elements[1].Inspect() != "5" {
+		t.Errorf("rata_rata expected 5, got %s", arr.Elements[1].Inspect())
+	}
+	if arr.Elements[2].Inspect() != "5" {
+		t.Errorf("median expected 5, got %s", arr.Elements[2].Inspect())
+	}
+	if arr.Elements[3].Inspect() != "4" {
+		t.Errorf("modus expected 4, got %s", arr.Elements[3].Inspect())
+	}
+	if arr.Elements[4].Inspect() != "2" && arr.Elements[4].Inspect() != "2.0" {
+		t.Errorf("standar_deviasi expected 2, got %s", arr.Elements[4].Inspect())
+	}
+}
+
+func TestStdlib_Matematika_KillerFeatures(t *testing.T) {
+	code := `
+	buat ejaan1 = matematika.terbilang(1250500)
+	buat ejaan2 = matematika.terbilang(15.5)
+	buat rp1 = matematika.rupiah(1500000)
+	buat rp2 = matematika.rupiah(1500000, benar)
+	buat rp3 = matematika.rupiah(-50000)
+	buat pct = matematika.persen(25, 200)
+	buat dari_pct = matematika.dari_persen(15, 200000)
+	buat nilai_lerp = matematika.lerp(0, 100, 0.5)
+	buat mapped = matematika.petakan_rentang(50, 0, 100, 0, 1)
+	buat dist2d = matematika.jarak(0, 0, 3, 4)
+	buat dist3d = matematika.jarak(0, 0, 0, 2, 3, 6)
+
+	[ejaan1, ejaan2, rp1, rp2, rp3, pct, dari_pct, nilai_lerp, mapped, dist2d, dist3d]
+	`
+	res := runCelangTestCode(t, code)
+	arr, ok := res.(*Array)
+	if !ok {
+		t.Fatalf("expected array, got %s", res.Inspect())
+	}
+	if arr.Elements[0].Inspect() != "satu juta dua ratus lima puluh ribu lima ratus" {
+		t.Errorf("terbilang(1250500) mismatch: %s", arr.Elements[0].Inspect())
+	}
+	if arr.Elements[1].Inspect() != "lima belas koma lima" {
+		t.Errorf("terbilang(15.5) mismatch: %s", arr.Elements[1].Inspect())
+	}
+	if arr.Elements[2].Inspect() != "Rp 1.500.000" {
+		t.Errorf("rupiah(1500000) mismatch: %s", arr.Elements[2].Inspect())
+	}
+	if arr.Elements[3].Inspect() != "Rp 1.500.000,00" {
+		t.Errorf("rupiah with dec mismatch: %s", arr.Elements[3].Inspect())
+	}
+	if arr.Elements[4].Inspect() != "-Rp 50.000" {
+		t.Errorf("negative rupiah mismatch: %s", arr.Elements[4].Inspect())
+	}
+	if arr.Elements[5].Inspect() != "12.5" {
+		t.Errorf("persen(25, 200) expected 12.5, got %s", arr.Elements[5].Inspect())
+	}
+	if arr.Elements[6].Inspect() != "30000" {
+		t.Errorf("dari_persen(15, 200000) expected 30000, got %s", arr.Elements[6].Inspect())
+	}
+	if arr.Elements[7].Inspect() != "50" {
+		t.Errorf("lerp(0, 100, 0.5) expected 50, got %s", arr.Elements[7].Inspect())
+	}
+	if arr.Elements[8].Inspect() != "0.5" {
+		t.Errorf("petakan_rentang expected 0.5, got %s", arr.Elements[8].Inspect())
+	}
+	if arr.Elements[9].Inspect() != "5" {
+		t.Errorf("jarak 2D expected 5, got %s", arr.Elements[9].Inspect())
+	}
+	if arr.Elements[10].Inspect() != "7" {
+		t.Errorf("jarak 3D expected 7, got %s", arr.Elements[10].Inspect())
+	}
+}
+
 func TestStdlib_TeksAndStrings(t *testing.T) {
 	code := `
 	buat parts = teks.pisah("apel,jeruk,mangga", ",")

@@ -434,3 +434,18 @@ func TestVM_Teks_ModernFeatures(t *testing.T) {
 		t.Errorf("expected %s, got %s", expected, res.Inspect())
 	}
 }
+
+func TestVM_Matematika_ModernFeatures(t *testing.T) {
+	input := `
+	buat rp = matematika.rupiah(250000)
+	buat words = matematika.terbilang(1500)
+	buat avg = matematika.rata_rata([10, 20, 30])
+	buat dist = matematika.jarak(0, 0, 3, 4)
+	rp + " | " + words + " | " + avg + " | " + dist
+	`
+	res, _, _ := runVM(t, input)
+	expected := "\"Rp 250.000 | seribu lima ratus | 20 | 5\""
+	if res.Inspect() != expected && res.Inspect() != "Rp 250.000 | seribu lima ratus | 20 | 5" {
+		t.Errorf("expected %s, got %s", expected, res.Inspect())
+	}
+}
