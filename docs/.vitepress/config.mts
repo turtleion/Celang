@@ -113,10 +113,10 @@ export default defineConfig({
       {
         text: '📦 Alat Bantu Bawaan',
         items: [
-          { text: 'Alat Perhitungan (matematika)', link: '/pustaka-standar/matematika' },
-          { text: 'Pengolah Teks (teks)', link: '/pustaka-standar/teks' },
-          { text: 'Penunjuk Waktu (waktu)', link: '/pustaka-standar/waktu' },
-          { text: 'Pengelola Berkas (berkas)', link: '/pustaka-standar/berkas' },
+          { text: 'Alat Perhitungan (matematika / math)', link: '/pustaka-standar/matematika' },
+          { text: 'Pengolah Teks (teks / strings)', link: '/pustaka-standar/teks' },
+          { text: 'Pengelola Berkas (berkas / fs)', link: '/pustaka-standar/berkas' },
+          { text: 'Penunjuk Waktu (waktu / time)', link: '/pustaka-standar/waktu' },
           { text: 'Pertukaran Data (json)', link: '/pustaka-standar/json' }
         ]
       },
