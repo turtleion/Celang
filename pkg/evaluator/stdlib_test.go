@@ -500,6 +500,146 @@ func TestStdlib_TeksAndStrings(t *testing.T) {
 	}
 }
 
+func TestStdlib_Teks_CaseStyles(t *testing.T) {
+	code := `
+	buat c_awal = teks.kapital_awal("celang")
+	buat c_judul = teks.judul("halo dunia celang")
+	buat c_unta = teks.unta("halo_dunia_celang")
+	buat c_ular = teks.ular("haloDuniaCelang")
+	buat c_kebab = teks.kebab("Halo Dunia Celang")
+
+	[c_awal, c_judul, c_unta, c_ular, c_kebab]
+	`
+	res := runCelangTestCode(t, code)
+	arr, ok := res.(*Array)
+	if !ok {
+		t.Fatalf("expected array, got %s", res.Inspect())
+	}
+	if arr.Elements[0].Inspect() != "Celang" {
+		t.Errorf("kapital_awal expected 'Celang', got %s", arr.Elements[0].Inspect())
+	}
+	if arr.Elements[1].Inspect() != "Halo Dunia Celang" {
+		t.Errorf("judul expected 'Halo Dunia Celang', got %s", arr.Elements[1].Inspect())
+	}
+	if arr.Elements[2].Inspect() != "haloDuniaCelang" {
+		t.Errorf("unta expected 'haloDuniaCelang', got %s", arr.Elements[2].Inspect())
+	}
+	if arr.Elements[3].Inspect() != "halo_dunia_celang" {
+		t.Errorf("ular expected 'halo_dunia_celang', got %s", arr.Elements[3].Inspect())
+	}
+	if arr.Elements[4].Inspect() != "halo-dunia-celang" {
+		t.Errorf("kebab expected 'halo-dunia-celang', got %s", arr.Elements[4].Inspect())
+	}
+}
+
+func TestStdlib_Teks_SearchAndPadding(t *testing.T) {
+	code := `
+	buat idx1 = teks.indeks_dari("halo dunia", "dunia")
+	buat idx2 = teks.indeks_terakhir("halo halo", "halo")
+	buat cnt = teks.hitung("banana", "an")
+	buat rep = teks.ulangi("ha", 3)
+	buat pad_kiri = teks.isi_kiri("42", 5, "0")
+	buat pad_kanan = teks.isi_kanan("item", 8, " ")
+	buat pad_tengah = teks.tengah("Judul", 11, "=")
+
+	[idx1, idx2, cnt, rep, pad_kiri, pad_kanan, pad_tengah]
+	`
+	res := runCelangTestCode(t, code)
+	arr, ok := res.(*Array)
+	if !ok {
+		t.Fatalf("expected array, got %s", res.Inspect())
+	}
+	if arr.Elements[0].Inspect() != "5" {
+		t.Errorf("indeks_dari expected 5, got %s", arr.Elements[0].Inspect())
+	}
+	if arr.Elements[1].Inspect() != "5" {
+		t.Errorf("indeks_terakhir expected 5, got %s", arr.Elements[1].Inspect())
+	}
+	if arr.Elements[2].Inspect() != "2" {
+		t.Errorf("hitung expected 2, got %s", arr.Elements[2].Inspect())
+	}
+	if arr.Elements[3].Inspect() != "hahaha" {
+		t.Errorf("ulangi expected 'hahaha', got %s", arr.Elements[3].Inspect())
+	}
+	if arr.Elements[4].Inspect() != "00042" {
+		t.Errorf("isi_kiri expected '00042', got %s", arr.Elements[4].Inspect())
+	}
+	if arr.Elements[5].Inspect() != "item    " {
+		t.Errorf("isi_kanan expected 'item    ', got '%s'", arr.Elements[5].Inspect())
+	}
+	if arr.Elements[6].Inspect() != "===Judul===" {
+		t.Errorf("tengah expected '===Judul===', got %s", arr.Elements[6].Inspect())
+	}
+}
+
+func TestStdlib_Teks_Regex(t *testing.T) {
+	code := `
+	buat is_email = teks.sesuai("user@mail.com", "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$")
+	buat is_not_email = teks.sesuai("bukan-email", "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$")
+	buat numbers = teks.temukan_semua("beli 2 apel dan 5 jeruk", "[0-9]+")
+	buat replaced = teks.ganti_pola("halo 123 dunia", "[0-9]+", "xxx")
+
+	[is_email, is_not_email, numbers[0], numbers[1], replaced]
+	`
+	res := runCelangTestCode(t, code)
+	arr, ok := res.(*Array)
+	if !ok {
+		t.Fatalf("expected array, got %s", res.Inspect())
+	}
+	if arr.Elements[0].Inspect() != "true" {
+		t.Errorf("sesuai email expected true")
+	}
+	if arr.Elements[1].Inspect() != "false" {
+		t.Errorf("sesuai not_email expected false")
+	}
+	if arr.Elements[2].Inspect() != "2" || arr.Elements[3].Inspect() != "5" {
+		t.Errorf("temukan_semua expected 2 and 5")
+	}
+	if arr.Elements[4].Inspect() != "halo xxx dunia" {
+		t.Errorf("ganti_pola expected 'halo xxx dunia', got %s", arr.Elements[4].Inspect())
+	}
+}
+
+func TestStdlib_Teks_SmartFeatures(t *testing.T) {
+	code := `
+	buat slug_res = teks.slug("Belajar Celang 2.0: Sangat Mudah & Seru!")
+	buat mask_email = teks.samarkan("budi.santoso@gmail.com")
+	buat mask_phone = teks.samarkan("081234567890")
+	buat sim_score = teks.kemiripan("jakarta", "jakartaa")
+	buat terdekat_buah = teks.terdekat("aple", ["apel", "jeruk", "mangga"])
+	buat fmt_map = teks.format("Halo \{nama}, total \{total}.", {"nama": "Andi", "total": 50000})
+	buat fmt_pos = teks.format("Halo \{0}, skor \{1}.", ["Budi", 100])
+
+	[slug_res, mask_email, mask_phone, sim_score > 0.8, terdekat_buah, fmt_map, fmt_pos]
+	`
+	res := runCelangTestCode(t, code)
+	arr, ok := res.(*Array)
+	if !ok {
+		t.Fatalf("expected array, got %s", res.Inspect())
+	}
+	if arr.Elements[0].Inspect() != "belajar-celang-2-0-sangat-mudah-dan-seru" {
+		t.Errorf("slug expected 'belajar-celang-2-0-sangat-mudah-dan-seru', got %s", arr.Elements[0].Inspect())
+	}
+	if arr.Elements[1].Inspect() != "b***o@gmail.com" {
+		t.Errorf("samarkan email expected 'b***o@gmail.com', got %s", arr.Elements[1].Inspect())
+	}
+	if arr.Elements[2].Inspect() != "0812****7890" {
+		t.Errorf("samarkan phone expected '0812****7890', got %s", arr.Elements[2].Inspect())
+	}
+	if arr.Elements[3].Inspect() != "true" {
+		t.Errorf("kemiripan score expected > 0.8")
+	}
+	if arr.Elements[4].Inspect() != "apel" {
+		t.Errorf("terdekat expected 'apel', got %s", arr.Elements[4].Inspect())
+	}
+	if arr.Elements[5].Inspect() != "Halo Andi, total 50000." {
+		t.Errorf("format expected 'Halo Andi, total 50000.', got %s", arr.Elements[5].Inspect())
+	}
+	if arr.Elements[6].Inspect() != "Halo Budi, skor 100." {
+		t.Errorf("format pos expected 'Halo Budi, skor 100.', got %s", arr.Elements[6].Inspect())
+	}
+}
+
 func TestStdlib_WaktuAndTime(t *testing.T) {
 	code := `
 	buat ms1 = waktu.sekarang()

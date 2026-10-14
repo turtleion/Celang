@@ -421,4 +421,16 @@ func TestVM_Berkas_StreamAndJSON(t *testing.T) {
 	}
 }
 
-
+func TestVM_Teks_ModernFeatures(t *testing.T) {
+	input := `
+	buat s = teks.slug("Belajar Celang Modern!")
+	buat m = teks.samarkan("user@example.com")
+	buat cl = teks.terdekat("kucing", ["anjing", "kucing_lucu", "kucin"])
+	s + " | " + m + " | " + cl
+	`
+	res, _, _ := runVM(t, input)
+	expected := "\"belajar-celang-modern | u***r@example.com | kucin\""
+	if res.Inspect() != expected && res.Inspect() != "belajar-celang-modern | u***r@example.com | kucin" {
+		t.Errorf("expected %s, got %s", expected, res.Inspect())
+	}
+}
