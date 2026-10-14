@@ -315,58 +315,29 @@ func (c *Compiler) compileStatement(stmt uast.Statement) error {
 	case *uast.ForEachStatement:
 		c.beginScope()
 
-		// 1. Compile iterable and place in local slot
+		// 1. Compile iterable and place in local slot as an iterator
 		if err := c.compileExpression(s.Iterable); err != nil {
 			return err
 		}
+		c.emitOp(bytecode.OpGetIter, line)
 		iterSlot := len(c.locals)
 		c.addLocal("__iter")
 
-		// 2. Call panjang(__iter) and store length in local slot
-		constPanjang := c.chunk.AddConstant(&evaluator.String{Value: "panjang"})
-		c.emitOp(bytecode.OpGetGlobal, line)
-		c.chunk.WriteUint16(constPanjang, line)
-		c.emitOp(bytecode.OpGetLocal, line)
-		c.chunk.WriteUint16(uint16(iterSlot), line)
-		c.emitOp(bytecode.OpCall, line)
-		c.chunk.Write(1, line)
-		lenSlot := len(c.locals)
-		c.addLocal("__len")
-
-		// 3. Initialize __idx = 0 in local slot
-		constZero := c.chunk.AddConstant(&evaluator.Integer{Value: 0})
-		c.emitOp(bytecode.OpConstant, line)
-		c.chunk.WriteUint16(constZero, line)
-		idxSlot := len(c.locals)
-		c.addLocal("__idx")
-
-		// 4. Reserve slot for user item variable
+		// 2. Reserve slot for user item variable
 		c.emitOp(bytecode.OpNull, line)
 		itemSlot := len(c.locals)
 		c.addLocal(s.Item)
 
-		// 5. Loop condition: __idx < __len
+		// 3. Loop condition / fetch next item
 		loopStart := len(c.chunk.Instructions)
-		c.emitOp(bytecode.OpGetLocal, line)
-		c.chunk.WriteUint16(uint16(idxSlot), line)
-		c.emitOp(bytecode.OpGetLocal, line)
-		c.chunk.WriteUint16(uint16(lenSlot), line)
-		c.emitOp(bytecode.OpLessThan, line)
+		exitJump := c.emitForIter(uint16(iterSlot), line)
 
-		exitJump := c.emitJump(bytecode.OpJumpIfFalse, line)
-		c.emitOp(bytecode.OpPop, line) // pop boolean condition
-
-		// 6. Set s.Item = __iter[__idx]
-		c.emitOp(bytecode.OpGetLocal, line)
-		c.chunk.WriteUint16(uint16(iterSlot), line)
-		c.emitOp(bytecode.OpGetLocal, line)
-		c.chunk.WriteUint16(uint16(idxSlot), line)
-		c.emitOp(bytecode.OpIndex, line)
+		// 4. Assign item to local variable
 		c.emitOp(bytecode.OpSetLocal, line)
 		c.chunk.WriteUint16(uint16(itemSlot), line)
 		c.emitOp(bytecode.OpPop, line)
 
-		// 7. Loop body
+		// 5. Loop body
 		if s.Body != nil {
 			for _, child := range s.Body.Statements {
 				if err := c.compileStatement(child); err != nil {
@@ -375,23 +346,11 @@ func (c *Compiler) compileStatement(stmt uast.Statement) error {
 			}
 		}
 
-		// 8. Advance index: __idx = __idx + 1
-		c.emitOp(bytecode.OpGetLocal, line)
-		c.chunk.WriteUint16(uint16(idxSlot), line)
-		constOne := c.chunk.AddConstant(&evaluator.Integer{Value: 1})
-		c.emitOp(bytecode.OpConstant, line)
-		c.chunk.WriteUint16(constOne, line)
-		c.emitOp(bytecode.OpAdd, line)
-		c.emitOp(bytecode.OpSetLocal, line)
-		c.chunk.WriteUint16(uint16(idxSlot), line)
-		c.emitOp(bytecode.OpPop, line)
-
-		// 9. Jump back
+		// 6. Loop back
 		c.emitLoop(loopStart, line)
 
-		// 10. Exit loop
+		// 7. Exit loop
 		c.patchJump(exitJump)
-		c.emitOp(bytecode.OpPop, line)
 
 		c.endScope(line)
 		return nil
@@ -803,6 +762,14 @@ func (c *Compiler) emitOp(op bytecode.Opcode, line int) {
 
 func (c *Compiler) emitJump(op bytecode.Opcode, line int) int {
 	c.emitOp(op, line)
+	c.chunk.Write(0xFF, line)
+	c.chunk.Write(0xFF, line)
+	return len(c.chunk.Instructions) - 2
+}
+
+func (c *Compiler) emitForIter(slot uint16, line int) int {
+	c.emitOp(bytecode.OpForIter, line)
+	c.chunk.WriteUint16(slot, line)
 	c.chunk.Write(0xFF, line)
 	c.chunk.Write(0xFF, line)
 	return len(c.chunk.Instructions) - 2

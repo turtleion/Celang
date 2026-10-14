@@ -338,3 +338,65 @@ func TestVM_ErgonomicFeatures(t *testing.T) {
 	}
 }
 
+func TestVM_ForLoop_String(t *testing.T) {
+	input := `
+	buat hasil = ""
+	untuk ch dalam "celang" {
+		hasil = hasil + ch + "-"
+	}
+	hasil
+	`
+	res, _, _ := runVM(t, input)
+	if res.Inspect() != "\"c-e-l-a-n-g-\"" && res.Inspect() != "c-e-l-a-n-g-" {
+		t.Errorf("expected c-e-l-a-n-g-, got %s", res.Inspect())
+	}
+}
+
+func TestVM_ForLoop_Map(t *testing.T) {
+	input := `
+	buat keys = ""
+	buat m = {"a": 1, "b": 2}
+	untuk k dalam m {
+		keys = keys + k
+	}
+	keys
+	`
+	res, _, _ := runVM(t, input)
+	if res.Inspect() != "\"ab\"" && res.Inspect() != "ab" {
+		t.Errorf("expected ab, got %s", res.Inspect())
+	}
+}
+
+func TestVM_ForLoop_Channel(t *testing.T) {
+	input := `
+	buat ch = Saluran(3)
+	ch.kirim(10)
+	ch.kirim(20)
+	ch.kirim(30)
+	ch.tutup()
+
+	buat sum = 0
+	untuk val dalam ch {
+		sum = sum + val
+	}
+	sum
+	`
+	res, _, _ := runVM(t, input)
+	if res.Inspect() != "60" {
+		t.Errorf("expected 60, got %s", res.Inspect())
+	}
+}
+
+func TestVM_Channel_Panjang(t *testing.T) {
+	input := `
+	buat ch = Saluran(5)
+	ch.kirim("a")
+	ch.kirim("b")
+	panjang(ch) + " - " + ch.panjang
+	`
+	res, _, _ := runVM(t, input)
+	if res.Inspect() != "\"2 - 2\"" && res.Inspect() != "2 - 2" {
+		t.Errorf("expected '2 - 2', got %s", res.Inspect())
+	}
+}
+

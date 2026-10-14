@@ -27,6 +27,7 @@ const (
 	STRUCT_INSTANCE_OBJ ObjectType = "STRUCT_INSTANCE"
 	TICKET_OBJ          ObjectType = "TIKET"
 	CHANNEL_OBJ         ObjectType = "SALURAN"
+	ITERATOR_OBJ        ObjectType = "ITERATOR"
 )
 
 type Object interface {
@@ -285,3 +286,73 @@ func inspectObjectWithVisited(obj Object, visited map[any]bool) string {
 		return o.Inspect()
 	}
 }
+
+// IteratorObject wraps stateful iteration for arrays, strings, maps, and channels.
+type IteratorObject struct {
+	NextFunc func() (Object, bool)
+}
+
+func (it *IteratorObject) Type() ObjectType { return ITERATOR_OBJ }
+func (it *IteratorObject) Inspect() string   { return "<iterator>" }
+func (it *IteratorObject) Next() (Object, bool) {
+	if it.NextFunc == nil {
+		return nil, false
+	}
+	return it.NextFunc()
+}
+
+// NewIterator creates an iterator for any iterable Celang object.
+func NewIterator(obj Object) (*IteratorObject, error) {
+	switch o := obj.(type) {
+	case *Array:
+		idx := 0
+		return &IteratorObject{
+			NextFunc: func() (Object, bool) {
+				if idx >= len(o.Elements) {
+					return nil, false
+				}
+				val := o.Elements[idx]
+				idx++
+				return val, true
+			},
+		}, nil
+	case *String:
+		runes := []rune(o.Value)
+		idx := 0
+		return &IteratorObject{
+			NextFunc: func() (Object, bool) {
+				if idx >= len(runes) {
+					return nil, false
+				}
+				val := &String{Value: string(runes[idx])}
+				idx++
+				return val, true
+			},
+		}, nil
+	case *Map:
+		idx := 0
+		return &IteratorObject{
+			NextFunc: func() (Object, bool) {
+				if idx >= len(o.Order) {
+					return nil, false
+				}
+				val := &String{Value: o.Order[idx]}
+				idx++
+				return val, true
+			},
+		}, nil
+	case *Channel:
+		return &IteratorObject{
+			NextFunc: func() (Object, bool) {
+				val, ok := <-o.Ch
+				if !ok {
+					return nil, false
+				}
+				return val, true
+			},
+		}, nil
+	default:
+		return nil, fmt.Errorf("objek tipe %s tidak dapat diiterasi", obj.Type())
+	}
+}
+

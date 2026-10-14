@@ -145,6 +145,17 @@ func (c *Chunk) DisassembleInstruction(offset int) (string, int) {
 		}
 		return fmt.Sprintf("%s  %s.%s", prefix, nameStr, propStr), offset + 5
 
+	case OpGetIter:
+		return prefix, offset + 1
+
+	case OpForIter:
+		if offset+4 >= len(c.Instructions) {
+			return fmt.Sprintf("%s [truncated]", prefix), offset + 1
+		}
+		slot := c.ReadUint16(offset + 1)
+		target := c.ReadUint16(offset + 3)
+		return fmt.Sprintf("%s  slot %d -> %04d", prefix, slot, target), offset + 5
+
 	default:
 		return prefix, offset + 1
 	}

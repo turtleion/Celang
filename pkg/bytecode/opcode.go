@@ -55,6 +55,10 @@ const (
 	// Advanced & Interop
 	OpEvalAST    // [OpEvalAST, idx_high, idx_low] evaluates AST declaration/statement
 	OpTimeTravel // [OpTimeTravel, name_high, name_low, prop_high, prop_low]
+
+	// Iteration
+	OpGetIter // pop target iterable, push Iterator wrapper
+	OpForIter // [OpForIter, slot_high, slot_low, offset_high, offset_low]
 )
 
 // OpcodeNames maps Opcodes to human-readable assembly instructions.
@@ -93,6 +97,8 @@ var OpcodeNames = map[Opcode]string{
 	OpReturn:       "OP_RETURN",
 	OpEvalAST:      "OP_EVAL_AST",
 	OpTimeTravel:   "OP_TIME_TRAVEL",
+	OpGetIter:      "OP_GET_ITER",
+	OpForIter:      "OP_FOR_ITER",
 }
 
 func (op Opcode) String() string {

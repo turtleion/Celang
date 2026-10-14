@@ -457,6 +457,34 @@ func (vm *VM) Run() (evaluator.Object, error) {
 				vm.push(&evaluator.Null{})
 			}
 
+		case bytecode.OpGetIter:
+			iterable := vm.pop()
+			if errObj, ok := iterable.(*evaluator.Error); ok {
+				return nil, fmt.Errorf("%s", errObj.Inspect())
+			}
+			iter, err := evaluator.NewIterator(iterable)
+			if err != nil {
+				return nil, err
+			}
+			vm.push(iter)
+
+		case bytecode.OpForIter:
+			iterSlot := chunk.ReadUint16(frame.ip)
+			target := chunk.ReadUint16(frame.ip + 2)
+			frame.ip += 4
+
+			iterObj := vm.stack[frame.basePointer+int(iterSlot)]
+			iterator, ok := iterObj.(*evaluator.IteratorObject)
+			if !ok {
+				return nil, fmt.Errorf("objek di slot %d bukan iterator yang valid", iterSlot)
+			}
+			val, hasNext := iterator.Next()
+			if !hasNext {
+				frame.ip = int(target)
+			} else {
+				vm.push(val)
+			}
+
 		default:
 			return nil, fmt.Errorf("opcode tidak dikenal: 0x%02X (%s)", byte(op), op.String())
 		}

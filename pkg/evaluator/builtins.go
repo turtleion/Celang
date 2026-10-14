@@ -73,6 +73,8 @@ func RegisterBuiltinsWithIO(env *Environment, in io.Reader, out io.Writer) {
 				return &Integer{Value: int64(len(arg.Elements))}
 			case *Map:
 				return &Integer{Value: int64(len(arg.Pairs))}
+			case *Channel:
+				return &Integer{Value: int64(len(arg.Ch))}
 			default:
 				return &Error{Message: fmt.Sprintf("tipe %s tidak memiliki panjang", arg.Type())}
 			}
