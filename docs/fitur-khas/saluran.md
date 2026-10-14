@@ -1,120 +1,92 @@
-# 🔄 Saluran (Channels & CSP Concurrency)
+# Saluran Pengiriman Pesan (`saluran`)
 
-**Saluran** (*Channel*) adalah pipa komunikasi antar-proses bergaya **CSP (Communicating Sequential Processes)** seperti yang dipopulerkan oleh bahasa Go. Saluran memungkinkan goroutine untuk saling bertukar data dengan aman tanpa saling berebut memori (*thread-safe*).
+Ketika Anda memiliki dua bagian program yang bekerja sendiri-sendiri, bagaimana cara keduanya saling bertukar informasi secara teratur tanpa saling mengganggu?
+
+Celang menyediakan **Saluran** (`saluran`), yaitu pipa pengantar pesan khusus yang menghubungkan dua bagian program agar bisa saling mengirim dan menerima data dengan aman.
 
 ---
 
-## 🏭 Analogi Nyata: Ban Berjalan di Pabrik
+## 🏭 Analogi Nyata: Pipa Pengantar Surat atau Ban Berjalan
 
-Bayangkan sebuah ban berjalan (*conveyor belt*) di sebuah pabrik:
-* **Produsen (Pengirim)**: Pekerja yang meletakkan produk jadi ke ban berjalan (`.kirim()`).
-* **Konsumen (Penerima)**: Pekerja di ujung ban yang mengambil produk tersebut (`.terima()`).
-* **Kapasitas Penampung**: Jika ban berjalan memiliki tempat tunggu (*buffer*), pekerja pengirim tidak perlu menunggu sampai pekerja penerima selesai mengambil barangnya.
+Bayangkan sebuah ban berjalan di restoran atau pipa pengantar surat di kantor:
+* **Pengirim**: Orang yang memasukkan pesan atau barang ke dalam pipa (`.kirim()`).
+* **Penerima**: Orang di ujung pipa yang mengambil barang yang keluar (`.terima()`).
+* **Kapasitas Pipa**: Pipa bisa memiliki ruang tampung antrean. Selama pipa belum penuh, pengirim bisa terus memasukkan pesan tanpa harus menunggu penerima mengambilnya.
 
 ```
- [ Produsen ] ──► .kirim(data) ──► [ Saluran / Ban Berjalan ] ──► .terima() ──► [ Konsumen ]
+ [ Pengirim ] ──► .kirim(pesan) ──► [ Saluran Pipa ] ──► .terima() ──► [ Penerima ]
 ```
 
 ---
 
 ## 1. Membuat Saluran
 
-Celang mendukung saluran tanpa penyangga (*unbuffered*) maupun berpanyangga (*buffered*):
+Anda dapat membuat saluran biasa atau saluran yang memiliki kapasitas antrean:
 
 ```celang
-// 1. Saluran tanpa penyangga (kapasitas 0)
-// Pengirim akan menunggu sampai ada penerima yang siap
+// 1. Saluran langsung (kapasitas 0)
+// Pengirim baru akan melangkah setelah penerima siap mengambilnya
 buat pipaLangsung = Saluran()
 
-// 2. Saluran dengan penyangga (kapasitas 3)
-// Pengirim bisa mengirim hingga 3 item sebelum tertahan
+// 2. Saluran dengan antrean (kapasitas 3 pesan)
+// Pengirim bisa memasukkan hingga 3 pesan sekaligus ke dalam antrean
 buat antrean = Saluran(3)
 ```
 
-### Saluran Bertipe (*Typed Channel*)
-Anda dapat memadukan saluran dengan fitur Generik untuk menjamin hanya tipe data tertentu yang bisa dikirim:
+### Menentukan Jenis Pesan yang Boleh Masuk
+Anda bisa membatasi saluran agar hanya menerima jenis data tertentu (misalnya hanya menerima angka):
 
 ```celang
 buat saluranAngka = Saluran<Angka>(5)
 
 saluranAngka.kirim(100) // ✅ Sah!
-// saluranAngka.kirim("halo") // ❌ Error! Tipe data tidak cocok
+// saluranAngka.kirim("halo") // ❌ Celang akan mengingatkan bahwa isi harus berupa Angka
 ```
 
 ---
 
-## 2. Operasi Saluran
-
-Saluran memiliki metode bawaan yang ringkas:
+## 2. Cara Mengirim dan Menerima Pesan
 
 ```celang
 buat antrean = Saluran(2)
 
-// 1. Mengirim data
+// 1. Memasukkan pesan ke dalam saluran
 antrean.kirim("Tugas A")
 antrean.kirim("Tugas B")
 
-// 2. Memeriksa isi dan kapasitas
-cetak("Banyak item:", antrean.panjang)     // 2
-cetak("Kapasitas total:", antrean.kapasitas) // 2
+// 2. Memeriksa isi antrean
+cetak("Banyak pesan di dalam:", antrean.panjang)     // 2
+cetak("Kapasitas maksimal    :", antrean.kapasitas) // 2
 
-// 3. Menerima data
+// 3. Mengambil pesan dari saluran
 buat tugas1 = antrean.terima()
 buat tugas2 = antrean.terima()
 cetak(tugas1, tugas2) // "Tugas A" "Tugas B"
 
-// 4. Menutup saluran
+// 4. Menutup saluran setelah semua selesai
 antrean.tutup()
 ```
 
 ---
 
-## 3. Streaming dengan Perulangan (`untuk .. dalam`)
+## 3. Membaca Pesan Mengalir (`untuk .. dalam`)
 
-Celang memungkinkan Anda mengonsumsi data yang dialirkan terus-menerus lewat perulangan `untuk .. dalam`. Perulangan ini akan otomatis membaca data satu per satu dan **otomatis berhenti** begitu saluran ditutup (`.tutup()`):
-
-```celang
-buat pipaPesan = Saluran(5)
-
-// Produsen: Kirim data dari latar belakang
-sambil {
-    untuk angka dalam [10, 20, 30] {
-        pipaPesan.kirim(angka)
-    }
-    pipaPesan.tutup() // Jangan lupa tutup setelah selesai mengirim!
-}
-
-// Konsumen: Baca data secara streaming
-cetak("Menerima data secara streaming:")
-untuk nilai dalam pipaPesan {
-    cetak("Data masuk:", nilai)
-}
-// Output:
-// Data masuk: 10
-// Data masuk: 20
-// Data masuk: 30
-```
-
----
-
-## 4. Pola Produsen & Konsumen (*Producer-Consumer*)
-
-Berikut adalah contoh lengkap komunikasi asinkron antara produsen dan konsumen:
+Salah satu kenyamanan terbaik di Celang adalah Anda bisa menyedot pesan yang mengalir terus-menerus menggunakan perulangan biasa `untuk .. dalam`. Perulangan ini akan membaca pesan satu per satu dan **otomatis berhenti dengan sendirinya** begitu saluran ditutup:
 
 ```celang
 buat antreanPesanan = Saluran(3)
 
-// Produsen: Menyiapkan pesanan
+// Di latar belakang: Koki menyiapkan pesanan
 sambil {
     buat daftarMenu = ["Nasi Goreng", "Sate Ayam", "Es Teh"]
     untuk menu dalam daftarMenu {
         cetak("Koki memasak:", menu)
         antreanPesanan.kirim(menu)
     }
-    antreanPesanan.tutup()
+    antreanPesanan.tutup() // Beritahu bahwa semua pesanan sudah selesai
 }
 
-// Konsumen: Pelayan menyajikan pesanan
+// Di bagian depan: Pelayan menyajikan makanan saat tiba
 untuk makanan dalam antreanPesanan {
     cetak("Pelayan menyajikan:", makanan)
 }
@@ -122,15 +94,14 @@ untuk makanan dalam antreanPesanan {
 
 ---
 
-## 🎯 Rangkuman Metode Saluran
+## 🎯 Ringkasan Perintah Saluran
 
-| Metode / Properti | Penjelasan |
+| Perintah | Kegunaan |
 | :--- | :--- |
-| `Saluran(kapasitas)` | Membuat saluran dengan kapasitas buffer tertentu |
-| `Saluran<T>(kapasitas)` | Saluran dengan batasan tipe data generik |
-| `saluran.kirim(data)` | Mengirim data ke dalam saluran |
-| `saluran.terima()` | Mengambil data berikutnya dari saluran |
-| `saluran.tutup()` | Menutup saluran dan memberi sinyal selesai |
-| `saluran.panjang` | Jumlah elemen yang saat ini ada di antrean |
-| `saluran.kapasitas` | Kapasitas maksimal penampung saluran |
-| `untuk x dalam saluran` | Iterasi otomatis sampai saluran ditutup |
+| `Saluran(kapasitas)` | Membuat pipa saluran dengan kapasitas antrean tertentu |
+| `saluran.kirim(data)` | Memasukkan pesan ke dalam saluran |
+| `saluran.terima()` | Mengambil pesan berikutnya dari saluran |
+| `saluran.tutup()` | Menutup saluran sebagai tanda bahwa pengiriman sudah selesai |
+| `saluran.panjang` | Mengetahui berapa banyak pesan yang sedang mengantre |
+| `saluran.kapasitas` | Mengetahui daya tampung maksimal saluran |
+| `untuk pesan dalam saluran` | Mengambil pesan secara otomatis sampai saluran ditutup |

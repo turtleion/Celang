@@ -1,65 +1,65 @@
-# Fungsi Bawaan (Built-in Functions)
+# Perintah & Fungsi Bawaan Siap Pakai
 
-Celang menyediakan sejumlah fungsi bawaan global yang selalu tersedia secara langsung di seluruh cakupan (*scope*) program tanpa perlu mengimpor modul pustaka standar terlebih dahulu.
+Celang menyediakan sejumlah perintah dan fungsi bawaan yang **selalu siap digunakan langsung** di mana saja di dalam program Anda, tanpa perlu memuat berkas atau modul tambahan.
 
-Fungsi-fungsi ini mendukung penamaan idiomatik Bahasa Indonesia dan alias internasional yang ramah bagi programmer dari berbagai latar belakang.
+Fungsi-fungsi ini mendukung nama Bahasa Indonesia yang nyaman serta nama padanan internasionalnya.
 
 ---
 
-## 📋 Ringkasan Daftar Fungsi
+## 📋 Daftar Perintah Bawaan
 
-| Kategori | Fungsi (Indonesia) | Alias Internasional | Keterangan |
+| Kelompok | Perintah (Bahasa Indonesia) | Padanan Internasional | Kegunaan |
 | :--- | :--- | :--- | :--- |
-| **I/O & Terminal** | `cetak(...nilai)` | `print` | Mencetak nilai ke terminal dengan spasi & baris baru otomatis |
-| | `masukan(prompt?)` | `input` | Membaca input baris teks dari terminal pengguna |
-| **Inspeksi Data** | `panjang(koleksi)` | `len` | Menghitung jumlah elemen teks, array, atau map |
-| | `tipe(nilai)` | `type` | Mengembalikan nama tipe data objek saat runtime |
-| **Konversi Tipe** | `Angka(nilai)` | `angka` | Mengonversi nilai teks/logika menjadi bilangan bulat/pecahan |
-| | `Teks(nilai)` | `teks` | Mengonversi nilai apa pun menjadi string teks |
-| | `Logika(nilai)` | `logika` | Mengevaluasi nilai kebenaran boolean (`benar` / `salah`) |
-| **Koleksi & Array** | `rentang(awal?, akhir)` | `range` | Menghasilkan daftar array bilangan terurut |
-| | `saring(array, fn)` | `filter` | Menyaring elemen array menggunakan predikat fungsi |
-| | `petakan(array, fn)` | `map` | Mentransformasikan setiap elemen array dengan fungsi callback |
-| **Manipulasi Teks** | `potong_spasi(teks)` | `trim` | Menghapus spasi putih di awal dan akhir teks |
-| | `kapitalisasi(teks)` | `capitalize`, `uppercase` | Mengubah seluruh karakter teks menjadi huruf besar |
-| **Manajemen Memori**| `salin(obj)` | `clone` | Melakukan duplikasi mendalam (*deep clone*) tanpa berbagi memori |
+| **Layar & Masukan** | `cetak(...nilai)` | `print` | Menampilkan tulisan atau hasil hitungan ke layar terminal |
+| | `masukan(pertanyaan?)` | `input` | Menanyakan dan menerima ketikan jawaban dari pengguna |
+| **Pemeriksaan Data** | `panjang(wadah)` | `len` | Menghitung banyak huruf di kalimat atau banyak barang di daftar |
+| | `tipe(nilai)` | `type` | Mengetahui jenis data (seperti `Angka`, `Teks`, atau `Array`) |
+| **Pengubah Jenis Data** | `Angka(nilai)` | `angka` | Mengubah tulisan atau data menjadi angka murni |
+| | `Teks(nilai)` | `teks` | Mengubah angka atau data apa pun menjadi tulisan teks |
+| | `Logika(nilai)` | `logika` | Memeriksa apakah suatu nilai bernilai ada (`benar`) atau kosong (`salah`) |
+| **Daftar & Kumpulan** | `rentang(awal?, akhir)` | `range` | Menghasilkan urutan angka dari awal sampai akhir |
+| | `saring(daftar, rumus)` | `filter` | Menyaring dan mengambil hanya barang yang lolos kriteria |
+| | `petakan(daftar, rumus)` | `map` | Mengubah setiap barang di daftar menggunakan rumus tertentu |
+| **Pembersih Teks** | `potong_spasi(teks)` | `trim` | Membuang spasi kosong di ujung kiri dan kanan tulisan |
+| | `kapitalisasi(teks)` | `capitalize`, `uppercase` | Mengubah seluruh tulisan menjadi huruf besar semua |
+| **Duplikasi Data** | `salin(objek)` | `clone` | Membuat salinan data mandiri agar perubahan tidak merusak data asli |
 
 ---
 
-## 1. I/O & Interaksi Terminal
+## 1. Menampilkan ke Layar & Menerima Jawaban
 
 ### `cetak(...nilai)` / `print`
-Mencetak satu atau beberapa nilai ke output terminal. Nilai yang dipisahkan tanda koma akan dicetak dengan spasi pemisah, dan diakhiri dengan baris baru (*newline*).
+Menampilkan tulisan atau angka ke layar. Jika Anda memasukkan beberapa hal sekaligus dengan koma, Celang akan memisahkannya dengan spasi:
 
 ```celang
 cetak("Halo Dunia!")
-cetak("Nilai:", 42, "Status:", benar)
-// Output: Nilai: 42 Status: benar
+cetak("Nama:", "Budi", "| Usia:", 25)
+// Hasil di layar: Nama: Budi | Usia: 25
 ```
 
-### `masukan(prompt?)` / `input`
-Membaca satu baris masukan teks dari pengguna melalui terminal. Parameter prompt bersifat opsional.
+### `masukan(pertanyaan?)` / `input`
+Mengajukan pertanyaan di layar dan menunggu sampai pengguna mengetik jawaban lalu menekan tombol Enter:
 
 ```celang
-buat nama = masukan("Masukkan nama Anda: ")
-cetak("Selamat datang,", nama)
+buat nama = masukan("Siapa namamu? ")
+cetak("Senang berkenalan denganmu,", nama)
 ```
 
 ---
 
-## 2. Inspeksi Data & Panjang
+## 2. Memeriksa Isi & Panjang Data
 
-### `panjang(koleksi)` / `len`
-Mengembalikan jumlah elemen dari `Teks` (panjang karakter), `Array` (jumlah item), atau `Map` (jumlah entri pasangan kunci-nilai).
+### `panjang(wadah)` / `len`
+Menghitung banyak karakter dalam tulisan, banyak barang dalam daftar, atau banyak kolom dalam kamus:
 
 ```celang
-cetak(panjang("Celang"))       // 6
-cetak(panjang([10, 20, 30]))   // 3
-cetak(panjang({"a": 1, "b": 2})) // 2
+cetak(panjang("Celang"))         // 6 (ada 6 huruf)
+cetak(panjang([10, 20, 30]))     // 3 (ada 3 angka)
+cetak(panjang({"a": 1, "b": 2})) // 2 (ada 2 pasang data)
 ```
 
 ### `tipe(nilai)` / `type`
-Mengecek nama tipe data objek saat runtime. Mengembalikan objek `Teks`.
+Mengetahui apa jenis data dari suatu nilai:
 
 ```celang
 cetak(tipe(100))        // "Angka"
@@ -72,132 +72,90 @@ cetak(tipe({"x": 10}))  // "Map"
 
 ---
 
-## 3. Konversi Tipe Data (*Type Casting*)
+## 3. Mengubah Jenis Data
 
-Fungsi-fungsi ini bekerja sebagai konstruktor konversi eksplisit:
-
-### `Angka(nilai)` / `angka`
-Mengonversi teks berformat angka atau boolean menjadi `Angka`.
+### `Angka(nilai)`
+Mengubah tulisan angka menjadi angka sungguhan agar bisa dihitung matematika:
 ```celang
-buat x = Angka("125000") // 125000
-buat y = Angka(3.95)     // 3 (pemotongan bulat)
-buat z = Angka(benar)    // 1
+buat x = Angka("125000") // angka 125000
+buat y = Angka(benar)    // angka 1
 ```
 
-### `Teks(nilai)` / `teks`
-Mengonversi tipe data apa pun menjadi `Teks`.
+### `Teks(nilai)`
+Mengubah nilai apa pun menjadi tulisan teks:
 ```celang
 buat s1 = Teks(42)       // "42"
 buat s2 = Teks(benar)    // "benar"
-buat s3 = Teks([1, 2])   // "[1, 2]"
 ```
 
-### `Logika(nilai)` / `logika`
-Mengevaluasi kebenaran (*truthiness*) suatu nilai. Nilai `0`, string kosong `""`, array kosong `[]`, atau `kosong` bernilai `salah`, sisanya bernilai `benar`.
+### `Logika(nilai)`
+Memeriksa apakah data tersebut bernilai ada atau kosong:
+- Angka `0`, tulisan kosong `""`, daftar kosong `[]`, atau nilai `kosong` bernilai `salah`.
+- Data yang berisi bernilai `benar`.
+
 ```celang
-cetak(Logika(1))         // benar
-cetak(Logika(0))         // salah
-cetak(Logika("Celang"))  // benar
-cetak(Logika(""))        // salah
+cetak(Logika(1))        // benar
+cetak(Logika(0))        // salah
+cetak(Logika("Celang")) // benar
+cetak(Logika(""))       // salah
 ```
 
 ---
 
-## 4. Manipulasi Koleksi & Array
+## 4. Mengolah Kumpulan Daftar
 
 ### `rentang(awal?, akhir)` / `range`
-Menghasilkan array angka terurut. Jika hanya diberikan 1 argumen `rentang(akhir)`, rentang dimulai dari `0` sampai `akhir`. Jika diberikan 2 argumen `rentang(awal, akhir)`, rentang mencakup dari `awal` hingga `akhir` (bisa naik atau turun).
-
+Membuat deretan angka berurutan secara cepat:
 ```celang
-buat r1 = rentang(4)       // [0, 1, 2, 3, 4]
-buat r2 = rentang(1, 5)    // [1, 2, 3, 4, 5]
-buat r3 = rentang(3, 1)    // [3, 2, 1]
+buat r1 = rentang(4)    // [0, 1, 2, 3, 4]
+buat r2 = rentang(1, 5) // [1, 2, 3, 4, 5]
+buat r3 = rentang(3, 1) // [3, 2, 1]
 ```
 
-### `saring(array, fungsi)` / `filter`
-Menyaring elemen array berdasarkan fungsi predikat yang mengembalikan `benar` atau `salah`.
-
+### `saring(daftar, rumus)` / `filter`
+Menyaring barang di dalam daftar, mengambil hanya yang memenuhi syarat:
 ```celang
 buat angka = [1, 2, 3, 4, 5, 6]
-buat genap = saring(angka, fungsi(n) {
-    kembalikan n % 2 == 0
-})
-cetak(genap) // [2, 4, 6]
+buat angkaGenap = saring(angka, x => x % 2 == 0)
+cetak(angkaGenap) // [2, 4, 6]
 ```
 
-### `petakan(array, fungsi)` / `map`
-Mentransformasikan setiap elemen array ke dalam bentuk baru melalui fungsi callback.
-
+### `petakan(daftar, rumus)` / `map`
+Mengubah semua isi daftar menggunakan rumus yang sama:
 ```celang
 buat angka = [1, 2, 3]
-buat kuadrat = petakan(angka, fungsi(n) {
-    kembalikan n * n
-})
+buat kuadrat = petakan(angka, x => x * x)
 cetak(kuadrat) // [1, 4, 9]
 ```
 
 ---
 
-## 5. Manipulasi Teks
+## 5. Memoles Teks
 
 ### `potong_spasi(teks)` / `trim`
-Menghapus karakter spasi putih (*whitespace*) di awal dan di akhir teks.
-
+Membuang spasi kosong di awal atau akhir tulisan:
 ```celang
 buat pesan = "   Halo Celang!   "
 cetak(potong_spasi(pesan)) // "Halo Celang!"
 ```
 
-### `kapitalisasi(teks)` / `capitalize` / `uppercase`
-Mengubah semua huruf dalam teks menjadi huruf besar (*uppercase*).
-
+### `kapitalisasi(teks)` / `uppercase`
+Mengubah seluruh tulisan menjadi huruf besar:
 ```celang
-buat judul = "bahasa pemrograman indonesia"
-cetak(kapitalisasi(judul)) // "BAHASA PEMROGRAMAN INDONESIA"
+cetak(kapitalisasi("selamat pagi")) // "SELAMAT PAGI"
 ```
 
 ---
 
-## 6. Manajemen Memori & Kloning
+## 6. Menduplikasi Data Secara Aman (`salin`)
 
-### `salin(obj)` / `clone`
-Melakukan *deep memory clone* pada objek, array bersarang, map, atau bentuk (*struct*). Objek hasil kloning berdiri sendiri secara independen, sehingga mutasi pada hasil salinan tidak akan mempengaruhi objek asli.
-
-```celang
-bentuk Pengguna {
-    nama: Teks,
-    poin: Angka
-}
-
-buat p1 = Pengguna("Ahmad", 100)
-buat p2 = salin(p1) // kloning independen
-
-p2.nama = "Budi"
-p2.poin = 200
-
-cetak(p1.nama, p1.poin) // "Ahmad", 100 (tidak berubah)
-cetak(p2.nama, p2.poin) // "Budi", 200
-```
-
----
-
-## 🌊 Integrasi Bersih dengan Pipeline Operator (`|>`)
-
-Semua fungsi bawaan Celang dirancang agar selaras dengan **Pipeline Operator** (`|>`), memungkinkan penulisan alur data bergaya fungsional yang mudah dibaca:
+Membuat salinan utuh dari data yang kompleks sehingga perubahan pada salinan tidak akan mengubah data aslinya:
 
 ```celang
-buat dataMentah = "   celang itu keren   "
+buat asli = [1, 2, 3]
+buat tiruan = salin(asli)
 
-dataMentah
-    |> potong_spasi
-    |> kapitalisasi
-    |> cetak
-// Output: CELANG ITU KEREN
-
-// Mengolah koleksi angka dengan pipeline:
-rentang(1, 10)
-    |> saring(fungsi(x) { kembalikan x % 2 != 0 })
-    |> petakan(fungsi(x) { kembalikan x * 10 })
-    |> cetak
-// Output: [10, 30, 50, 70, 90]
+tiruan.tambah(4)
+cetak(asli)   // [1, 2, 3] (tetap aman!)
+cetak(tiruan) // [1, 2, 3, 4]
 ```

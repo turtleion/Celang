@@ -1,17 +1,17 @@
-# Multi-Dialek (ID, Sunda, JS, Pythonic)
+# Menulis dengan Berbagai Gaya Bahasa (Multi-Dialek)
 
-Salah satu inovasi terbesar Celang adalah pemisahan antara **Struktur Semantik Program (Universal AST)** dan **Tampilan Sintaks (Syntax Style)**. 
+Pernahkah Anda berdebat dengan teman tentang mana yang lebih enak dibaca: gaya penulisan kurung kurawal atau gaya indentasi, kata kunci Bahasa Indonesia atau Bahasa Inggris?
 
-Di bahasa pemrograman konvensional, sintaks bersifat kaku. Di Celang, Anda dapat menulis logika yang sama persis menggunakan kata kunci Bahasa Indonesia, gaya JavaScript, gaya Python, atau bahkan bahasa daerah seperti Bahasa Sunda.
+Di Celang, Anda tidak perlu lagi berdebat. Celang memisahkan antara **makna logika program** dan **gaya tulisan yang tampak di mata**. Anda bebas menulis dan membaca program yang sama dalam gaya Bahasa Indonesia, Basa Sunda, JavaScript, atau Python.
 
 ---
 
-## 1. Dialek Bawaan (*Built-in Profiles*)
+## 1. Pilihan Gaya Bahasa Bawaan
 
-Celang menyediakan profil bawaan siap pakai:
+Celang menyediakan beberapa pilihan gaya bahasa siap pakai:
 
-### A. Dialek Bahasa Indonesia (`indonesian` - Default)
-Didesain agar mudah dipahami secara alami oleh siapa saja yang berbahasa Indonesia:
+### A. Gaya Bahasa Indonesia (`indonesian` - Gaya Utama)
+Dirancang agar terasa wajar dan langsung dipahami oleh siapa saja yang berbahasa Indonesia:
 ```celang
 buat nama = "Budi"
 jika nama == "Budi" {
@@ -21,19 +21,19 @@ jika nama == "Budi" {
 }
 ```
 
-### B. Dialek JavaScript (`javascript`)
-Bagi pengembang web atau pengguna Node.js yang sudah terbiasa dengan sintaks JS modern:
+### B. Gaya JavaScript (`javascript` atau `js`)
+Bagi pembuat program web yang sudah terbiasa dengan gaya JavaScript:
 ```celang
 let nama = "Budi"
-if (nama === "Budi") {
+if (nama == "Budi") {
     print("Halo Budi!")
 } else {
     print("Halo tamu!")
 }
 ```
 
-### C. Dialek Pythonic (`pythonic`)
-Bagi pengembang yang menyukai gaya penulisan Python:
+### C. Gaya Python (`pythonic` atau `py`)
+Bagi yang menyukai gaya penulisan ringkas ala Python:
 ```celang
 nama = "Budi"
 if nama == "Budi" {
@@ -43,11 +43,11 @@ if nama == "Budi" {
 }
 ```
 
-### D. Dialek Bahasa Daerah (Contoh: `sunda`)
-Dapat dimuat dari berkas kustom seperti `sunda.style`:
+### D. Gaya Bahasa Daerah (Contoh: Basa Sunda via `sunda.style`)
+Bisa dimuat dari berkas gaya kustom:
 ```celang
-jieun ngaran = "Budi"
-lamun ngaran == "Budi" {
+jieun nama = "Budi"
+lamun nama == "Budi" {
     cetak("Sampurasun Budi!")
 } lamun henteu {
     cetak("Sampurasun semah!")
@@ -56,50 +56,45 @@ lamun ngaran == "Budi" {
 
 ---
 
-## 2. Tabel Perbandingan Kata Kunci
+## 2. Tabel Persamaan Kata Kunci
 
-| Konsep | Indonesia (`indonesian`) | JavaScript (`javascript`) | Pythonic (`pythonic`) | Sunda (`sunda.style`) |
+Berikut perbandingan kata kunci di berbagai gaya:
+
+| Maksud Perintah | Bahasa Indonesia | JavaScript | Pythonic | Basa Sunda |
 | :--- | :--- | :--- | :--- | :--- |
-| Deklarasi Variabel | `buat` | `let` / `var` | *(langsung)* | `jieun` |
-| Konstanta | `konstanta` | `const` | `const` | `tetep` |
-| Percabangan | `jika` | `if` | `if` | `lamun` |
-| Kondisi Kedua | `selain jika` | `else if` | `elif` | `atawa lamun` |
-| Kondisi Terakhir | `selain` | `else` | `else` | `lamun henteu` |
-| Perulangan While | `selama` | `while` | `while` | `salami` |
-| Perulangan For | `untuk ... dalam` | `for ... of` | `for ... in` | `pikeun ... dina` |
-| Fungsi | `fungsi` | `function` | `def` | `fungsi` |
-| Kembalian | `kembalikan` | `return` | `return` | `balikkeun` |
-| Asinkron | `sambil` | `async` | `async` | `bari` |
-| Paralel | `bersamaan` | `parallel` | `parallel` | `babarengan` |
-| Nilai Boolean | `benar`, `salah` | `true`, `false` | `True`, `False` | `bener`, `salah` |
-| Nilai Kosong | `kosong` | `null` | `None` | `kosong` |
+| **Menyiapkan Variabel** | `buat` | `let` / `var` | *(langsung nama)* | `jieun` |
+| **Nilai Tetap (Konstanta)** | `konstanta` | `const` | `const` | `tetep` |
+| **Pemeriksaan Kondisi** | `jika` | `if` | `if` | `lamun` |
+| **Pilihan Kedua** | `selain jika` | `else if` | `elif` | `atawa lamun` |
+| **Pilihan Terakhir** | `selain` | `else` | `else` | `lamun henteu` |
+| **Perulangan Selama** | `selama` | `while` | `while` | `salami` |
+| **Perulangan Daftar** | `untuk ... dalam` | `for ... of` | `for ... in` | `pikeun ... dina` |
+| **Membuat Rumus/Fungsi** | `fungsi` | `function` | `def` | `fungsi` |
+| **Mengembalikan Hasil** | `kembalikan` | `return` | `return` | `balikkeun` |
+| **Tugas Latar Belakang** | `sambil` | `async` | `async` | `bari` |
+| **Tugas Serentak** | `bersamaan` | `parallel` | `parallel` | `babarengan` |
+| **Nilai Ya / Benar** | `benar` | `true` | `True` | `bener` |
+| **Nilai Tidak / Salah** | `salah` | `false` | `False` | `salah` |
+| **Nilai Kosong** | `kosong` | `null` | `None` | `kosong` |
 
 ---
 
-## 3. Menjalankan Kode dengan Dialek Tertentu
+## 3. Mengubah Tampilan Kode Antar-Gaya (`celang format`)
 
-Anda dapat menginstruksikan Celang untuk mem-parsing kode dengan style tertentu melalui bendera `--style`:
-
-```bash
-# Menjalankan berkas bertema JavaScript
-celang run --style javascript kode_web.ce
-
-# Menjalankan berkas bertema Sunda dengan berkas style eksternal
-celang run --style examples/sunda.style program_sunda.ce
-```
-
----
-
-## 4. Konversi Otomatis Antar-Gaya (`celang format`)
-
-Karena Celang mengonversi kode ke Universal AST (U-AST), Celang dapat **menerjemahkan gaya kode secara instan dan tanpa kehilangan logika**:
+Anda dapat menyuruh Celang menerjemahkan tampilan berkas kode ke gaya lain secara instan tanpa khawatir merusak alur perhitungan:
 
 ```bash
-# Mengubah kode bergaya JavaScript ke Bahasa Indonesia murni
-celang format --to indonesian app_js.ce -w
+# Menampilkan kode dalam gaya Python di layar:
+./celang format program.ce --style=pythonic
 
-# Mengubah kode Bahasa Indonesia ke dialek Sunda
-celang format --to examples/sunda.style program.ce -o program_sunda.ce
+# Menampilkan kode dalam gaya JavaScript di layar:
+./celang format program.ce --style=javascript
+
+# Menampilkan kode dalam dialek Sunda menggunakan berkas gaya kustom:
+./celang format program.ce --style=examples/sunda.style
+
+# Langsung mengubah isi berkas secara permanen (tambahkan opsi -w):
+./celang format -w program.ce --style=javascript
 ```
 
-Hal ini memungkinkan kolaborasi tim di mana setiap pengembang dapat membaca atau menulis dalam dialek yang paling nyaman bagi mereka!
+Dengan fitur ini, seluruh anggota tim dapat bekerja sama dengan tenang, membaca kode dalam gaya yang paling mereka sukai, dan tetap menghasilkan program yang sama persis!

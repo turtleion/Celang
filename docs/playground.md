@@ -1,14 +1,14 @@
 ---
 layout: doc
-title: Live Web Playground
-description: Coba dan eksekusi kode Celang secara langsung di browser Anda menggunakan WebAssembly (WASM).
+title: Mencoba Langsung di Peramban Web (Playground)
+description: Coba dan jalankan kode Celang secara langsung di peramban web Anda tanpa perlu memasang aplikasi apa pun.
 ---
 
-# 🎮 WebAssembly Interactive Playground
+# 🎮 Mencoba Langsung di Peramban Web (Playground)
 
-Coba dan jalankan kode Celang secara instan langsung di peramban web (*browser*) Anda tanpa perlu menginstal compiler atau dependensi apa pun! 
+Anda dapat mencoba dan merasakan kemudahan menulis kode Celang langsung di peramban web (*browser*) Anda sekarang juga, tanpa perlu memasang aplikasi atau melakukan pengaturan apa pun di komputer Anda!
 
-Mesin eksekusi di bawah ini dijalankan sepenuhnya di sisi klien (*client-side*) menggunakan biner **WebAssembly (WASM)** yang dikompilasi dari kernel Go Celang, mendukung mode **Bytecode VM** berkecepatan tinggi maupun mode **Tree-Walking AST**.
+Halaman ini menjalankan Celang sepenuhnya di dalam peramban web lokal Anda. Seluruh perhitungan diproses langsung di perangkat Anda tanpa mengirimkan kode atau data apa pun ke server luar.
 
 ---
 
@@ -18,9 +18,9 @@ Mesin eksekusi di bawah ini dijalankan sepenuhnya di sisi klien (*client-side*) 
 
 ---
 
-## 💡 Fitur yang Didukung di Browser
+## 💡 Kemudahan yang Tersedia di Halaman Ini
 
-- **Pilihan Contoh Kode Bawaan**: Uji coba Halo Dunia, Variabel Time-Travel, Bentuk & Metode, Pipeline Operator, hingga Destrukturisasi.
-- **Pilihan Mesin Ganda**: Beralih antara **Bytecode VM** (linear stack-based, performa tinggi) dan **AST Evaluator**.
-- **Indikator Benchmark Real-Time**: Melihat waktu eksekusi langsung dalam milidetik (ms).
-- **Keamanan Penuh**: Seluruh komputasi berjalan di dalam sandbox WebAssembly lokal di browser Anda tanpa mengirim data ke server luar.
+- **Contoh Program Siap Coba**: Anda bisa langsung memilih contoh program yang sudah disiapkan, seperti program salam, penelusuran riwayat variabel (*time-travel*), bentuk data kustom, hingga pengolahan data bertahap.
+- **Pilihan Mesin Penggerak**: Anda dapat melihat perbedaan saat program dijalankan menggunakan **Mesin Virtual Cepat** (pilihan utama) maupun **Penafsir Logika Langsung**.
+- **Pengukur Waktu Nyata**: Melihat berapa milidetik yang dibutuhkan komputer Anda untuk menyelesaikan perhitungan.
+- **Aman dan Privat**: Seluruh kode berjalan di dalam lingkungan tertutup di peramban Anda sendiri.

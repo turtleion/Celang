@@ -1,113 +1,83 @@
-# 🏹 Fungsi Ringkas Panah (Arrow Functions `=>`)
+# Rumus Cepat Panah (`=>`)
 
-Celang menyediakan sintaks **Fungsi Panah (`=>`)** ala JavaScript/TypeScript modern yang sangat ringkas untuk membuat fungsi anonim (*lambda*) tanpa perlu menulis kata kunci `fungsi { ... }`.
+Terkadang kita hanya ingin membuat rumus perhitungan sederhana tanpa perlu mengetik kata `fungsi`, kurung kurawal, dan kata `kembalikan` yang panjang.
+
+Celang menyediakan tanda **Panah Ringkas (`=>`)** untuk menulis rumus kecil dalam satu tarikan napas.
 
 ---
 
-## 💡 Mengapa Menggunakan Fungsi Panah?
+## 💡 Perbandingan Menulis Rumus
 
-Bandingkan penulisan fungsi konvensional dengan fungsi panah:
+Bandingkan dua cara menulis rumus pengali dua berikut:
 
 ```celang
-// Gaya konvensional:
-buat kaliDuaLama = fungsi(x) { kembalikan x * 2 }
+// Cara biasa yang panjang:
+buat kaliDuaPanjang = fungsi(x) { kembalikan x * 2 }
 
-// Gaya panah ringkas:
+// Cara cepat dengan tanda panah:
 buat kaliDua = x => x * 2
 ```
 
-Lebih bersih, ekspresif, dan hemat baris kode!
+Tanda panah `=>` artinya: *"terima masukan di sebelah kiri, lalu langsung berikan hasil perhitungan di sebelah kanan"*. Lebih ringkas, bersih, dan hemat waktu!
 
 ---
 
-## 1. Variasi Bentuk Sintaks
+## 1. Berbagai Bentuk Penulisan
 
-### Parameter Tunggal (Tanpa Tanda Kurung)
-Jika fungsi hanya membutuhkan satu parameter, Anda tidak perlu menuliskan tanda kurung:
+### Satu Masukan (Tanpa Kurung)
+Jika rumus hanya menerima satu nilai, Anda tidak perlu memakai tanda kurung:
 
 ```celang
 buat kuadrat = x => x * x
 cetak(kuadrat(7)) // 49
 ```
 
-### Banyak Parameter (Dengan Tanda Kurung)
-Jika ada dua parameter atau lebih, bungkus daftar parameter di dalam `( ... )`:
+### Dua Masukan atau Lebih (Dengan Kurung)
+Jika ada dua masukan atau lebih, kumpulkan di dalam tanda kurung `( ... )`:
 
 ```celang
 buat tambah = (a, b) => a + b
 buat hitungLuas = (panjang, lebar) => panjang * lebar
 
-cetak(tambah(10, 25))       // 35
-cetak(hitungLuas(5, 4))     // 20
+cetak(tambah(10, 25))   // 35
+cetak(hitungLuas(5, 4)) // 20
 ```
 
-### Tanpa Parameter
-Gunakan tanda kurung kosong `()` jika fungsi tidak menerima argumen:
+### Tanpa Masukan
+Jika rumus hanya menghasilkan salam tetap tanpa perlu masukan:
 
 ```celang
-buat salam = () => "Halo, selamat datang di Celang!"
-cetak(salam())
+buat salam = () => "Selamat pagi, kawan!"
+cetak(salam()) // "Selamat pagi, kawan!"
 ```
 
-### Parameter dengan Tipe Data Eksplisit
-Anda tetap bisa menentukan tipe data parameter untuk keamanan kode:
+### Rumus Lebih dari Satu Langkah (`{ ... }`)
+Jika Anda membutuhkan beberapa langkah sebelum memberikan hasil akhir, gunakan kurung kurawal `{ ... }` dan kata `kembalikan`:
 
 ```celang
-buat tambahSatu = (x: Angka) => x + 1
-cetak(tambahSatu(99)) // 100
-```
-
-### Tubuh Fungsi Berbentuk Blok (`{ ... }`)
-Jika fungsi membutuhkan beberapa langkah pemrosesan atau baris jamak, bungkus tubuh fungsi dengan kurung kurawal `{ ... }`:
-
-```celang
-buat sapaNama = nama => {
-    buat pesan = "Halo, " + nama + "!"
-    cetak("Mencatat ke log...")
-    kembalikan pesan
+buat sapaPengguna = nama => {
+    buat ucapan = "Halo, " + nama + "!"
+    cetak("Mencatat kunjungan...")
+    kembalikan ucapan
 }
 
-cetak(sapaNama("Andi"))
+cetak(sapaPengguna("Andi"))
 ```
 
 ---
 
-## 2. Sangat Cocok untuk Functional Programming & Pipeline
+## 2. Sangat Nyaman untuk Menyaring dan Mengubah Data
 
-Kekuatan terbesar fungsi panah terasa saat dikombinasikan dengan fungsi koleksi seperti `saring()` (*filter*), `petakan()` (*map*), dan **Pipeline Operator (`|>`)**:
+Rumus panah ini terasa paling menyenangkan saat dipadukan dengan alat penyaring data (`saring`) dan alat pengubah data (`petakan`):
 
-### Pemrosesan Koleksi Ringkas
 ```celang
 buat nilaiSiswa = [45, 78, 90, 62, 85, 30]
 
-// Ambil nilai yang lulus (>= 60), lalu tambahkan bonus 5 poin
-buat nilaiLulusBonus = nilaiSiswa
+// Ambil nilai yang lulus (>= 60), lalu tambahkan nilai bonus 5 poin:
+buat nilaiLulus = nilaiSiswa
     |> saring(skor => skor >= 60)
     |> petakan(skor => skor + 5)
 
-cetak(nilaiLulusBonus) // [83, 95, 67, 90]
+cetak(nilaiLulus) // [83, 95, 67, 90]
 ```
-
-### Menyaring Objek Kompleks
-```celang
-buat daftarProduk = [
-    { "nama": "Buku", "harga": 25000 },
-    { "nama": "Laptop", "harga": 8000000 },
-    { "nama": "Pena", "harga": 5000 }
-]
-
-buat produkMurah = daftarProduk |> saring(item => item.harga < 50000)
-cetak(produkMurah)
-```
-
----
-
-## 🎯 Rangkuman Bentuk Sintaks
-
-| Bentuk Sintaks | Penjelasan |
-| :--- | :--- |
-| `x => x * 2` | Parameter tunggal, satu ekspresi otomatis dikembalikan |
-| `(a, b) => a + b` | Banyak parameter |
-| `() => "selesai"` | Tanpa parameter |
-| `(a: Angka, b: Angka) => a + b` | Parameter bertipe data eksplisit |
-| `x => { baris1; baris2; }` | Tubuh fungsi multi-baris |
+Kodenya terbaca sangat alami: *saring mereka yang skornya 60 ke atas, lalu petakan masing-masing skor dengan menambahkan 5 poin*.

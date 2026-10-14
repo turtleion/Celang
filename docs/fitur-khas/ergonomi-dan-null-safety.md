@@ -1,131 +1,110 @@
-# Ergonomi & Null Safety di Celang
+# Keamanan Nilai Kosong & Kenyamanan Menulis
 
-Celang mengusung filosofi *human-centric*: setiap operasi yang sering digunakan dibuat sejelas dan senyaman mungkin bagi manusia tanpa mengorbankan keamanan sistem.
+Salah satu penyebab paling sering sebuah program komputer mendadak macet adalah **mencari data yang ternyata kosong**. 
 
-Fitur-fitur ergonomi modern berikut hadir tanpa simbol-simbol kriptik yang membingungkan:
-1. **Navigasi Aman (*Null Safety*):** `mungkin`
-2. **Nilai Cadangan (*Null Coalescing*):** `kalau kosong` (atau `??`)
-3. **Pembersihan Otomatis (*Defer*):** `saat_selesai`
-4. **Sintaks Rentang & Pemotongan (*Range & Slicing*):** `..`
+Celang menyediakan beberapa jaring pengaman alami agar kode Anda tetap berjalan tenang dan tidak mudah terhenti:
+
+1. **Pemeriksaan Aman:** `mungkin`
+2. **Nilai Cadangan:** `kalau kosong` (atau `??`)
+3. **Pembersihan Otomatis:** `saat_selesai`
+4. **Rentang Angka & Pemotongan:** `..`
 
 ---
 
-## 1. Navigasi Aman dengan `mungkin`
+## 1. Menjaga Agar Tidak Macet dengan `mungkin`
 
-Dalam bahasa seperti JavaScript, C#, atau Kotlin, pengecekan properti bersarang menggunakan simbol `?.` (*optional chaining*). Di Celang, Anda dapat menulisnya secara ekspresif menggunakan kata kunci `mungkin`:
-
+Bayangkan Anda ingin mencari nama kota dari data pengguna:
 ```celang
 buat kota = mungkin pengguna.profil.alamat.kota
 ```
 
-### Cara Kerja:
-* Jika salah satu bagian dari rantai objek (`pengguna`, `profil`, atau `alamat`) bernilai `kosong` (`nihil` / `null`), Celang **tidak akan melempar error / crash**.
-* Evaluasi rantai akan langsung berhenti dan mengembalikan nilai `kosong`.
-* Jika seluruh rantai valid, nilai properti tujuan akan dikembalikan seperti biasa.
+### Bagaimana Cara Kerjanya?
+* Jika data `pengguna`, `profil`, atau `alamat` ternyata belum diisi atau bernilai kosong, Celang **tidak akan macet atau mengeluarkan pesan galat**.
+* Celang akan berhenti mencari dengan tenang dan memberikan hasil `kosong` (null).
+* Jika semua datanya lengkap, nama kota akan diambil seperti biasa.
 
-> **Catatan:** Operator singkat `?.` (contoh: `pengguna?.profil?.kota`) juga tetap didukung bagi yang menyukai penulisan cepat.
+> **Tips Singkat:** Anda juga bisa menggunakan tanda `?.` (contoh: `pengguna?.profil?.kota`) jika menyukai penulisan cepat.
 
 ---
 
-## 2. Nilai Cadangan dengan `kalau kosong`
+## 2. Menyiapkan Nilai Cadangan dengan `kalau kosong`
 
-Operasi ini menentukan nilai pengganti (*fallback*) jika ekspresi di sebelah kiri bernilai `kosong`.
+Jika data yang dicari ternyata kosong, Anda bisa langsung menyiapkan jawaban pengganti:
 
 ```celang
-buat nama_tampilan = input_nama kalau kosong "Anonim"
-buat port = konfigurasi.port kalau kosong 8080
+buat namaTampilan = inputNama kalau kosong "Tamu Anonim"
+buat nomorPort = konfigurasi.port kalau kosong 8080
 ```
 
 ### Menggabungkan `mungkin` dan `kalau kosong`:
-Keduanya berpadu secara sangat alami seperti kalimat bahasa Indonesia biasa:
+Keduanya bisa dibaca seperti kalimat bahasa Indonesia biasa yang sangat wajar:
 
 ```celang
 buat kota = mungkin pengguna.profil.alamat.kota kalau kosong "Jakarta"
 ```
-Jika `pengguna` tidak ada atau alamat belum diisi, variabel `kota` langsung berisi `"Jakarta"`!
+Artinya: *Ambil kota jika ada, tetapi kalau kosong, gunakan "Jakarta".*
 
-> **Penting Mengenai Boolean dan Angka Nol:**  
-> Nilai boolean `salah` (false) dan angka `0` **bukanlah** nilai kosong. Jadi:
-> ```celang
-> buat aktif = salah kalau kosong benar   // Hasil tetap: salah
-> buat skor = 0 kalau kosong 100          // Hasil tetap: 0
-> ```
-> Nilai cadangan hanya dipicu jika nilai sebelah kiri benar-benar bernilai `kosong` / `null`.
-
-> **Catatan:** Operator simbol `??` (contoh: `a ?? b`) juga didukung sebagai alternatif ringkas.
+> **Catatan Penting:**  
+> Nilai `salah` (false) dan angka `0` bukanlah nilai kosong! Nilai cadangan hanya akan dipakai jika datanya benar-benar tidak ada (`kosong` / null).
 
 ---
 
-## 3. Pembersihan Otomatis dengan `saat_selesai` (*Defer*)
+## 3. Pembersihan Otomatis dengan `saat_selesai`
 
-Terinspirasi dari fitur `defer` di bahasa Go, Celang menyediakan kata kunci `saat_selesai`. Kata kunci ini menjadwalkan suatu perintah atau pembersihan sumber daya (*cleanup*) agar dieksekusi **tepat sebelum fungsi selesai**:
+Terkadang kita perlu memastikan bahwa suatu tindakan perapian selalu dikerjakan sebelum sebuah fungsi selesai (misalnya menutup dokumen atau melepaskan sambungan):
 
 ```celang
-fungsi olah_berkas(nama_berkas) {
-    buat berkas = buka_berkas(nama_berkas)
-    saat_selesai tutup_berkas(berkas) // DIJAMIN dieksekusi sebelum fungsi keluar
+fungsi bacaCatatan(namaBerkas) {
+    buat dokumen = bukaBerkas(namaBerkas)
+    saat_selesai tutupBerkas(dokumen) // DIJAMIN selalu dijalankan sebelum fungsi selesai!
 
-    jika berkas_kosong(berkas) {
-        kembalikan kosong // tutup_berkas tetap terpanggil!
+    jika dokumenKosong(dokumen) {
+        kembalikan kosong // dokumen tetap ditutup dengan aman!
     }
 
-    kembalikan proses(berkas)
+    kembalikan olahIsi(dokumen)
 }
 ```
 
-### Urutan Eksekusi (LIFO - Last In, First Out)
-Jika ada lebih dari satu `saat_selesai` dalam satu fungsi, mereka akan dieksekusi dalam urutan terbalik:
-
-```celang
-fungsi urutan() {
-    saat_selesai cetak("Langkah 3")
-    saat_selesai cetak("Langkah 2")
-    cetak("Langkah 1")
-}
-
-urutan()
-// Output:
-// Langkah 1
-// Langkah 2
-// Langkah 3
-```
+### Urutan Pelaksanaan
+Jika ada lebih dari satu perintah `saat_selesai`, perintah tersebut akan dijalankan dengan urutan terbalik (yang terakhir didaftarkan akan dikerjakan lebih dulu, seperti menumpuk piring lalu mengambil piring teratas terlebih dahulu).
 
 ---
 
-## 4. Sintaks Rentang (`..`) & Pemotongan Koleksi (*Slicing*)
+## 4. Rentang Angka & Memotong Bagian (`..`)
 
-### A. Rentang Angka Native (`awal..akhir`)
-Anda dapat membuat array angka berurutan secara instan menggunakan operator rentang `..`:
+### A. Membuat Deretan Angka Cepat (`awal..akhir`)
+Anda dapat membuat urutan angka langsung menggunakan tanda dua titik `..`:
 
 ```celang
 buat angka = 1..5
 cetak(angka) // [1, 2, 3, 4, 5]
 ```
 
-Dapat langsung digunakan pada perulangan `untuk ... dalam`:
+Dapat langsung dipadukan dengan perulangan:
 ```celang
 untuk i dalam 1..5 {
-    cetak("Iterasi ke-", i)
+    cetak("Langkah ke-", i)
 }
 ```
 
-### B. Pemotongan Array (*Array Slicing*)
-Mengambil sebagian elemen array menggunakan notasi indeks rentang:
+### B. Mengambil Sebagian Isi Daftar
+Anda dapat memotong sebagian daftar dengan menyebutkan rentangnya:
 
 ```celang
 buat data = [10, 20, 30, 40, 50]
 
-buat tengah = data[1..4]  // Ambil indeks 1 sampai sebelum 4 -> [20, 30, 40]
-buat awalan = data[..2]   // Dari awal sampai indeks 2 -> [10, 20]
-buat akhiran = data[3..]  // Dari indeks 3 sampai akhir -> [40, 50]
+buat tengah = data[1..4]  // Mengambil dari nomor 1 sampai sebelum 4 -> [20, 30, 40]
+buat awalan = data[..2]   // Dari awal sampai nomor 2 -> [10, 20]
+buat akhiran = data[3..]  // Dari nomor 3 sampai habis -> [40, 50]
 ```
 
-### C. Pemotongan Teks (*String Slicing*)
-Berlaku juga untuk tipe data teks (`Teks`):
+### C. Mengambil Sebagian Kata dalam Kalimat
+Cara yang sama juga berlaku untuk kalimat teks:
 
 ```celang
 buat nama = "Bahasa Celang"
-buat sub = nama[7..13] // "Celang"
-cetak(sub)
+buat cuplikan = nama[7..13] // "Celang"
+cetak(cuplikan)
 ```
-Celang menangani pemotongan string berbasis karakter Unicode (*rune-safe*), sehingga karakter multi-byte dan emoji dipotong dengan benar tanpa merusak byte string.
+Celang menangani pemotongan teks secara cerdas, sehingga simbol dan karakter emoji tetap terpotong rapi tanpa merusak susunan hurufnya.

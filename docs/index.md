@@ -3,8 +3,8 @@ layout: home
 
 hero:
   name: "Celang"
-  text: "Bahasa Pemrograman Human-Centric & Syntax-Styling"
-  tagline: "Tulis kode dalam gayamu, nikmati kompilasi Bytecode VM secepat kilat, dan jelajahi riwayat variabel dengan Time-Travel."
+  text: "Bahasa Pemrograman Ramah & Fleksibel"
+  tagline: "Tulis kode dalam bahasa yang Anda pahami, nikmati eksekusi cepat, dan telusuri riwayat variabel dengan mudah."
   image:
     src: /logo.png
     alt: Celang Logo
@@ -13,31 +13,31 @@ hero:
       text: 🚀 Mulai Sekarang
       link: /panduan/mulai-cepat
     - theme: brand
-      text: 🎮 Buka Playground Web
+      text: 🎮 Coba di Browser (Playground)
       link: /playground
     - theme: alt
-      text: ⚡ Coba Time-Travel
+      text: ⚡ Jelajahi Riwayat Variabel
       link: /fitur-khas/time-travel
 
 features:
   - icon: 🎨
-    title: Syntax Styling Multi-Dialek
-    details: Satu logika U-AST dapat dibaca dan diformat bebas dalam gaya Indonesia, Sunda, JavaScript, atau Pythonic tanpa merusak kode.
+    title: Gaya Bahasa Fleksibel
+    details: Satu program dapat dibaca dan diubah tampilannya dengan bebas ke gaya Bahasa Indonesia, Basa Sunda, JavaScript, atau Python tanpa merusak kode.
   - icon: ⏳
-    title: Variabel Time-Travel (O(1) Memori)
-    details: Lacak nilai variabel masa lalu secara instan via .sebelumnya, .awal, dan .histori dengan bounded ring-buffer tanpa memory leak.
+    title: Variabel yang Mengingat Masa Lalu
+    details: Mengetahui nilai sebelumnya, nilai awal, dan riwayat perubahan variabel secara instan, tetap ringan dan aman untuk komputer Anda.
   - icon: ⚡
-    title: Bytecode VM Terintegrasi
-    details: Berjalan secara default di Virtual Machine stack-based berkinerja tinggi, 2x lebih cepat dan 47% lebih hemat memori dibanding tree-walk.
+    title: Eksekusi Cepat Tanpa Repot
+    details: Kode langsung dijalankan oleh mesin virtual bawaan berkecepatan tinggi tanpa perlu pengaturan tambahan yang rumit.
   - icon: 🧩
-    title: Bentuk (Struct) & Destrukturisasi
-    details: Pemodelan data modern dengan method berorientasi objek, destrukturisasi array & map, serta interpolasi teks yang intuitif.
+    title: Bentuk Data & Kemudahan Menulis
+    details: Kelompokkan data dengan rapi, bongkar isi daftar secara instan, dan sisipkan nilai ke dalam kalimat dengan sangat alami.
   - icon: 🌐
-    title: Pustaka Standar Dwibasa
-    details: Modul bawaan matematika, teks, waktu, berkas, dan JSON dapat dipanggil fleksibel menggunakan istilah lokal maupun bahasa internasional.
+    title: Pustaka Alat Dwibasa
+    details: Alat bantu matematika, pengolah teks, penunjuk waktu, pengelola berkas, dan pertukaran data JSON siap pakai dalam bahasa lokal maupun internasional.
   - icon: 💖
-    title: Diagnostik Empati Manusiawi
-    details: Kesalahan kompilasi dan runtime disajikan dengan saran solusi yang ramah dan menuntun, bukan sekadar stack-trace membingungkan.
+    title: Petunjuk Kesalahan yang Ramah
+    details: Saat terjadi kesalahan, aplikasi menyajikan pesan yang menuntun dengan saran solusi nyata, bukan kode acak yang membingungkan.
 ---
 
 ## Sekilas Kode Celang
@@ -45,7 +45,7 @@ features:
 ::: code-group
 
 ```celang [🇮🇩 Gaya Indonesia]
-// Bentuk data dan Time-Travel
+// Bentuk data dan Riwayat Nilai
 buat gaji = 5000000
 gaji = 7500000
 gaji = 9500000
@@ -55,17 +55,17 @@ cetak("Gaji sebelumnya :", gaji.sebelumnya)
 cetak("Gaji mula-mula  :", gaji.awal)
 cetak("Histori gaji    :", gaji.histori)
 
-// Pipeline Pemrosesan
+// Penyaluran Proses Bertahap
 buat angka = [1, 2, 3, 4, 5, 6]
 buat hasil = angka
     |> saring(fungsi(x) { kembalikan x % 2 == 0 })
     |> petakan(fungsi(x) { kembalikan x * 10 })
 
-cetak("Hasil pipeline  :", hasil) // [20, 40, 60]
+cetak("Hasil akhir     :", hasil) // [20, 40, 60]
 ```
 
 ```celang [🌾 Gaya Sunda]
-// Wangun data sareng Time-Travel
+// Wangun data sareng Riwayat Nilai
 jieun gaji = 5000000
 gaji = 7500000
 gaji = 9500000

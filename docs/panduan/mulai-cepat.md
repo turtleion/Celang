@@ -1,70 +1,66 @@
-# Mulai Cepat & Instalasi
+# Panduan Mulai Cepat & Langkah Pertama
 
-Panduan ini akan membantumu memasang runtime Celang dan menjalankan program pertamamu dalam hitungan menit.
+Panduan ini akan membantu Anda memasang Celang di komputer Anda dan menjalankan program pertama dalam beberapa menit.
 
 ---
 
-## 🛠️ Prasyarat
+## 🛠️ Persiapan Awal
 
-Untuk membangun runtime Celang dari kode sumber:
-- **Go** versi 1.20 atau yang lebih baru.
+Jika Anda ingin membuat aplikasi Celang langsung dari kode sumbernya, pastikan komputer Anda telah memiliki:
+- **Go** (versi 1.20 atau yang lebih baru).
 - Sistem Operasi: Linux, macOS, atau Windows.
 
+> **Catatan:** Jika Anda belum ingin memasang apa pun di komputer saat ini, Anda bisa langsung mencoba Celang di peramban web Anda melalui menu [Playground](/playground).
+
 ---
 
-## 📥 Pemasangan (Build dari Sumber)
+## 📥 Cara Memasang di Komputer
 
-1. **Kloning repositori**:
+1. **Unduh kode proyek**:
    ```bash
    git clone https://github.com/celang/celang.git
    cd celang
    ```
 
-2. **Kompilasi binary runtime**:
+2. **Bangun aplikasi Celang**:
    ```bash
    go build -o celang ./cmd/celang
    ```
 
-3. *(Opsional)* **Pindahkan binary ke PATH sistem**:
+3. *(Opsional)* **Pindahkan ke folder sistem agar bisa dipanggil dari mana saja**:
    ```bash
-   # Di Linux / macOS:
+   # Di Linux atau macOS:
    sudo mv celang /usr/local/bin/
    ```
 
-4. **Verifikasi instalasi**:
+4. **Periksa hasil pemasangan**:
    ```bash
-   celang versi
+   ./celang versi
    ```
-   *Output:*
-   ```text
-   🌟 Celang Runtime v1.0.0 (linux/amd64)
-      Sistem Bahasa Pemrograman Human-Centric & Syntax-Styling
-      Bytecode Compiler & Virtual Machine (VM) Terintegrasi
-      Lisensi: MIT
-   ```
+   Komputer akan menampilkan pesan sambutan dan nomor versi Celang yang aktif.
 
 ---
 
 ## 🚀 Menjalankan Program Pertama
 
-1. Buat berkas baru bernama `halo.ce`:
+1. Buat berkas baru bernama `halo.ce` di folder Anda:
    ```celang
    // halo.ce
    buat salam = "Halo, Dunia!"
    cetak(salam)
 
-   buat nama = ["Budi", "Siti", "Andi"]
-   untuk orang dalam nama {
+   buat sahabat = ["Budi", "Siti", "Andi"]
+   untuk orang dalam sahabat {
        cetak("Selamat datang,", orang)
    }
    ```
 
-2. Jalankan program dengan perintah `run`:
+2. Jalankan program Anda dengan perintah `run`:
    ```bash
-   celang run halo.ce
+   ./celang run halo.ce
    ```
 
-   *Output:*
+3. Hasil yang muncul di layar:
    ```text
    Halo, Dunia!
    Selamat datang, Budi
@@ -74,18 +70,18 @@ Untuk membangun runtime Celang dari kode sumber:
 
 ---
 
-## ⚡ Mode Eksekusi
+## ⚡ Pilihan Cara Menjalankan
 
-Secara *default*, perintah `celang run` mengeksekusi program menggunakan **Bytecode Virtual Machine (VM)** berkecepatan tinggi.
+Secara bawaan (*default*), perintah `./celang run` langsung menjalankan program menggunakan mesin virtual cepat.
 
-Jika kamu ingin membandingkannya dengan mesin AST interpreter lama untuk keperluan analisis/debug:
+Jika di kemudian hari Anda ingin membandingkannya dengan cara kerja penafsir lama (misalnya saat menganalisis alur kode):
 ```bash
-# Menjalankan via AST Evaluator lama (legacy tree-walk)
-celang run halo.ce --ast
+# Menjalankan melalui penafsir pohon logika langsung (AST Evaluator):
+./celang run halo.ce --ast
 ```
 
-Untuk membongkar instruksi bytecode di balik programmu:
+Jika Anda penasaran dan ingin melihat bagaimana komputer menyusun instruksi rakitan di balik program Anda:
 ```bash
-# Melihat kode rakitan bytecode (Disassembler)
-celang disasm halo.ce
+# Melihat daftar instruksi mesin rakitan:
+./celang disasm halo.ce
 ```

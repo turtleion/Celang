@@ -1,17 +1,19 @@
-# Pipeline Operator (`|>`)
+# Penyaluran Data Berantai (`|>`)
 
-Operator pipeline `|>` mengalirkan hasil ekspresi di sebelah kiri sebagai argumen pertama ke fungsi di sebelah kanan. Fitur ini menghilangkan sarang tanda kurung yang rumit (*nested calls*) dan membuat alur data mudah dibaca dari atas ke bawah.
-
----
-
-## 🌊 Contoh Pemrosesan String
-
-Tanpa pipeline:
+Ketika Anda mengolah data melalui beberapa tahap secara berturut-turut, menulis fungsi di dalam fungsi yang bertumpuk-tumpuk sering kali membuat kode sulit dibaca karena harus dibaca dari tengah ke luar:
 ```celang
+// Sulit dibaca karena bertumpuk dari dalam ke luar:
 buat hasil = kapitalisasi(potong_spasi("  belajar celang  "))
 ```
 
-Dengan pipeline:
+Tanda penyaluran berantai `|>` memecahkan masalah ini. Tanda ini mengalirkan hasil perhitungan dari langkah sebelumnya langsung ke langkah berikutnya, seperti air mengalir di pipa atau ban berjalan di pabrik.
+
+---
+
+## 🌊 Contoh Memoles Teks
+
+Dengan tanda `|>`, Anda dapat membaca alur kerja secara wajar dari atas ke bawah:
+
 ```celang
 buat hasil = "  belajar celang  "
     |> potong_spasi()
@@ -20,36 +22,41 @@ buat hasil = "  belajar celang  "
 cetak(hasil) // "BELAJAR CELANG"
 ```
 
+1. Mulai dari teks mentah `"  belajar celang  "`.
+2. Alirkan ke `potong_spasi()` untuk membuang spasi di ujungnya.
+3. Alirkan hasilnya ke `kapitalisasi()` untuk mengubah semua huruf menjadi besar.
+
 ---
 
-## 🔄 Pemrosesan Koleksi (Filter & Map)
+## 🔄 Mengolah Daftar Angka Bertahap
 
-Pipeline sangat bertenaga saat dikombinasikan dengan fungsi transformasi array tingkat tinggi seperti `saring` (*filter*) dan `petakan` (*map*):
+Penyaluran ini sangat nyaman dipadukan dengan alat penyaring (`saring`) dan pemeta (`petakan`):
 
 ```celang
-buat angka = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+buat deret = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
-buat hasil = angka
-    |> saring(fungsi(x) { kembalikan x % 2 == 0 })  // Ambil genap: [2, 4, 6, 8, 10]
-    |> petakan(fungsi(x) { kembalikan x * 10 })     // Kalikan 10: [20, 40, 60, 80, 100]
+buat hasil = deret
+    |> saring(fungsi(x) => x % 2 == 0)  // Ambil hanya angka genap: [2, 4, 6, 8, 10]
+    |> petakan(fungsi(x) => x * 10)     // Kalikan masing-masing dengan 10
 
 cetak(hasil) // [20, 40, 60, 80, 100]
 ```
 
 ---
 
-## 🏷️ Fungsi dengan Argumen Tambahan
+## 🏷️ Jika Fungsi Membutuhkan Keterangan Tambahan
 
-Jika fungsi tujuan menerima lebih dari satu argumen, nilai dari sebelah kiri pipa selalu disuntikkan sebagai **argumen pertama**:
+Jika fungsi tujuan memerlukan lebih dari satu masukan, nilai yang dialirkan dari pipa sebelah kiri akan otomatis menjadi **masukan yang pertama**:
 
 ```celang
-fungsi bungkus_tag(isi, tag) {
+fungsi bungkusTag(isi, tag) {
     kembalikan "<" + tag + ">" + isi + "</" + tag + ">"
 }
 
-buat html = "Selamat Datang"
-    |> bungkus_tag("b")
-    |> bungkus_tag("div")
+buat teksBungkus = "Selamat Datang"
+    |> bungkusTag("b")
+    |> bungkusTag("div")
 
-cetak(html) // <div><b>Selamat Datang</b></div>
+cetak(teksBungkus) // <div><b>Selamat Datang</b></div>
 ```
+Kalimat `"Selamat Datang"` masuk sebagai `isi`, sedangkan `"b"` menjadi `tag`-nya. Hasilnya kemudian dialirkan lagi ke langkah berikutnya.

@@ -1,74 +1,74 @@
-# Modul Teks (`teks` / `strings`)
+# Alat Bantu Pengolah Teks (`teks` / `strings`)
 
-Modul `teks` (atau alias `strings`) menyediakan fungsi manipulasi teks dan string yang lengkap, mendukung encoding UTF-8, pemotongan spasi, pemisahan kata, dan pencarian pola.
+Modul `teks` (bisa juga dipanggil dengan nama `strings`) menyediakan berbagai alat praktis untuk mengolah kalimat, mulai dari memotong spasi, memecah kata, menyambung daftar, hingga mencari kata tertentu di dalam kalimat.
 
 ---
 
-## Memuat Modul
+## Cara Memanggil
 
-Dapat digunakan secara langsung tanpa instalasi eksternal:
+Modul ini sudah siap digunakan tanpa perlu pengaturan apa pun:
 
 ```celang
-// Menggunakan identifier Bahasa Indonesia
-buat kataKata = teks.pisah("apel,mangga,jeruk", ",")
+// Menggunakan nama Bahasa Indonesia:
+buat buah = teks.pisah("apel,mangga,jeruk", ",")
 
-// Atau menggunakan identifier internasional
+// Atau menggunakan nama internasional:
 buat hasil = strings.join(["A", "B", "C"], " - ")
 ```
 
 ---
 
-## Daftar Fungsi
+## Daftar Alat Bantu
 
-### 1. Pemisahan & Penggabungan
-- **`pisah(teks, pemisah)` / `split(str, sep)`**: Memecah string menjadi array berdasarkan pemisah tertentu.
-- **`gabung(array, pemisah)` / `join(arr, sep)`**: Menggabungkan elemen-elemen array menjadi satu string.
+### 1. Memecah dan Menyambung Kalimat
+- **`pisah(kalimat, pemisah)` / `split(str, sep)`**: Memecah kalimat panjang menjadi potongan daftar kata berdasarkan tanda pemisah tertentu.
+- **`gabung(daftar, pemisah)` / `join(arr, sep)`**: Menyambung potongan-potongan kata menjadi satu kalimat utuh dengan tanda penghubung.
 
 ```celang
-buat data = "kopi,teh,susu"
-buat daftar = teks.pisah(data, ",")
+buat belanjaan = "kopi,teh,susu"
+buat daftar = teks.pisah(belanjaan, ",")
 cetak(daftar) // ["kopi", "teh", "susu"]
 
 buat kalimat = teks.gabung(daftar, " & ")
 cetak(kalimat) // "kopi & teh & susu"
 ```
 
-### 2. Transformasi Huruf
-- **`kapital(teks)` / `upper(str)`**: Mengubah seluruh teks menjadi huruf besar/kapital.
-- **`kecil(teks)` / `lower(str)`**: Mengubah seluruh teks menjadi huruf kecil.
+### 2. Mengubah Huruf Besar dan Kecil
+- **`kapital(kalimat)` / `upper(str)`**: Mengubah seluruh huruf menjadi huruf besar (kapital).
+- **`kecil(kalimat)` / `lower(str)`**: Mengubah seluruh huruf menjadi huruf kecil.
 
 ```celang
-cetak(teks.kapital("celang bahasa keren")) // "CELANG BAHASA KEREN"
-cetak(teks.kecil("KATA KAPITAL"))         // "kata kapital"
+cetak(teks.kapital("belajar celang itu menyenangkan")) // "BELAJAR CELANG ITU MENYENANGKAN"
+cetak(teks.kecil("HURUF BESAR"))                     // "huruf besar"
 ```
 
-### 3. Pembersihan Spasi
-- **`potong(teks)` / `trim(str)`**: Menghilangkan spasi dan karakter whitespace di awal dan akhir teks.
+### 3. Merapikan Spasi di Ujung Kata
+- **`potong(kalimat)` / `trim(str)`**: Membuang spasi kosong yang tidak sengaja terketik di awal atau akhir tulisan.
 
 ```celang
-buat inputPengguna = "   admin@domain.com   "
-buat emailBersih = teks.potong(inputPengguna)
-cetak(emailBersih) // "admin@domain.com"
+buat masukanKetik = "   budi@email.com   "
+buat emailBersih = teks.potong(masukanKetik)
+cetak(emailBersih) // "budi@email.com"
 ```
 
-### 4. Penggantian Teks
-- **`ganti(teks, kata_lama, kata_baru)` / `replace(str, old, new)`**: Mengganti semua kemunculan `kata_lama` dengan `kata_baru`.
+### 4. Mengganti Kata Tertentu
+- **`ganti(kalimat, kataLama, kataBaru)` / `replace(str, old, new)`**: Menemukan kata lama di dalam kalimat dan menggantinya dengan kata baru.
 
 ```celang
-buat template = "Halo [NAMA], selamat datang di [NAMA] Corp!"
-buat pesan = teks.ganti(template, "[NAMA]", "Budi")
-cetak(pesan) // "Halo Budi, selamat datang di Budi Corp!"
+buat surat = "Halo [NAMA], selamat datang!"
+buat hasilSurat = teks.ganti(surat, "[NAMA]", "Budi")
+cetak(hasilSurat) // "Halo Budi, selamat datang!"
 ```
 
-### 5. Pencarian & Validasi Pola
-- **`berisi(teks, kata_cari)` / `contains(str, substr)`**: Memeriksa apakah teks mengandung substring tertentu (mengembalikan `benar` atau `salah`).
-- **`dimulai_dengan(teks, awalan)` / `starts_with(str, prefix)`**: Memeriksa apakah teks diawali dengan awalan tertentu.
-- **`diakhiri_dengan(teks, akhiran)` / `ends_with(str, suffix)`**: Memeriksa apakah teks diakhiri dengan akhiran tertentu.
+### 5. Memeriksa Isi Kalimat
+- **`berisi(kalimat, kataCari)` / `contains(str, substr)`**: Memeriksa apakah kata yang dicari ada di dalam kalimat (memberikan jawaban `benar` atau `salah`).
+- **`dimulai_dengan(kalimat, awalan)` / `starts_with(...)`**: Memeriksa apakah kalimat diawali dengan kata tertentu.
+- **`diakhiri_dengan(kalimat, akhiran)` / `ends_with(...)`**: Memeriksa apakah kalimat diakhiri dengan kata tertentu.
 
 ```celang
-buat namaBerkas = "dokumen_keuangan.pdf"
+buat namaDokumen = "laporan_keuangan.pdf"
 
-cetak(teks.berisi(namaBerkas, "keuangan"))      // benar
-cetak(teks.dimulai_dengan(namaBerkas, "dokumen")) // benar
-cetak(teks.diakhiri_dengan(namaBerkas, ".pdf"))   // benar
+cetak(teks.berisi(namaDokumen, "keuangan"))      // benar
+cetak(teks.dimulai_dengan(namaDokumen, "laporan")) // benar
+cetak(teks.diakhiri_dengan(namaDokumen, ".pdf"))   // benar
 ```

@@ -1,63 +1,62 @@
-# Modul JSON (`json`)
+# Alat Bantu Pertukaran Data (`json`)
 
-Modul `json` menyediakan fungsi serialisasi dan deserialisasi data format JSON secara cepat dan aman, memungkinkan pertukaran data API dan penyimpanan dokumen konfigurasi terstruktur.
+Format **JSON** adalah standar tulisan yang paling populer di dunia untuk bertukar data antar-aplikasi dan situs web.
+
+Modul `json` di Celang menyediakan alat untuk membaca data teks JSON menjadi data yang bisa langsung diproses oleh Celang, serta mengubah data Celang kembali menjadi teks JSON yang rapi.
 
 ---
 
-## Memuat Modul
+## Cara Memanggil
 
-Tersedia secara global tanpa konfigurasi tambahan:
+Modul ini sudah siap digunakan secara langsung:
 
 ```celang
-// Mengurai teks JSON
+// 1. Membaca teks JSON menjadi data Celang:
 buat data = json.uraikan("{\"nama\": \"Celang\", \"versi\": 1}")
 
-// Memformat objek Celang ke string JSON
+// 2. Mengubah data Celang menjadi teks JSON yang rapi:
 buat teksJSON = json.format(data, 2)
+cetak(teksJSON)
 ```
 
 ---
 
-## Daftar Fungsi
+## Daftar Alat Bantu
 
-### 1. `uraikan(teksJSON)` / `parse(teksJSON)`
-Mengonversi teks berformat JSON menjadi objek, peta (*map*), array, angka, atau nilai Celang yang sesuai.
+### 1. Mengurai Teks JSON (`uraikan` / `parse`)
+Mengubah kalimat teks JSON menjadi data Celang (seperti kamus, daftar, angka, atau teks) agar mudah diakses:
 
 ```celang
-buat payload = "{\"id\": 101, \"nama\": \"Andi\", \"hobi\": [\"membaca\", \"koding\"], \"aktif\": true}"
+buat teksMentah = "{\"id\": 101, \"nama\": \"Andi\", \"hobi\": [\"membaca\", \"memasak\"]}"
 
-buat pengguna = json.uraikan(payload)
+buat pengguna = json.uraikan(teksMentah)
 
-cetak("ID Pengguna:", pengguna.id)
-cetak("Nama Pengguna:", pengguna.nama)
+cetak("Nomor ID    :", pengguna.id)
+cetak("Nama        :", pengguna.nama)
 cetak("Hobi pertama:", pengguna.hobi[0])
 ```
 
-::: tip Penanganan Kesalahan
-Jika teks JSON tidak valid (kurang tanda kutip, kurung tidak berpasangan, atau koma berlebih), Celang akan menampilkan pesan diagnostik yang ramah:
-```text
-Kesalahan: Gagal mengurai teks JSON: invalid character 'a' after object key
-Saran: Periksa kembali sintaks JSON Anda (tanda kutip ganda, koma, kurung kurawal).
-```
-:::
+> **Petunjuk Ramah:** Jika teks JSON yang Anda masukkan kurang tanda kutip atau kurungnya tidak lengkap, Celang akan memberi tahu secara lembut letak kesalahan ketik tersebut agar mudah Anda betulkan.
 
-### 2. `format(objek, spasi?)` / `stringify(objek, spasi?)`
-Mengonversi objek atau struktur data Celang kembali ke bentuk representasi string JSON.
-- Argumen kedua bersifat opsional untuk memberikan indentasi spasi (*pretty-print*).
+---
+
+### 2. Menyusun Teks JSON (`format` / `stringify`)
+Mengubah data yang ada di Celang menjadi teks berformat JSON agar bisa dikirim ke aplikasi lain atau disimpan ke berkas:
 
 ```celang
-buat konfigurasi = {
+buat dataPengaturan = {
     "server": "localhost",
     "port": 8080,
-    "debug": benar,
-    "fitur": ["uast", "bytecode-vm", "syntax-styling"]
+    "aktif": benar,
+    "fitur": ["mudah", "cepat", "ramah"]
 }
 
-// Format ringkas satu baris (compact)
-buat compact = json.format(konfigurasi)
-cetak(compact)
+// 1. Format ringkas satu baris:
+buat satuBaris = json.format(dataPengaturan)
+cetak(satuBaris)
 
-// Format rapi dengan indentasi 2 spasi (pretty-print)
-buat rapi = json.format(konfigurasi, 2)
-cetak("JSON Berindentasi:\n" + rapi)
+// 2. Format rapi berjarak 2 spasi agar nyaman dibaca mata:
+buat teksRapi = json.format(dataPengaturan, 2)
+cetak(teksRapi)
 ```
+Tampilan yang dihasilkan akan berjejer rapi ke bawah dengan kurung kurawal yang tertata indah.

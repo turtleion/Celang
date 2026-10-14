@@ -1,101 +1,70 @@
-# Bytecode Compiler & Virtual Machine (VM)
+# Mesin Virtual Cepat: Bagaimana Celang Menjalankan Program
 
-Untuk mencapai performa komputasi yang tinggi tanpa mengorbankan fleksibilitas semantik dinamis, Celang mengimplementasikan mesin eksekusi ganda: **Tree-Walking AST Evaluator** (untuk fleksibilitas REPL dan introspeksi interaktif) dan **Stack-based Bytecode Virtual Machine** (untuk kecepatan eksekusi tinggi dan optimasi memori).
+Agar program Anda dapat berjalan secepat kilat tanpa membebani komputer, Celang menggunakan **Mesin Virtual Berbasis Instruksi Ringkas (Bytecode VM)** sebagai mesin penggerak utamanya.
 
 ---
 
-## 1. Mengapa Bytecode VM?
+## 1. Dua Cara Menjalankan Program
 
-Pada evaluator Tree-Walking klasik:
-- Setiap evaluasi simpul AST melibatkan pemanggilan fungsi rekursif Go yang dalam.
-- Alokasi objek intermediate di heap Go menciptakan tekanan pada Garbage Collector (GC).
-- Penelusuran pohon acak di memori memicu *cache misses* pada level CPU.
+Bayangkan Anda ingin memasak sup:
+* **Cara Pertama (Membaca Buku Tebal Berulang Kali)**: Setiap kali ingin memotong wortel atau menabur garam, Anda membuka lembar demi lembar buku resep yang tebal dari awal. Ini membutuhkan waktu lebih lama untuk membolak-balik halaman.
+* **Cara Kedua (Menyalin Catatan Ringkas ke Kertas Selembar)**: Sebelum memasak, Anda merangkum seluruh langkah ke selembar kertas kecil berisi instruksi singkat: `1. Potong wortel`, `2. Rebus air`, `3. Tabur garam`. Sambil memasak, Anda membaca catatan kecil ini dalam sekejap mata.
 
-Dengan arsitektur Bytecode VM:
-- Pohon U-AST dikompilasi terlebih dahulu ke dalam deretan instruksi linear (*compact byte stream*).
-- Operasi dijalankan pada *evaluation stack* berbasis array yang ramah *CPU L1/L2 cache*.
-- Alur kontrol (`jika`, `selama`, `untuk`) diubah menjadi instruksi lompatan (*Jump Instructions*) berbiaya sangat rendah.
+Celang bekerja dengan **Cara Kedua**:
+1. Pohon logika program Anda diringkas menjadi deretan instruksi kecil dan padat.
+2. Mesin virtual Celang mengeksekusi instruksi kecil tersebut satu per satu dengan sangat cepat.
 
 ```mermaid
-flowchart TD
-    AST[Universal AST] --> Comp[Bytecode Compiler]
-    Comp --> Chunk[Bytecode Chunk: Code Array & Constant Pool]
-    Chunk --> VM[Virtual Machine Loop]
-    subgraph VM Execution
-        VM --> Fetch[Fetch Opcode]
-        Fetch --> Decode[Decode Instruction]
-        Decode --> Exec[Execute on Stack]
-        Exec --> Fetch
-    end
+flowchart LR
+    A[Pohon Logika Program] --> B[Penyusun Instruksi / Compiler]
+    B --> C[Daftar Instruksi Ringkas]
+    C --> D[Mesin Virtual Celang / VM]
+    D --> E[Hasil Muncul di Layar]
 ```
 
 ---
 
-## 2. Struktur Instruksi & Opcode
+## 2. Bagaimana Mesin Menghitung Nilai?
 
-Kompiler Celang memancarkan instruksi yang didefinisikan dalam [`pkg/bytecode/opcode.go`](file:///home/yosatsu/Coding/Celang/pkg/bytecode/opcode.go):
+Mesin virtual Celang menggunakan konsep **Tumpukan Nilai** (seperti tumpukan piring di meja):
 
-| Kelompok Opcode | Contoh Opcode | Fungsi |
-| :--- | :--- | :--- |
-| **Konstanta & Literal** | `OpConstant`, `OpTrue`, `OpFalse`, `OpNull` | Mendorong nilai literal ke puncak *stack*. |
-| **Aritmatika** | `OpAdd`, `OpSub`, `OpMul`, `OpDiv`, `OpMod` | Mengambil 2 operand teratas, menghitung, dan mendorong hasil. |
-| **Perbandingan** | `OpEqual`, `OpNotEqual`, `OpGreaterThan`, `OpLessThan` | Evaluasi boolean kondisi pembanding. |
-| **Manipulasi Stack** | `OpPop` | Membuang nilai yang tidak lagi diperlukan dari stack. |
-| **Variabel Global/Lokal** | `OpSetGlobal`, `OpGetGlobal`, `OpSetLocal`, `OpGetLocal` | Membaca/menulis variabel pada indeks memori cepat. |
-| **Alur Kontrol** | `OpJumpNotTruthy`, `OpJump` | Melompati instruksi berdasarkan kondisi logika (*branching*). |
-| **Koleksi & Indeks** | `OpArray`, `OpMap`, `OpIndex` | Membangun array, map, serta mengakses indeks/kunci. |
-| **Fungsi & Frame** | `OpCall`, `OpReturnValue`, `OpReturn` | Mengelola *CallFrames* dan lingkup variabel lokal. |
-| **I/O Cepat** | `OpPrint` | Mencetak nilai dari stack secara langsung tanpa overhead wrapper. |
+1. Misalkan ada perhitungan `10 + 25`.
+2. Mesin menaruh angka `10` di meja.
+3. Mesin menaruh angka `25` di atas angka `10`.
+4. Saat perintah `Tambah` tiba, mesin mengambil dua angka teratas tersebut, menjumlahkannya menjadi `35`, lalu menaruh kembali angka `35` di meja.
+
+Karena proses ini hanya melibatkan tumpukan nilai sederhana, komputer Anda bisa melakukannya dalam hitungan sekejap mata tanpa perlu berpikir rumit.
 
 ---
 
-## 3. Desain Stack-Based Virtual Machine
+## 3. Pilihan Mode di Terminal
 
-Mesin virtual Celang (`pkg/vm/vm.go`) beroperasi menggunakan model *stack-based*:
-
-```
-          ┌──────────────┐
-  Top ──► │      25      │  ◄── Puncak Stack
-          ├──────────────┤
-          │      10      │
-          ├──────────────┤
-          │ "Halo Celang"│
-  Base ─► └──────────────┘
-```
-
-Ketika instruksi `OpAdd` dijalankan:
-1. Angka `25` di-pop dari puncak stack.
-2. Angka `10` di-pop dari stack.
-3. Hasil penjumlahan (`35`) didorong (*push*) kembali ke puncak stack.
-
-### Manajemen Bingkai Panggilan (*Call Frames*)
-
-Saat fungsi dipanggil:
-- VM mengalokasikan bingkai panggilan (*CallFrame*) baru yang mencatat *Instruction Pointer* (IP) fungsi pemanggil dan penunjuk dasar stack (*base pointer*).
-- Setelah fungsi selesai mengembalikan nilai (`OpReturnValue`), CallFrame dilepaskan dan eksekusi melompat kembali ke instruksi berikutnya di fungsi pemanggil secara instan.
-
----
-
-## 4. Cara Menjalankan Mode Bytecode VM
-
-Secara default, `celang run` menjalankan program menggunakan runtime AST. Anda dapat mengaktifkan akselerasi Bytecode VM dengan menyematkan bendera `--vm`:
+Secara bawaan (*default*), Celang **selalu menggunakan Mesin Virtual Cepat** setiap kali Anda menjalankan perintah:
 
 ```bash
-# Menjalankan program menggunakan Bytecode Virtual Machine
-celang run --vm program.ce
+# Menjalankan program (secara otomatis menggunakan mesin virtual cepat):
+./celang run program.ce
+```
 
-# Mengukur waktu eksekusi untuk benchmarking
-time celang run --vm program.ce
+Jika untuk keperluan belajar atau penelitian Anda ingin melihat bagaimana program dijalankan menggunakan penafsir pohon logika langsung (AST Evaluator):
+```bash
+# Menjalankan dengan mode penafsir pohon langsung:
+./celang run program.ce --ast
+```
+
+Jika Anda ingin melihat daftar instruksi ringkas yang dibaca oleh mesin di balik program Anda:
+```bash
+# Melihat daftar instruksi ringkas di layar:
+./celang disasm program.ce
 ```
 
 ---
 
-## 5. Ringkasan Perbandingan Evaluator
+## 4. Ringkasan Perbedaan Dua Mesin
 
-| Karakteristik | AST Evaluator | Bytecode VM (`--vm`) |
+| Hal yang Dilihat | Mesin Virtual Cepat (Bawaan) | Penafsir Pohon Langsung (`--ast`) |
 | :--- | :--- | :--- |
-| **Model Eksekusi** | Tree-Walking rekursif | Linear Bytecode Loop |
-| **Penggunaan Memori** | Lebih tinggi (banyak simpul node) | Sangat hemat (deretan byte & array) |
-| **Kecepatan Aritmatika & Loop** | Standar | Hingga 2-5x lebih cepat |
-| **Dukungan REPL Interaktif** | Utama | Terintegrasi |
-| **Portabilitas Bytecode** | Perlu pohon JSON | Dapat diekspor ke binary chunk |
+| **Status Pemakaian** | Mode utama dan bawaan | Pilihan alternatif untuk analisis |
+| **Cara Menjalankan** | Membaca daftar instruksi ringkas | Menelusuri bagan logika langkah demi langkah |
+| **Beban Memori Komputer** | Sangat ringan | Sedikit lebih berat |
+| **Kecepatan Perhitungan** | Sangat cepat | Kecepatan standar |

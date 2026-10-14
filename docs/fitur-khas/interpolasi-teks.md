@@ -1,12 +1,18 @@
-# String Interpolation
+# Menyisipkan Nilai ke dalam Kalimat (Interpolasi Teks)
 
-Celang menyediakan interpolasi teks (*string interpolation*) yang ekspresif, memungkinkanmu menyisipkan variabel dan ekspresi aritmatika langsung ke dalam teks tanpa perlu menggabungkannya berulang kali dengan operator `+`.
+Saat membuat pesan atau pengumuman, menyambung-nyambungkan kata dengan tanda tambah (`+`) secara berulang-ulang sering kali melelahkan dan mudah salah:
+```celang
+// Melelahkan dan mudah salah tanda spasi:
+buat pesan = "Halo " + nama + ", sisa uangmu adalah Rp " + saldo + "."
+```
+
+Celang menyediakan cara yang jauh lebih alami: **menyisipkan nilai langsung ke dalam kalimat**, seperti mengisi titik-titik pada formulir template surat.
 
 ---
 
-## 🇮🇩 Gaya Indonesia: Tanda Kutip Ganda `{ekspresi}`
+## 🇮🇩 Menyisipkan Nilai dengan `{ ... }`
 
-Dalam teks dengan tanda kutip ganda (`"..."`), gunakan kurung kurawal `{...}` untuk menyisipkan nilai:
+Di dalam kalimat bertanda kutip ganda (`"..."`), cukup gunakan kurung kurawal `{nama_variabel}` untuk menyisipkan nilai:
 
 ```celang
 buat pengguna = "Budi Santoso"
@@ -14,28 +20,28 @@ buat saldo = 130000
 
 buat pesan = "Halo {pengguna}, saldo aktifmu adalah Rp {saldo}."
 cetak(pesan)
-// Output: Halo Budi Santoso, saldo aktifmu adalah Rp 130000.
+// Hasil di layar: Halo Budi Santoso, saldo aktifmu adalah Rp 130000.
 ```
 
-### Ekspresi Langsung di Dalam Teks
-Kamu bisa meletakkan operasi perhitungan langsung di dalam kurung kurawal:
+### Menghitung Langsung di dalam Kalimat
+Anda juga bisa meletakkan perhitungan matematika langsung di dalam kurung kurawal:
 
 ```celang
-buat pesanHitung = "Jika saldo digandakan (x2): Rp {saldo * 2}!"
+buat pesanHitung = "Jika saldomu digandakan (x2), menjadi: Rp {saldo * 2}!"
 cetak(pesanHitung)
-// Output: Jika saldo digandakan (x2): Rp 260000!
+// Hasil di layar: Jika saldomu digandakan (x2), menjadi: Rp 260000!
 ```
 
 ---
 
-## ⚡ Gaya JavaScript / TypeScript: Backtick `${ekspresi}`
+## ⚡ Gaya Template Petik Terbalik (Backtick `${...}`)
 
-Bagi pengembang yang terbiasa dengan sintaks template literal JavaScript, Celang mendukung tanda petik terbalik (backtick `` `...` ``) dengan sintaks `${...}`:
+Jika Anda terbiasa dengan gaya JavaScript atau TypeScript, Celang juga mendukung penulisan menggunakan tanda petik terbalik (`` `...` ``) dengan simbol `${...}`:
 
 ```celang
-buat level = "VIP Platinum"
-buat pesanJS = `Selamat ${pengguna}, status keanggotaanmu adalah ${level}.`
+buat tingkatan = "VIP Platinum"
+buat pesanKhusus = `Selamat ${pengguna}, status keanggotaanmu adalah ${tingkatan}.`
 
-cetak(pesanJS)
-// Output: Selamat Budi Santoso, status keanggotaanmu adalah VIP Platinum.
+cetak(pesanKhusus)
+// Hasil di layar: Selamat Budi Santoso, status keanggotaanmu adalah VIP Platinum.
 ```

@@ -1,50 +1,51 @@
-# Modul Matematika (`matematika` / `math`)
+# Alat Bantu Perhitungan (`matematika` / `math`)
 
-Modul `matematika` (tersedia juga dengan alias `math`) menyediakan fungsi kalkulasi matematika, trigonometri, pembulatan, dan bilangan acak yang efisien dan dwibasa.
+Modul `matematika` (bisa juga dipanggil dengan nama `math`) menyediakan berbagai rumus perhitungan angka siap pakai, mulai dari akar, pangkat, pembulatan, angka acak, hingga nilai tertinggi dan terendah.
 
 ---
 
-## Memuat Modul
+## Cara Memanggil
 
-Modul ini terdaftar sebagai pustaka standar bawaan (*batteries included*), sehingga dapat diakses secara langsung:
+Alat ini sudah terpasang secara otomatis di Celang. Anda bisa langsung memanggilnya menggunakan Bahasa Indonesia maupun bahasa internasional:
 
 ```celang
-// Menggunakan identifier Bahasa Indonesia
+// Menggunakan nama Bahasa Indonesia:
 buat r = matematika.akar(144)
 
-// Atau menggunakan identifier internasional
+// Menggunakan nama internasional:
 buat p = math.pow(2, 8)
 ```
 
 ---
 
-## Daftar Fungsi
+## Daftar Rumus dan Contoh Penggunaan
 
-### 1. `akar(x)` / `sqrt(x)`
-Menghitung akar kuadrat dari bilangan non-negatif.
+### 1. Mencari Akar (`akar` / `sqrt`)
+Menghitung akar kuadrat dari suatu bilangan positif:
 ```celang
 cetak(matematika.akar(25)) // 5
-cetak(math.sqrt(2))        // 1.4142135623730951
+cetak(math.sqrt(144))      // 12
 ```
 
-### 2. `pangkat(basis, eksponen)` / `pow(basis, eksponen)`
-Menghitung perpangkatan $basis^{eksponen}$.
+### 2. Menghitung Pangkat (`pangkat` / `pow`)
+Mengalikan angka dengan dirinya sendiri sebanyak pangkat yang diminta:
 ```celang
-cetak(matematika.pangkat(3, 4)) // 81
-cetak(math.pow(2, 10))          // 1024
+cetak(matematika.pangkat(3, 4)) // 81 (artinya 3 x 3 x 3 x 3)
+cetak(math.pow(2, 8))           // 256
 ```
 
-### 3. `mutlak(x)` / `abs(x)`
-Mengembalikan nilai absolut/mutlak (selalu bernilai positif atau nol).
+### 3. Mengubah ke Nilai Positif (`mutlak` / `abs`)
+Mengubah angka minus menjadi angka positif:
 ```celang
 cetak(matematika.mutlak(-42)) // 42
 cetak(math.abs(-3.14))        // 3.14
 ```
 
-### 4. Pembulatan Angka
-- **`bulat(x)` / `round(x)`**: Membulatkan ke bilangan bulat terdekat.
-- **`lantai(x)` / `floor(x)`**: Membulatkan ke bawah (*floor*).
-- **`atap(x)` / `ceil(x)`**: Membulatkan ke atas (*ceiling*).
+### 4. Pembulatan Angka Pecahan
+Celang menyediakan 3 pilihan pembulatan sesuai kebutuhan Anda:
+- **`bulat(x)` / `round(x)`**: Membulatkan ke angka bulat terdekat (di atas 0.5 naik ke atas, di bawah 0.5 turun ke bawah).
+- **`lantai(x)` / `floor(x)`**: Selalu membulatkan ke bawah.
+- **`atap(x)` / `ceil(x)`**: Selalu membulatkan ke atas.
 
 ```celang
 cetak(matematika.bulat(4.6))  // 5
@@ -52,34 +53,32 @@ cetak(matematika.lantai(4.9)) // 4
 cetak(matematika.atap(4.1))   // 5
 ```
 
-### 5. `acak([min, max])` / `random([min, max])`
-- Tanpa argumen: Menghasilkan bilangan riil acak antara `0.0` hingga `1.0`.
-- Dengan 2 argumen `acak(min, max)`: Menghasilkan bilangan bulat acak inklusif antara `min` dan `max`.
+### 5. Mengambil Angka Acak (`acak` / `random`)
+Sangat berguna untuk permainan tebak angka atau undian:
+- Jika dipanggil tanpa angka masukan `matematika.acak()`: Menghasilkan pecahan acak antara 0.0 sampai 1.0.
+- Jika dipanggil dengan dua angka batas `matematika.acak(awal, akhir)`: Menghasilkan angka bulat acak di antara kedua batas tersebut.
 
 ```celang
-// Nilai desimal acak 0.0 - 1.0
-buat rasio = matematika.acak()
-
-// Dadu acak 1 sampai 6
+// Melempar dadu (angka acak dari 1 sampai 6):
 buat dadu = matematika.acak(1, 6)
-cetak("Angka dadu:", dadu)
+cetak("Angka dadu yang keluar:", dadu)
 ```
 
-### 6. `maks(...angka)` / `min(...angka)`
-Mencari nilai terbesar (*maksimum*) atau terkecil (*minimum*) dari sekumpulan argumen.
+### 6. Mencari Nilai Terbesar dan Terkecil (`maks` & `min`)
+Membandingkan sekumpulan angka dan mengambil yang paling tinggi atau paling rendah:
 ```celang
-cetak(matematika.maks(12, 45, 9, 88, 23)) // 88
-cetak(matematika.min(12, 45, 9, 88, 23))  // 9
+cetak(matematika.maks(12, 45, 9, 88, 23)) // 88 (paling besar)
+cetak(matematika.min(12, 45, 9, 88, 23))  // 9  (paling kecil)
 ```
 
 ---
 
-## Konstanta
+## Angka Tetap (Konstanta)
 
-- **`matematika.PI`** / **`math.PI`**: $\pi \approx 3.141592653589793$
-- **`matematika.E`** / **`math.E`**: $e \approx 2.718281828459045$
+- **`matematika.PI`** / **`math.PI`**: Nilai pi lingkaran ($\approx 3.141592653589793$)
+- **`matematika.E`** / **`math.E`**: Nilai bilangan Euler ($\approx 2.718281828459045$)
 
 ```celang
-buat kelilingLingkaran = 2 * math.PI * 7
+buat kelilingLingkaran = 2 * matematika.PI * 7
 cetak("Keliling lingkaran:", kelilingLingkaran)
 ```

@@ -1,44 +1,46 @@
-# Bentuk (Struct) & Metode Berorientasi Objek
+# Bentuk Data Kustom (`bentuk`)
 
-Celang mendukung pemodelan data berorientasi objek yang bersih menggunakan kata kunci `bentuk` (atau `struct`).
+Ketika Anda membuat program yang menangani data dunia nyata—seperti data rekening bank, data murid, atau barang belanjaan—menggunakan variabel terpisah-pisah bisa membuat kode berantakan.
+
+Di Celang, Anda dapat mengelompokkan informasi yang saling berkaitan ke dalam satu cetak biru yang rapi menggunakan kata kunci `bentuk`.
 
 ---
 
-## 🏗️ Mendefinisikan Bentuk
+## 🏗️ Membuat Cetak Biru Bentuk
 
-Bentuk dapat memiliki properti (*fields*) dengan tipe data opsional, nilai default, dan fungsi metode yang terikat.
+Sebuah `bentuk` dapat memiliki daftar informasi (properti) dan daftar tindakan (fungsi/metode) yang bisa dilakukannya:
 
 ```celang
 bentuk RekeningBank {
     pemilik: Teks,
-    saldo itu Angka = 0,
+    saldo: Angka = 0,
 
     fungsi setor(jumlah: Angka) {
-        diri.saldo += jumlah
-        kembalikan diri.saldo
+        @saldo += jumlah
+        kembalikan @saldo
     }
 
     fungsi tarik(jumlah: Angka) {
-        jika jumlah > diri.saldo {
+        jika jumlah > @saldo {
             lempar "Saldo tidak mencukupi!"
         }
-        diri.saldo -= jumlah
-        kembalikan diri.saldo
+        @saldo -= jumlah
+        kembalikan @saldo
     }
 }
 ```
 
 ---
 
-## 🎯 Instansiasi Objek
+## 🎯 Mengisi Data ke dalam Bentuk
 
-Instansiasi dapat dilakukan melalui konstruktor posisi terurut atau melalui kamus (*Map*):
+Setelah cetak birunya siap, Anda dapat membuat objek data nyata berdasarkan cetak biru tersebut:
 
 ```celang
-// 1. Instansiasi dengan argumen posisi
+// Cara 1: Mengisi data berdasarkan urutan
 buat akun1 = RekeningBank("Budi Santoso", 100000)
 
-// 2. Instansiasi dengan kamus (Map properties)
+// Cara 2: Mengisi data dengan menyebutkan nama kolomnya
 buat akun2 = RekeningBank({
     "pemilik": "Siti Rahma",
     "saldo": 250000
@@ -49,11 +51,12 @@ cetak(akun1) // RekeningBank{pemilik: Budi Santoso, saldo: 100000}
 
 ---
 
-## 🧭 Memanggil Metode & Referensi Diri (@properti)
+## 🧭 Memanggil Tindakan & Tanda `@`
 
-Di dalam metode bentuk, kamu dapat menggunakan:
-- `@properti` atau `@metode()` sebagai **shorthand elegan** untuk mengakses anggota instance internal.
-- `diri` (idiomatik Indonesia), `this`, atau `self` ketika membutuhkan referensi objek utuh (contoh: `buat ref = diri`).
+Di dalam fungsi yang ada di dalam bentuk, Anda dapat menggunakan tanda `@` di depan nama data sebagai jalan pintas untuk menyebut data milik dirinya sendiri:
+
+- `@saldo` artinya sama dengan `saldo milik akun ini`.
+- `@setor(10000)` artinya memanggil tindakan setor milik akun ini.
 
 ```celang
 bentuk Dompet {
@@ -69,20 +72,16 @@ bentuk Dompet {
 
 ---
 
-## 🔒 Enkapsulasi & Visibilitas (`privat`)
+## 🔒 Menjaga Data Sensitif (`privat`)
 
-Secara default, anggota bentuk bersifat **publik** (*loose mode*). Jika ingin mengamankan field atau metode sensitif dari manipulasi luar, gunakan kata kunci `privat`.
-
-Celang mendukung dua gaya penulisan visibilitas:
-1. **Per-baris**: `privat saldo: Angka = 0`
-2. **Blok terkelompok**: `privat { ... }`
+Secara umum, data di dalam bentuk dapat dilihat dan diubah oleh siapa saja. Namun, jika ada informasi sensitif (seperti nomor PIN atau saldo rahasia) yang tidak boleh diubah sembarangan dari luar, Anda dapat melindunginya dengan kata `privat`.
 
 ```celang
 bentuk RekeningBank {
-    pemilik: Teks, // publik secara default
+    pemilik: Teks, // Bisa dilihat siapa saja
 
     privat {
-        saldo: Angka = 0,
+        saldo: Angka = 0, // Rahasia, hanya bisa diubah lewat tindakan resmi
         pin: Angka = 1234,
 
         validasiPin(inputPin: Angka) {
@@ -95,9 +94,9 @@ bentuk RekeningBank {
         kembalikan @saldo
     }
 
-    ambil(jumlah: Angka, inputPin: Angka) {
+    tarik(jumlah: Angka, inputPin: Angka) {
         jika !@validasiPin(inputPin) {
-            lempar "PIN salah!"
+            lempar "Nomor PIN salah!"
         }
         jika jumlah > @saldo {
             lempar "Saldo tidak mencukupi!"
@@ -110,15 +109,16 @@ bentuk RekeningBank {
 buat akun = RekeningBank("Budi")
 akun.setor(50000)
 
-// ❌ Akses langsung dari luar akan diblokir dengan pesan empati:
-// akun.saldo = 999999 // Kesalahan: Properti 'saldo' bersifat privat pada bentuk 'RekeningBank'
+// ❌ Jika seseorang mencoba mengubah saldo secara paksa dari luar:
+// akun.saldo = 9999999 
+// Celang akan menolak dengan ramah: 'saldo' bersifat privat!
 ```
 
 ---
 
-## 🧩 Komposisi Bentuk (Struct Embedding)
+## 🧩 Menggabungkan Bentuk Lain (Penyisipan Bentuk)
 
-Celang mengutamakan prinsip *composition over inheritance*. Kamu dapat menanamkan (*embed*) satu atau lebih bentuk lain ke dalam sebuah bentuk cukup dengan menuliskan nama tipenya:
+Anda tidak perlu mengetik ulang data yang sama jika sudah ada bentuk lain yang memilikinya. Anda cukup menyisipkan nama bentuk lain tersebut ke dalam bentuk baru:
 
 ```celang
 bentuk Identitas {
@@ -126,33 +126,33 @@ bentuk Identitas {
     umur: Angka,
 
     sapa() {
-        kembalikan "Halo, aku " + @nama
+        kembalikan "Halo, nama saya " + @nama
     }
 }
 
 bentuk Karyawan {
-    Identitas, // Di-embed langsung
+    Identitas, // Langsung menyertakan nama, umur, dan kemampuan sapa
     gaji: Angka = 5000000,
     divisi: Teks = "Teknologi"
 }
 
 buat staf = Karyawan("Dewi", 25, 8000000, "Desain")
-cetak(staf.nama)    // "Dewi" (diwarisi dari Identitas)
-cetak(staf.sapa())   // "Halo, aku Dewi"
+cetak(staf.nama)   // "Dewi"
+cetak(staf.sapa())  // "Halo, nama saya Dewi"
 cetak(staf.divisi) // "Desain"
 ```
 
 ---
 
-## 🐑 Kloning Objek (Deep Memory Clone: `salin` / `clone`)
+## 🐑 Membuat Duplikat Mandiri (`salin`)
 
-Untuk menduplikasi instance objek atau koleksi secara mendalam tanpa berbagi referensi memori, gunakan fungsi bawaan `salin()` atau `clone()`:
+Jika Anda ingin membuat salinan persis dari suatu data tanpa khawatir perubahan pada salinan akan ikut merusak data aslinya, gunakan perintah `salin`:
 
 ```celang
 buat asli = RekeningBank("Ali", 100000)
 buat tiruan = salin(asli)
 
 tiruan.pemilik = "Budi"
-cetak(asli.pemilik)   // "Ali" (tidak terpengaruh)
+cetak(asli.pemilik)   // "Ali" (tetap aman, tidak berubah)
 cetak(tiruan.pemilik) // "Budi"
 ```

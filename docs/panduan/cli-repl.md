@@ -1,40 +1,41 @@
-# CLI & Interactive REPL
+# Panduan Perintah Terminal & Jendela Interaktif
 
-Celang dilengkapi dengan antarmuka baris perintah (*Command Line Interface*) yang kaya fitur serta REPL interaktif terintegrasi.
-
----
-
-## 💻 Panduan Perintah CLI
-
-Cukup jalankan `celang bantuan` atau `celang -h` untuk melihat seluruh opsi yang tersedia:
-
-| Perintah | Deskripsi |
-| :--- | :--- |
-| `celang` | Langsung masuk ke sesi Interactive REPL |
-| `celang repl [--style=...]` | Membuka REPL dengan gaya sintaks awal tertentu |
-| `celang run <file> [--ast] [-- args...]` | Menjalankan program Celang (`.ce`) atau AST (`.ast`) |
-| `celang disasm <file.ce>` | Menampilkan instruksi rakitan Bytecode (Disassembler) |
-| `celang format [-w] <file> [--style=...]` | Memformat kode ke gaya tertentu (`-w` untuk menimpa file langsung) |
-| `celang compile <file.ce> [-o out.ast]` | Mengompilasi kode menjadi berkas U-AST JSON portabel |
-| `celang ast <file.ce>` | Mencetak pohon struktur Universal AST ke terminal |
-| `celang init [nama_proyek]` | Menginisialisasi proyek Celang baru (`celang.mod` & `utama.ce`) |
-| `celang versi` | Menampilkan informasi versi runtime Celang |
+Celang menyediakan dua cara praktis untuk berinteraksi dengan komputer: melalui **perintah terminal** untuk memproses berkas, dan melalui **jendela interaktif** untuk mencoba ketikan kode secara langsung.
 
 ---
 
-## 🎮 Interactive REPL
+## 💻 Daftar Perintah di Terminal
 
-REPL (*Read-Eval-Print Loop*) memungkinkanmu mengeksplorasi sintaks Celang secara langsung dan instan.
+Jalankan `./celang bantuan` di terminal Anda untuk melihat daftar perintah yang tersedia:
 
-### Memulai Sesi
+| Perintah | Contoh Penggunaan | Kegunaan |
+| :--- | :--- | :--- |
+| `celang` | `./celang` | Langsung membuka jendela interaktif untuk mencoba kode seketika. |
+| `celang repl` | `./celang repl --style=sunda` | Membuka jendela interaktif dengan gaya bahasa tertentu. |
+| `celang run` | `./celang run program.ce` | Menjalankan program berkas `.ce` atau `.ast`. |
+| `celang format` | `./celang format program.ce --style=javascript` | Menata ulang tampilan kode ke gaya lain di layar (tambahkan `-w` untuk langsung menimpa berkas). |
+| `celang compile` | `./celang compile program.ce -o program.ast` | Mengubah kode teks menjadi berkas data logika U-AST berformat JSON. |
+| `celang init` | `./celang init toko_buku` | Membuat folder proyek baru lengkap dengan berkas pembukanya. |
+| `celang ast` | `./celang ast program.ce` | Menampilkan susunan pohon data logika kode ke layar. |
+| `celang disasm` | `./celang disasm program.ce` | Menampilkan daftar instruksi mesin rakitan di balik program. |
+| `celang versi` | `./celang versi` | Memeriksa nomor versi Celang yang terpasang. |
+
+---
+
+## 🎮 Jendela Interaktif (REPL)
+
+Jendela interaktif ibarat ruang obrolan langsung antara Anda dan Celang. Setiap kali Anda mengetik satu baris perintah, Celang akan langsung menjawab hasilnya.
+
+### Membuka Jendela Interaktif
+Cukup ketik:
 ```bash
-celang
+./celang
 ```
 
-Tampilan sambutan:
+Layar Anda akan menampilkan salam pembuka:
 ```text
 🌟 Celang Interactive REPL v1.0.0 (Bytecode VM Engine)
-Gaya aktif: Bahasa Indonesia (Baku) | Ketik ':bantuan' untuk petunjuk, ':keluar' untuk selesai.
+Gaya aktif: Bahasa Indonesia | Ketik ':bantuan' untuk petunjuk, ':keluar' untuk selesai.
 
 celang> buat a = 10
 celang> buat b = 20
@@ -42,26 +43,30 @@ celang> a + b
 => 30
 ```
 
-### Perintah Khusus (*Meta-Commands*)
+---
 
-Di dalam REPL, awali perintah dengan titik dua (`:`):
+### Perintah Khusus di Jendela Interaktif
 
-- `:bantuan` atau `:?` — Menampilkan panduan perintah REPL.
-- `:lingkungan` atau `:vars` — Melihat daftar variabel dan nilainya yang saat ini aktif di memori.
-- `:gaya <nama|path>` — Mengganti profil gaya sintaks aktif (misal `:gaya sunda` atau `:gaya javascript`).
-- `:bc <ekspresi>` — Membongkar ekspresi menjadi instruksi Bytecode VM.
-- `:ast <ekspresi>` — Melihat pohon Universal AST JSON dari baris kode.
-- `:bersih` atau `:cls` — Membersihkan layar terminal.
-- `:reset` atau `:ulang` — Mengosongkan memori variabel kembali ke kondisi awal.
-- `:keluar` atau `:q` — Keluar dari sesi REPL.
+Anda dapat mengatur sesi Anda menggunakan perintah yang diawali dengan tanda titik dua (`:`):
 
-### Input Multi-Baris Cerdas
-REPL otomatis mendeteksi tanda kurung kurawal `{ ... }` yang belum tertutup dan menyediakan prompt multi-baris (`......>`):
+- `:bantuan` (atau `:?`) — Menampilkan petunjuk perintah di jendela interaktif.
+- `:lingkungan` (atau `:vars`) — Melihat daftar semua variabel dan nilainya yang sedang diingat komputer saat ini.
+- `:gaya <nama>` — Mengganti gaya bahasa aktif seketika (contoh: `:gaya sunda` atau `:gaya javascript`).
+- `:bersih` (atau `:cls`) — Membersihkan layar terminal agar kembali rapi.
+- `:reset` (atau `:ulang`) — Mengosongkan ingatan komputer kembali ke kondisi bersih seperti saat baru dibuka.
+- `:keluar` (atau `:q`) — Menutup jendela interaktif dan kembali ke terminal biasa.
+
+---
+
+### Mengetik Perintah Lebih dari Satu Baris
+
+Anda tidak perlu khawatir jika ingin membuat fungsi atau perintah yang panjang. Celang secara otomatis mengetahui jika Anda membuka kurung kurawal `{`:
 
 ```text
-celang> fungsi luas_persegi(sisi) {
+celang> fungsi luasPersegi(sisi) {
 ......>     kembalikan sisi * sisi
 ......> }
-celang> luas_persegi(8)
+celang> luasPersegi(8)
 => 64
 ```
+Tanda titik-titik (`......>`) menandakan bahwa Celang sedang sabar menunggu sampai Anda menutup kurung kurawal `}` untuk menjalankan seluruh blok kode tersebut bersama-sama.

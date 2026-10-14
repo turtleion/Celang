@@ -63,68 +63,68 @@ export default defineConfig({
       { text: 'Panduan', link: '/panduan/mulai-cepat' },
       { text: 'Playground', link: '/playground' },
       { text: 'Fitur Unggulan', link: '/fitur-khas/time-travel' },
-      { text: 'Syntax Styling', link: '/gaya-sintaks/multi-dialek' },
-      { text: 'Stdlib API', link: '/pustaka-standar/matematika' },
-      { text: 'Bytecode VM', link: '/arsitektur/bytecode-vm' }
+      { text: 'Gaya Bahasa', link: '/gaya-sintaks/multi-dialek' },
+      { text: 'Alat Bawaan', link: '/pustaka-standar/matematika' },
+      { text: 'Cara Kerja Mesin', link: '/arsitektur/bytecode-vm' }
     ],
     sidebar: [
       {
         text: '🚀 Panduan Memulai',
         items: [
           { text: 'Filosofi & Pengenalan', link: '/panduan/pengenalan' },
-          { text: 'Mulai Cepat & Instalasi', link: '/panduan/mulai-cepat' },
-          { text: 'CLI & Interactive REPL', link: '/panduan/cli-repl' }
+          { text: 'Mulai Cepat & Langkah Pertama', link: '/panduan/mulai-cepat' },
+          { text: 'Perintah Terminal & REPL', link: '/panduan/cli-repl' }
         ]
       },
       {
         text: '🧠 Dasar Bahasa',
         items: [
-          { text: 'Variabel & Tipe Data', link: '/dasar/variabel-tipe' },
-          { text: 'Operator & Ekspresi', link: '/dasar/operator' },
-          { text: 'Kontrol Alur & Penanganan Galat', link: '/dasar/kontrol-alur' },
-          { text: 'Fungsi & Fungsi Anonim', link: '/dasar/fungsi' },
-          { text: 'Fungsi Bawaan (Built-in)', link: '/dasar/fungsi-bawaan' }
+          { text: 'Variabel & Jenis Data', link: '/dasar/variabel-tipe' },
+          { text: 'Tanda Hitung & Penghubung', link: '/dasar/operator' },
+          { text: 'Keputusan, Perulangan, & Kendala', link: '/dasar/kontrol-alur' },
+          { text: 'Fungsi & Tindakan', link: '/dasar/fungsi' },
+          { text: 'Perintah Bawaan Siap Pakai', link: '/dasar/fungsi-bawaan' }
         ]
       },
       {
         text: '✨ Fitur Khas Celang',
         items: [
-          { text: 'Variabel Time-Travel', link: '/fitur-khas/time-travel' },
-          { text: 'Bentuk (Struct) & Metode', link: '/fitur-khas/bentuk-struct' },
-          { text: 'Generik (Type Parameters & Constraints)', link: '/fitur-khas/generik' },
-          { text: 'Titip & Jemput (Non-blocking Async)', link: '/fitur-khas/titip-jemput' },
-          { text: 'Saluran (CSP Channel Concurrency)', link: '/fitur-khas/saluran' },
-          { text: 'Fungsi Ringkas Panah (=>)', link: '/fitur-khas/fungsi-ringkas' },
-          { text: 'Destrukturisasi (Array & Map)', link: '/fitur-khas/destrukturisasi' },
-          { text: 'String Interpolation', link: '/fitur-khas/interpolasi-teks' },
-          { text: 'Pipeline Operator (|>)', link: '/fitur-khas/pipeline' },
-          { text: 'Ergonomi & Null Safety (mungkin, kalau kosong, saat_selesai, ..)', link: '/fitur-khas/ergonomi-dan-null-safety' },
-          { text: 'Konkurensi Alami (sambil & bersamaan)', link: '/fitur-khas/konkurensi' }
+          { text: 'Variabel yang Mengingat Masa Lalu', link: '/fitur-khas/time-travel' },
+          { text: 'Bentuk Data Kustom (bentuk)', link: '/fitur-khas/bentuk-struct' },
+          { text: 'Wadah Fleksibel (Generik)', link: '/fitur-khas/generik' },
+          { text: 'Titip & Jemput (Tugas Latar Belakang)', link: '/fitur-khas/titip-jemput' },
+          { text: 'Saluran Pengiriman Pesan', link: '/fitur-khas/saluran' },
+          { text: 'Rumus Cepat Panah (=>)', link: '/fitur-khas/fungsi-ringkas' },
+          { text: 'Membongkar Isi Paket (Destrukturisasi)', link: '/fitur-khas/destrukturisasi' },
+          { text: 'Menyisipkan Nilai ke Kalimat', link: '/fitur-khas/interpolasi-teks' },
+          { text: 'Penyaluran Berantai (|>)', link: '/fitur-khas/pipeline' },
+          { text: 'Keamanan Nilai Kosong & Kenyamanan', link: '/fitur-khas/ergonomi-dan-null-safety' },
+          { text: 'Pekerjaan Bersamaan (sambil & bersamaan)', link: '/fitur-khas/konkurensi' }
         ]
       },
       {
-        text: '🎨 Syntax Styling',
+        text: '🎨 Gaya Bahasa & Penulisan',
         items: [
-          { text: 'Multi-Dialek (ID, Sunda, JS, Pythonic)', link: '/gaya-sintaks/multi-dialek' },
-          { text: 'In-Code Styling Block', link: '/gaya-sintaks/in-code-styling' },
-          { text: 'Membuat Berkas .style Kustom', link: '/gaya-sintaks/berkas-style' }
+          { text: 'Gaya Bahasa Fleksibel (Multi-Dialek)', link: '/gaya-sintaks/multi-dialek' },
+          { text: 'Mengubah Gaya di Tengah Kode', link: '/gaya-sintaks/in-code-styling' },
+          { text: 'Membuat Gaya Bahasa Sendiri (.style)', link: '/gaya-sintaks/berkas-style' }
         ]
       },
       {
-        text: '📦 Pustaka Standar (Stdlib)',
+        text: '📦 Alat Bantu Bawaan',
         items: [
-          { text: 'Modul Matematika (math)', link: '/pustaka-standar/matematika' },
-          { text: 'Modul Teks (strings)', link: '/pustaka-standar/teks' },
-          { text: 'Modul Waktu (time)', link: '/pustaka-standar/waktu' },
-          { text: 'Modul Berkas (fs)', link: '/pustaka-standar/berkas' },
-          { text: 'Modul JSON', link: '/pustaka-standar/json' }
+          { text: 'Alat Perhitungan (matematika)', link: '/pustaka-standar/matematika' },
+          { text: 'Pengolah Teks (teks)', link: '/pustaka-standar/teks' },
+          { text: 'Penunjuk Waktu (waktu)', link: '/pustaka-standar/waktu' },
+          { text: 'Pengelola Berkas (berkas)', link: '/pustaka-standar/berkas' },
+          { text: 'Pertukaran Data (json)', link: '/pustaka-standar/json' }
         ]
       },
       {
-        text: '⚙️ Arsitektur Internal',
+        text: '⚙️ Cara Kerja di Balik Layar',
         items: [
-          { text: 'Universal AST (U-AST) & JSON Serde', link: '/arsitektur/uast' },
-          { text: 'Bytecode Compiler & Virtual Machine', link: '/arsitektur/bytecode-vm' }
+          { text: 'Pohon Logika Murni (U-AST)', link: '/arsitektur/uast' },
+          { text: 'Mesin Eksekusi Cepat (Bytecode VM)', link: '/arsitektur/bytecode-vm' }
         ]
       }
     ],

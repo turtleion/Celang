@@ -1,106 +1,53 @@
-# Peta Jalan Fitur Mendatang Celang (`ROADMAP.md`)
+# Peta Perkembangan Proyek Celang (`ROADMAP.md`)
 
-Dokumen ini mencatat rencana pengembangan fitur lanjutan untuk bahasa pemrograman Celang setelah implementasi sistem Visibilitas Modul, Runtime Error Handling, Operator Pipeline (`|>`), dan In-Code Styling (`gaya "..." { }`).
-
----
-
-## 📌 Prioritas Saat Ini: Standard Library Bawaan (*Batteries Included*)
-Fokus utama saat ini adalah menyediakan pustaka standar bawaan agar Celang dapat digunakan untuk membuat program dunia nyata (I/O berkas, matematika, manipulasi teks, waktu, dan format JSON) tanpa bergantung pada pustaka eksternal.
-
-> Rincian pendekatan teknis dan arsitektur pengikatan host runtime (Go) dibahas secara lengkap di berkas terpisah: [`STDLIB_APPROACH.md`](./STDLIB_APPROACH.md).
+Dokumen ini mencatat pencapaian fitur yang telah berhasil diimplementasikan di dalam Celang serta rencana arah pengembangan untuk masa depan.
 
 ---
 
-## 🗺️ Rangkuman Fitur-Fitur Masa Depan
+## 🏆 Fitur yang Telah Selesai Diimplementasikan
 
-### 1. 📦 Standard Library Bawaan (✅ Selesai di `feature/stdlib`)
-Modul-modul inti yang terikat langsung ke sistem operasi melalui backend runtime Go:
-- **`berkas` / `fs`**: I/O berkas dan folder (`baca`, `tulis`, `tambah`, `ada`, `hapus`).
-- **`matematika` / `math`**: Operasi numerik presisi (`akar`, `pangkat`, `mutlak`, `bulat`, `lantai`, `atap`, `acak`, `maks`, `min`, konstanta `PI`, `E`).
-- **`teks` / `strings`**: Pemrosesan string (`pisah`, `gabung`, `ganti`, `berisi`, `kapital`, `kecil`, `potong`, `dimulai_dengan`, `diakhiri_dengan`).
-- **`waktu` / `time`**: Penanganan waktu & penundaan (`sekarang`, `sekarang_detik`, `format`, `tidur`).
-- **`json`**: Serialisasi & parsing objek JSON rekursif (`uraikan` / `parse`, `format` / `stringify`).
+Seluruh fitur di bawah ini telah teruji penuh dan siap digunakan di versi Celang saat ini:
 
----
+### 1. Fondasi Inti & Bahasa
+- [x] **Pohon Logika Murni (Universal AST)**: Representasi kode independen dari gaya bahasa, mendukung ekspor dan impor berkas JSON lossless dua arah (`.ast`).
+- [x] **Variabel Penjelajah Waktu**: Kemampuan variabel mengingat masa lalunya (`.sebelumnya`, `.awal`, dan `.histori`) dengan pembatas memori aman (50 catatan).
+- [x] **Pengenalan Angka Alami (Smart Fallback Coercion)**: Kemampuan mengenali angka di dalam teks sehari-hari seperti `"Rp 150000" - 25000`.
+- [x] **Penyaluran Data Berantai (`|>`)**: Mengalirkan data dari kiri ke kanan secara alami.
+- [x] **Interpolasi Teks**: Menyisipkan nilai langsung ke dalam kalimat menggunakan tanda `{...}` atau `${...}`.
+- [x] **Membongkar Paket Data (Destrukturisasi)**: Membongkar isi array dan map langsung ke dalam variabel terpisah.
+- [x] **Jaring Pengaman Nilai Kosong**: Kata kunci `mungkin`, `?.`, dan nilai cadangan `kalau kosong` (atau `??`).
+- [x] **Pembersihan Otomatis**: Kata kunci `saat_selesai` / `defer` untuk tindakan perapian terjamin.
 
-### 2. ✨ String Interpolation (✅ Selesai)
-Menggantikan penggabungan string bertingkat (`"Halo " + nama + ", umur " + umur`) dengan sintaks templat yang bersih dan ekspresif.
+### 2. Bentuk Data & Fitur Modern
+- [x] **Bentuk Data Kustom (`bentuk`)**: Pemodelan data dengan metode, hak akses `privat`, dan jalan pintas `@`.
+- [x] **Wadah Fleksibel (Generik)**: Dukungan parameter jenis data `<T>` dengan pembatas alami `harus` (contoh `<T harus Angka>`).
+- [x] **Saluran Pengiriman Pesan (`saluran`)**: Pipa komunikasi aman dengan antrean, pengiriman (`.kirim`), penerimaan (`.terima`), penutupan (`.tutup`), dan perulangan `untuk .. dalam`.
+- [x] **Titip & Jemput**: Menitipkan tugas di latar belakang (`titip`), menukar tiket untuk mengambil hasil (`jemput`), serta kombinasi `jemput_semua` dan `jemput_pertama`.
+- [x] **Rumus Cepat Panah (`=>`)**: Penulisan rumus satu baris yang ringkas.
 
-#### Contoh Sintaks:
-```celang
-buat nama = "Budi"
-buat saldo = 50000
+### 3. Mesin Eksekusi & Kinerja
+- [x] **Kompiler Bytecode & Mesin Virtual (VM)**: Kompilasi pohon logika menjadi instruksi ringkas dan eksekusi tumpukan cepat sebagai mode eksekusi bawaan (*default*).
+- [x] **Penafsir Pohon Logika Alternatif**: Opsi `--ast` untuk analisis langsung pohon logika.
+- [x] **Diagnostik Empati Manusiawi**: Pesan kesalahan yang menampilkan kotak petunjuk ramah dan saran perbaikan praktis.
 
-// Gaya Indonesia:
-buat pesan = "Halo {nama}, sisa saldo kamu: Rp {saldo}."
-
-// Gaya JavaScript:
-let pesan = `Halo ${nama}, sisa saldo kamu: Rp ${saldo}.`
-```
-
----
-
-### 3. 🧩 Destructuring Assignment (✅ Selesai)
-Memungkinkan pemecahan elemen array atau properti map langsung ke variabel mandiri dalam satu baris deklarasi.
-
-#### Contoh Pembongkaran Array:
-```celang
-buat koordinat = [100, 250]
-buat [x, y] = koordinat
-// x = 100, y = 250
-```
-
-#### Contoh Pembongkaran Map (Object):
-```celang
-buat profil = { "nama": "Andi", "peran": "Admin" }
-buat { nama, peran } = profil
-// nama = "Andi", peran = "Admin"
-```
+### 4. Ekosistem Gaya Bahasa & Perkakas
+- [x] **Gaya Bahasa Fleksibel (Multi-Dialek)**: Profil bawaan Bahasa Indonesia, Basa Sunda, JavaScript, dan Pythonic.
+- [x] **Format Ulang Kode Otomatis**: Perintah `celang format` untuk menerjemahkan tampilan kode antar gaya.
+- [x] **Mengubah Gaya di Tengah Kode**: Blok `gaya "..." { ... }`.
+- [x] **Jendela Interaktif (REPL)**: Sesi interaktif terminal dengan riwayat, dukungan banyak baris, dan perintah khusus.
+- [x] **Pustaka Standar Bawaan**: Modul `matematika` (`math`), `teks` (`strings`), `waktu` (`time`), `berkas` (`fs`), dan `json`.
+- [x] **WebAssembly Playground**: Menjalankan Celang langsung di peramban web tanpa perlu instalasi.
+- [x] **Ekstensi Resmi Visual Studio Code**: Pewarnaan kode, cuplikan cepat (snippets), dan penutupan kurung otomatis.
 
 ---
 
-### 4. 🏗️ Tipe Data Kustom / Struct (`bentuk` / `struct` / `tipe`) (✅ Selesai)
-Mendukung pendefinisian cetak biru objek dengan tipe properti yang jelas serta kemampuan menyematkan fungsi (method).
+## 🚀 Rencana Masa Depan (Eksplorasi Lanjutan)
 
-#### Contoh Sintaks:
-```celang
-bentuk RekeningBank {
-    pemilik: Teks,
-    saldo itu Angka,
+Berikut beberapa ide yang dipertimbangkan untuk pengembangan berikutnya:
 
-    fungsi setor(jumlah: Angka) {
-        diri.saldo += jumlah
-    }
-}
-
-buat akun = RekeningBank("Budi", 100000)
-akun.setor(50000)
-cetak(akun.saldo) // 150000
-```
-
----
-
-### 5. 💻 REPL Interaktif (`celang repl` / `celang`) (✅ Selesai)
-Menyediakan terminal interaktif baris perintah di mana programmer dapat:
-- Mengetik baris kode Celang dan langsung melihat output hasil evaluasinya.
-- Menguji pipa ekspresi (`|>`) secara instan.
-- Melihat konversi dialek sintaks (*Live Styling Preview*) langsung di terminal.
-- Menggunakan perintah meta REPL (`:lingkungan`, `:gaya`, `:ast`, `:bersih`, `:reset`).
-
-```bash
-$ celang
-🌟 Celang REPL v1.0 (Ketik ':keluar' untuk selesai)
-celang> buat x = 10
-celang> x |> cetak()
-```
-
----
-
-### 6. 🛠️ Tooling Formatter In-Place (`celang format -w`) (✅ Selesai)
-Menambahkan flag `-w` / `--write` pada CLI pemformatan (mirip `gofmt -w` atau `prettier --write`):
-```bash
-# Menimpa file di tempat dengan kode yang sudah terformat rapi
-celang format -w program.ce --style=indonesian
-celang format -w program.ce --style=./jawa.style
-```
-Serta integrasi filter otomatis saat check-in ke sistem Git (*clean/smudge filter*).
+1. **Pengelola Paket Komunitas (Package Manager)**:
+   - Kemudahan mengunduh dan berbagi modul buatan komunitas langsung lewat perintah terminal.
+2. **Kompilasi Biner Mandiri**:
+   - Kemampuan membungkus program Celang menjadi satu berkas biner mandiri yang bisa dijalankan langsung di komputer orang lain tanpa perlu memasang Celang terlebih dahulu.
+3. **Penyempurnaan Integrasi Editor (Language Server Protocol / LSP)**:
+   - Menyediakan fitur pelengkapan kata otomatis (*auto-complete*) dan pemeriksaan kesalahan saat mengetik di editor.

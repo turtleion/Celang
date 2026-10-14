@@ -1,99 +1,70 @@
-# Universal AST (U-AST) & JSON Serde
+# Bagaimana Celang Mengingat Kode: Pohon Logika Murni (U-AST)
 
-Salah satu pilar arsitektur utama Celang adalah **Universal Abstract Syntax Tree (U-AST)**. Alih-alih mengikat pohon sintaksis secara erat dengan kata kunci gramatikal tertentu, Celang merepresentasikan seluruh konstruksi kode ke dalam struktur semantik universal yang independen dari gaya bahasa (*syntax-agnostic*).
+Pernahkah Anda memikirkan sebuah ide, lalu Anda bisa menceritakan ide tersebut dalam Bahasa Indonesia, Bahasa Inggris, atau Bahasa Sunda? 
+
+Idenya tetap sama, yang berganti hanyalah kata-kata yang keluar dari mulut Anda.
+
+Itulah cara kerja **Universal Abstract Syntax Tree (U-AST)** atau **Pohon Logika Murni** di Celang.
 
 ---
 
-## 1. Konsep & Filosofi
+## 1. Ide Pikiran vs Kata-Kata yang Terlihat
 
-Dalam kebanyakan kompiler tradisional:
-```
-Kode Sumber (Go/Python) ──► AST Spesifik Bahasa ──► Bytecode / Machine Code
-```
+Di kebanyakan bahasa pemrograman konvensional, teks tulisan dan logika program menempel secara kaku. Jika Anda mengubah kata kuncinya, komputernya langsung bingung.
 
-Dalam Celang:
+Celang memisahkan keduanya:
+- **Pohon Logika (U-AST)** ibarat **isi pikiran murni** dari program Anda.
+- **Teks Kode (.ce)** ibarat **pakaian atau bahasa** yang digunakan untuk membaca pikiran tersebut ke mata manusia.
+
 ```mermaid
 flowchart LR
-    ID[Kode Gaya Indonesia] --> P[Universal Parser]
+    ID[Kode Bahasa Indonesia] --> P[Penerjemah Celang]
     JS[Kode Gaya JavaScript] --> P
-    SU[Kode Gaya Sunda] --> P
+    SU[Kode Basa Sunda] --> P
     
-    P --> UAST[(Universal AST)]
+    P --> UAST[(Pohon Logika Murni)]
     
-    UAST --> F1[Formatter: Cetak Gaya Sunda]
-    UAST --> F2[Formatter: Cetak Gaya JS]
-    UAST --> INT[Tree-Walking Interpreter]
-    UAST --> COMP[Bytecode Compiler & VM]
-    UAST --> JSON[JSON Serde .ast]
+    UAST --> F1[Tampilkan dalam Basa Sunda]
+    UAST --> F2[Tampilkan dalam Gaya JavaScript]
+    UAST --> VM[Jalankan di Komputer]
+    UAST --> JSON[Simpan ke Berkas .ast]
 ```
 
-Karena pohon semantiknya bersifat universal:
-1. Kode dari dialek apa pun menghasilkan U-AST yang identik.
-2. Formatter dapat mencetak U-AST kembali ke dialek mana pun tanpa mengubah makna program.
-3. Seluruh pohon U-AST dapat disimpan ke berkas JSON (`.ast`) dan dijalankan ulang kapan saja.
+### Apa Manfaatnya bagi Pengguna?
+1. **Tidak Ada Perdebatan Format**: Jika rekan kerja Anda lebih suka gaya JavaScript dan Anda lebih suka Bahasa Indonesia, Anda berdua bisa melihat logika yang sama persis sesuai kenyamanan mata masing-masing.
+2. **Kekebalan dari Kesalahan Ejaan**: Karena yang disimpan dan dijalankan adalah inti logikanya, mengganti tampilan tidak akan merusak alur perhitungan program.
+3. **Bisa Disimpan sebagai Data**: Seluruh pohon logika ini dapat disimpan ke berkas data berekstensi `.ast` dan dijalankan langsung kapan saja.
 
 ---
 
-## 2. Struktur Node U-AST
+## 2. Mengenal Bagian-Bagian dalam Pohon Logika
 
-U-AST dibangun di atas paket Go [`pkg/uast`](file:///home/yosatsu/Coding/Celang/pkg/uast).
+Di dalam ingatan komputer, program Anda disusun seperti dahan pohon keluarga yang rapi:
 
-### Hierarki Dasar
-
-- **`Program`**: Simpul akar yang memuat deretan `Statements`.
-- **`Statement`**: Pernyataan eksekutif yang tidak mengembalikan nilai secara langsung:
-  - `VarDeclStatement`: Deklarasi variabel (`buat x = 10` / `let x = 10`)
-  - `ConstDeclStatement`: Deklarasi konstanta
-  - `FunctionDeclaration`: Deklarasi fungsi bernama
-  - `StructDeclaration`: Deklarasi bentuk / struktur data
-  - `IfStatement`: Percabangan kondisi
-  - `WhileStatement` & `ForStatement`: Perulangan
-  - `ConcurrencyStatement`: Blok `sambil` / `bersamaan`
-  - `TimeTravelStatement`: Blok perjalanan waktu `mundur ke ...`
-- **`Expression`**: Konstruksi ekspresi yang menghasilkan nilai:
-  - `BinaryExpression`: Operasi biner (`+`, `-`, `*`, `==`)
-  - `PipelineExpression`: Operasi pipa (`|>`)
-  - `CallExpression`: Pemanggilan fungsi / metode
-  - `DestructureAssignment`: Destrukturisasi array atau kamus
+1. **Pernyataan Tindakan**: Perintah yang melakukan sesuatu tetapi tidak menghasilkan nilai balasan langsung.
+   - Membuat wadah nilai baru (`buat nama = "Budi"`).
+   - Mengambil keputusan (`jika nilai > 75 ...`).
+   - Melakukan pengulangan (`untuk orang dalam sahabat ...`).
+2. **Ungkapan Nilai**: Bagian yang menghasilkan sebuah jawaban atau angka.
+   - Perhitungan hitungan (`10 + 20`).
+   - Pengambilan keputusan ya/tidak (`umur >= 17`).
+   - Pemanggilan tindakan (`cetak("Halo")`).
 
 ---
 
-## 3. Serialisasi & Deserialisasi JSON (Serde)
+## 3. Menyimpan dan Menjalankan Berkas Logika (.ast)
 
-U-AST memiliki dukungan bawaan untuk serialisasi dua arah (*bidirectional JSON serde*).
-
-### Mengekspor U-AST ke JSON
-
-Anda dapat mengintrospeksi pohon AST menggunakan perintah baris Celang:
+Selain berkas teks biasa (`.ce`), Celang dapat mengubah program Anda langsung menjadi berkas data logika berformat JSON (`.ast`):
 
 ```bash
-# Menghasilkan berkas pohon sintaksis program.ast
-celang parse program.ce -o program.ast
+# Mengubah berkas kode menjadi berkas data logika:
+./celang compile program.ce -o program.ast
 ```
 
-Contoh cuplikan dokumen JSON AST untuk deklarasi variabel:
-
-```json
-{
-  "type": "VarDeclStatement",
-  "name": "saldo",
-  "value": {
-    "type": "IntegerLiteral",
-    "value": 1500000
-  },
-  "metadata": {
-    "line": 4,
-    "column": 1
-  }
-}
-```
-
-### Menjalankan Berkas U-AST Langsung
-
-Celang dapat mengeksekusi berkas `.ast` secara langsung tanpa melalui tahap lexing dan parsing ulang:
+Berkas `.ast` yang dihasilkan berisi catatan struktur logika murni. Anda dapat menjalankannya langsung di terminal:
 
 ```bash
-celang run program.ast
+./celang run program.ast
 ```
 
-Fitur ini membuka peluang integrasi ekosistem yang luar biasa: IDE, static analyzer, AI code generator, atau linter pihak ketiga dapat memanipulasi AST berupa file JSON biasa tanpa perlu menulis parser bahasa dari nol!
+Karena formatnya adalah data biasa, alat bantu lain seperti editor kode, pemeriksa otomatis, atau kecerdasan buatan dapat membaca dan memahami program Anda dengan sangat mudah tanpa harus meraba-raba teks mentah dari awal.

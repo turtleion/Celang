@@ -1,80 +1,64 @@
-# In-Code Styling Block
+# Mengubah Gaya di Tengah Kode (`gaya "..." { }`)
 
-Selain menetapkan dialek untuk seluruh berkas via baris perintah atau header `@gaya`, Celang memiliki fitur unik: **In-Code Styling Block**.
+Selain menentukan gaya bahasa untuk satu berkas utuh, Celang memiliki fitur yang sangat unik: **Mengubah Gaya Bahasa di Tengah-Tengah Program**.
 
-Fitur ini memungkinkan pengembang berpindah dialek di tengah-tengah kode program menggunakan blok `gaya "<nama_dialek>" { ... }`.
-
----
-
-## 1. Motivasi & Kegunaan
-
-Bayangkan skenario berikut:
-1. Anda sedang menulis aplikasi berlogika bisnis berbahasa Indonesia.
-2. Anda menyalin pustaka kecil (*snippet*) algoritma dari komunitas JavaScript atau Python.
-3. Alih-alih harus menerjemahkan keyword secara manual satu per satu, Anda cukup membungkusnya dalam blok `gaya "javascript"` atau `gaya "pythonic"`.
-4. Variabel dan fungsi yang dideklarasikan di dalam blok tersebut **langsung dapat digunakan** oleh bagian kode lainnya!
+Fitur ini memungkinkan Anda berpindah gaya bahasa untuk beberapa baris kode tertentu menggunakan blok `gaya "<nama_gaya>" { ... }`.
 
 ---
 
-## 2. Contoh Penggunaan
+## 💡 Kapan Ini Bermanfaat?
 
-Berikut adalah contoh nyata dari berkas [examples/incode_styling.ce](file:///home/yosatsu/Coding/Celang/examples/incode_styling.ce):
+Bayangkan situasi berikut:
+1. Anda sedang menulis program utama menggunakan Bahasa Indonesia yang nyaman.
+2. Anda menemukan cuplikan rumus yang bagus dari internet yang ditulis dalam gaya JavaScript atau Python.
+3. Alih-alih harus menerjemahkan kata demi kata secara manual, Anda cukup membungkus rumus tersebut di dalam blok `gaya "javascript"` atau `gaya "pythonic"`.
+4. Variabel dan fungsi yang Anda buat di dalam blok tersebut **tetap bisa dipakai langsung** oleh bagian program lainnya!
+
+---
+
+## 📝 Contoh Nyata
+
+Berikut contoh program yang memadukan Bahasa Indonesia, JavaScript, dan Python dalam satu berkas:
 
 ```celang
-// @gaya: indonesian
+// 1. Bagian Utama Ditulis dalam Bahasa Indonesia
+buat namaPengguna = "Budi"
+cetak("Nama Pengguna:", namaPengguna)
 
-// 1. Kode Utama dalam Gaya Indonesia
-buat nama_pengguna = "Budi"
-cetak("Nama Pengguna:", nama_pengguna)
-
-// 2. Blok dengan Gaya JavaScript (In-Code Styling Block)
+// 2. Meminjam Gaya JavaScript untuk Memeriksa Akses
 gaya "javascript" {
-    let status_login = true
-    function cek_akses(user) {
-        return user === "Budi" && status_login
+    let statusLogin = true
+    function cekAkses(user) {
+        return user == "Budi" && statusLogin
     }
-    let diizinkan = cek_akses(nama_pengguna)
+    let diizinkan = cekAkses(namaPengguna)
 }
 
-// 3. Kembali ke Konteks Global (Variabel & Fungsi Tetap Tersedia)
-jika (diizinkan) {
-    cetak("Akses Diberikan: Selamat datang,", nama_pengguna)
+// 3. Kembali ke Bahasa Indonesia (Variabel 'diizinkan' tetap bisa dipakai!)
+jika diizinkan {
+    cetak("Akses Diberikan: Selamat datang,", namaPengguna)
 } selain {
     cetak("Akses Ditolak!")
 }
 
-// 4. Blok dengan Gaya Pythonic
+// 4. Meminjam Gaya Python untuk Rumus Bunga
 gaya "pythonic" {
-    def hitung_proyeksi(pokok, bunga, tahun): {
-        total = pokok
-        for t in rentang(1, tahun): {
-            total = total + (total * bunga / 100)
-        }
-        return total
+    def hitungBunga(pokok, persen): {
+        return pokok * persen / 100
     }
-    saldo_akhir = hitung_proyeksi(1000000, 10, 3)
+    bonus = hitungBunga(1000000, 10)
 }
 
-cetak("Saldo Proyeksi Akhir:", saldo_akhir)
+cetak("Bonus Akhir:", bonus) // 100000
 ```
 
 ---
 
-## 3. Cara Kerja di Balik Layar
+## ⚙️ Cara Kerja di Balik Layar
 
-Ketika parser Celang menemukan kata kunci `gaya "<profil>" { ... }`:
+Ketika Celang menemukan perintah `gaya "nama_gaya" { ... }`:
 
-```mermaid
-flowchart TD
-    A[Parser Membaca Kode] --> B{Ketemu 'gaya "profil"'?}
-    B -- Ya --> C[Push Profil Baru ke Stack Lexer]
-    C --> D[Tokenisasi Menggunakan Keyword Profil Baru]
-    D --> E[Parse Statement Menjadi U-AST Standar]
-    E --> F[Tutup Blok '}']
-    F --> G[Pop Profil & Kembalikan ke Profil Awal]
-    B -- Tidak --> H[Gunakan Profil Aktif]
-```
-
-1. **Lexer Context Switching**: Lexer beralih ke tabel kata kunci dialek yang diminta (`javascript`, `pythonic`, dll).
-2. **Normalisasi ke U-AST**: Pernyataan `let`, `function`, atau `def` diubah menjadi simpul U-AST universal yang sama persis seperti `buat` dan `fungsi`.
-3. **Penyatuan Lingkup (*Scope Sharing*)**: Variabel yang dibuat masuk ke dalam *Environment* aktif sehingga tidak terisolasi dan dapat saling berinteraksi secara mulus.
+1. **Berganti Kacamata Baca**: Celang sementara waktu mengganti kamus kata kuncinya menjadi kamus gaya yang diminta (misalnya mengenali kata `let`, `function`, atau `def`).
+2. **Menyimpan ke Logika Murni yang Sama**: Kata `let` atau `def` disimpan ke dalam pohon logika yang sama persis seperti `buat` dan `fungsi`.
+3. **Kembali Seperti Semula**: Begitu kurung kurawal penutup `}` tercapai, Celang kembali menggunakan kacamata baca bahasa utama.
+4. **Variabel Saling Terhubung**: Semua variabel yang dibuat di dalam blok tersebut tetap hidup dan dapat dibaca oleh bagian kode lainnya tanpa terisolasi.

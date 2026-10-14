@@ -1,54 +1,55 @@
-# 🎟️ Titip & Jemput (Non-blocking Asynchronous)
+# Menitipkan Pekerjaan & Menjemput Hasil (`titip` & `jemput`)
 
-**Titip & Jemput** adalah terobosan Celang untuk pemrograman asinkron (*asynchronous*) yang menggantikan kerumitan konsep `Promise`, `async`, dan `await` di JavaScript.
+Pernahkah Anda memesan makanan di kedai, lalu kasir memberi Anda nomor antrean atau tiket? Anda tidak perlu berdiri mematung di depan dapur; Anda bisa duduk santai membaca buku. Ketika pesanan selesai dipanggil, barulah Anda menukar nomor antrean tersebut untuk mengambil makanan Anda.
+
+Inilah cara kerja **Titip & Jemput** di Celang. Fitur ini memungkinkan program menjalankan tugas yang memakan waktu lama di latar belakang tanpa membuat aktivitas utama terhenti.
 
 ---
 
-## 🧺 Analogi Nyata: Karcis Laundry
-
-Bayangkan Anda membawa pakaian kotor ke tempat laundry:
-1. **Titip (`titip`)**: Anda menyerahkan pakaian ke kasir. Kasir langsung memberikan **Karcis/Tiket Bukti Titip**. Anda tidak berdiri melongo menunggu mesin cuci selesai berputar berjam-jam; Anda langsung bebas pergi melakukan hal lain.
-2. **Jemput (`jemput`)**: Nanti saat Anda butuh pakaian bersih tersebut, Anda datang membawa karcis untuk menjemput cucian. Jika sudah selesai, Anda menerima pakaian bersihnya. Jika mesin cuci rusak, kasir mengabari Anda (galat/error).
+## 🧺 Dua Langkah Sederhana
 
 ```
 [ Program Utama ]
        │
-       ├─► titip hitungData()  ──► Dapat <Tiket> langsung!
-       │                             │
-       │                             ▼
-       ├─► Lanjut kerja lain...   [ Goroutine latar belakang berjalan... ]
-       │                             │
-       ▼                             ▼
-   jemput tiket  ◄────────────── [ Selesai! Mengembalikan hasil ]
+       ├─► titip hitungLaporan() ──► Langsung mendapat <Tiket>!
+       │                                │
+       │                                ▼
+       ├─► Melakukan hal lain...     [ Tugas dikerjakan di latar belakang ]
+       │                                │
+       ▼                                ▼
+   jemput tiket  ◄─────────────────  [ Selesai! Mengembalikan hasil ]
 ```
+
+1. **Titip (`titip`)**: Anda menyerahkan suatu pekerjaan untuk dikerjakan di latar belakang. Anda langsung menerima sebuah **Tiket** sebagai bukti.
+2. **Jemput (`jemput`)**: Kapan pun Anda membutuhkan hasil dari pekerjaan tersebut, gunakan tiket tadi untuk mengambil hasilnya.
 
 ---
 
-## 1. Perintah Dasar: `titip` dan `jemput`
-
-### Menitipkan Pekerjaan ke Latar Belakang
-Gunakan kata kunci `titip` di depan ekspresi atau fungsi yang ingin dijalankan di latar belakang:
+## 1. Cara Menggunakan Dasar
 
 ```celang
 fungsi unduhLaporan() {
-    waktu.tidur(1000) // pura-pura proses lama 1 detik
-    kembalikan "Laporan Tahunan 2026.pdf"
+    waktu.tidur(1000) // pura-pura proses butuh 1 detik
+    kembalikan "Laporan Keuangan 2026.pdf"
 }
 
-// 1. Titip pekerjaan -> langsung dapat tiket tanpa berhenti menunggu
+// 1. Titipkan pekerjaan -> program langsung lanjut tanpa terhenti
 buat tiket = titip unduhLaporan()
-cetak("Tiket berhasil didapat, proses berjalan di latar belakang!")
+cetak("Tiket diterima, proses sedang berjalan di belakang...")
 
-// 2. Jemput hasilnya ketika dibutuhkan
+// 2. Lakukan pekerjaan lain
+cetak("Melayani pelanggan lain di meja kasir...")
+
+// 3. Ambil hasil saat siap
 buat dokumen = jemput tiket
-cetak("Dokumen diterima:", dokumen)
+cetak("Dokumen berhasil diterima:", dokumen)
 ```
 
 ---
 
-## 2. Batas Waktu Tunggu (*Timeout*)
+## 2. Batas Waktu Tunggu
 
-Tidak ingin menunggu selamanya jika proses latar belakang macet? Gunakan klausa `dalam <waktu>`:
+Jika Anda khawatir proses latar belakang macet atau memakan waktu terlalu lama, Anda dapat menetapkan batas waktu tunggu:
 
 ```celang
 buat tiketProses = titip prosesKomputasiBerat()
@@ -57,71 +58,58 @@ buat tiketProses = titip prosesKomputasiBerat()
 buat hasil = jemput tiketProses dalam 3.detik
 ```
 
-> [!NOTE]
-> Anda bisa menulis durasi dengan `3.detik`, `500.milidetik`, atau angka langsung seperti `jemput tiket dalam 3`. Jika waktu habis sebelum tugas selesai, Celang akan melempar pesan kesalahan yang ramah.
+> **Petunjuk Satuan Waktu:** Anda bisa menulis durasi dengan `3.detik`, `500.milidetik`, atau angka langsung seperti `jemput tiket dalam 3`. Jika waktu habis sebelum tugas selesai, Celang akan memberikan pemberitahuan yang ramah.
 
 ---
 
-## 3. Kombinator Lanjutan: `jemput_semua` & `jemput_pertama`
+## 3. Mengelola Banyak Tugas Sekaligus
 
-Ketika Anda memiliki beberapa tugas yang dititipkan sekaligus, Celang menyediakan dua fungsi bawaan yang sangat intuitif:
+Ketika Anda menitipkan beberapa pekerjaan secara bersamaan, Celang menyediakan dua cara mudah untuk mengambil hasilnya:
 
-### `jemput_semua([t1, t2, ...])` (Mirip `Promise.all`)
-Menunggu semua tiket selesai dikerjakan secara paralel, lalu mengembalikan sebuah daftar (*Array*) berisi seluruh hasilnya:
+### Menunggu Semua Selesai (`jemput_semua`)
+Menunggu semua tiket selesai dikerjakan, lalu mengumpulkan semua hasilnya ke dalam sebuah daftar:
 
 ```celang
 buat t1 = titip ambilDataPengguna()
 buat t2 = titip ambilDataProduk()
 buat t3 = titip ambilDataDiskon()
 
-// Menunggu ketiganya selesai secara bersamaan:
+// Menunggu ketiganya selesai:
 buat [pengguna, produk, diskon] = jemput_semua([t1, t2, t3])
 
 cetak("Semua data berhasil dimuat!")
 ```
 
-### `jemput_pertama([t1, t2, ...])` (Mirip `Promise.race`)
-Mengambil hasil dari tiket mana pun yang **paling cepat selesai**:
+### Mengambil yang Paling Cepat Selesai (`jemput_pertama`)
+Jika Anda memanggil beberapa jalur cadangan dan hanya membutuhkan satu jawaban dari yang paling cepat selesai:
 
 ```celang
-buat serverA = titip panggilServerJakarta()
-buat serverB = titip panggilServerSingapura()
+buat jalur1 = titip panggilServerJakarta()
+buat jalur2 = titip panggilServerSingapura()
 
-// Ambil respon tercepat:
-buat responTercepat = jemput_pertama([serverA, serverB])
-cetak("Respon dari server tercepat:", responTercepat)
+// Ambil jawaban dari jalur mana pun yang paling cepat merespons:
+buat responCepat = jemput_pertama([jalur1, jalur2])
+cetak("Jawaban dari server tercepat:", responCepat)
 ```
 
 ---
 
-## 4. Penanganan Galat (*Error Handling*)
+## 4. Bagaimana Jika Terjadi Masalah pada Tugas Latar Belakang?
 
-Jika tugas yang dititipkan mengalami kegagalan, galat tersebut tidak akan hilang atau membungkam program diam-diam. Galat akan otomatis dilempar saat Anda memanggil `jemput`, sehingga dapat ditangkap secara elegan menggunakan blok `coba ... tangkap`:
+Jika tugas yang dititipkan mengalami kegagalan, masalah tersebut tidak akan hilang atau membungkam program diam-diam. Masalah tersebut akan disampaikan saat Anda memanggil `jemput`, sehingga dapat Anda tangani dengan aman menggunakan blok `coba ... tangkap`:
 
 ```celang
-fungsi simpanKeServer() {
+fungsi simpanData() {
     lempar "Koneksi internet terputus!"
 }
 
-buat tiket = titip simpanKeServer()
+buat tiket = titip simpanData()
 
 coba {
     buat hasil = jemput tiket
     cetak("Sukses:", hasil)
-} tangkap (kesalahan) {
-    cetak("Peringatan:", kesalahan)
-    // Output: Peringatan: Koneksi internet terputus!
+} tangkap (masalah) {
+    cetak("Pemberitahuan:", masalah)
+    // Tampilan: Pemberitahuan: Koneksi internet terputus!
 }
 ```
-
----
-
-## 🎯 Perbandingan dengan Bahasa Lain
-
-| Konsep | JavaScript | Go | Celang |
-| :--- | :--- | :--- | :--- |
-| **Pemicu Async** | `new Promise(...)` / `async` | `go routine()` | `titip ekspresi` |
-| **Menunggu Hasil** | `await promise` | `<-channel` | `jemput tiket` |
-| **Tunggu Semua** | `Promise.all(...)` | `sync.WaitGroup` | `jemput_semua(...)` |
-| **Tunggu Tercepat**| `Promise.race(...)` | `select` | `jemput_pertama(...)` |
-| **Batas Waktu** | `AbortController` | `context.WithTimeout` | `jemput tiket dalam 3.detik` |
