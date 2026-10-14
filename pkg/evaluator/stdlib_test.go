@@ -269,6 +269,128 @@ func TestStdlib_Berkas_StreamCSP(t *testing.T) {
 	}
 }
 
+func TestStdlib_Berkas_GantiTeks(t *testing.T) {
+	tmpDir := t.TempDir()
+	f := filepath.Join(tmpDir, "config.env")
+	_ = os.WriteFile(f, []byte("PORT=3000\nENV=dev\n"), 0644)
+
+	code := `
+	berkas.ganti_teks("` + f + `", "ENV=dev", "ENV=prod")
+	berkas.baca("` + f + `")
+	`
+	res := runCelangTestCode(t, code)
+	if s, ok := res.(*String); !ok || !strings.Contains(s.Value, "ENV=prod") {
+		t.Fatalf("ganti_teks failed: %s", res.Inspect())
+	}
+}
+
+func TestStdlib_Berkas_KepalaDanEkor(t *testing.T) {
+	tmpDir := t.TempDir()
+	f := filepath.Join(tmpDir, "log.txt")
+	content := "satu\ndua\ntiga\nempat\nlima\n"
+	_ = os.WriteFile(f, []byte(content), 0644)
+
+	code := `
+	buat awal = berkas.kepala("` + f + `", 2)
+	buat akhir = berkas.ekor("` + f + `", 2)
+	[awal[0], awal[1], akhir[0], akhir[1]]
+	`
+	res := runCelangTestCode(t, code)
+	arr, ok := res.(*Array)
+	if !ok || len(arr.Elements) != 4 {
+		t.Fatalf("kepala dan ekor failed: %s", res.Inspect())
+	}
+	if arr.Elements[0].Inspect() != "satu" || arr.Elements[1].Inspect() != "dua" {
+		t.Errorf("kepala mismatch: %s, %s", arr.Elements[0].Inspect(), arr.Elements[1].Inspect())
+	}
+	if arr.Elements[2].Inspect() != "empat" || arr.Elements[3].Inspect() != "lima" {
+		t.Errorf("ekor mismatch: %s, %s", arr.Elements[2].Inspect(), arr.Elements[3].Inspect())
+	}
+}
+
+func TestStdlib_Berkas_Hash(t *testing.T) {
+	tmpDir := t.TempDir()
+	f := filepath.Join(tmpDir, "hello.txt")
+	_ = os.WriteFile(f, []byte("hello world"), 0644)
+
+	code := `
+	buat h_sha = berkas.hash("` + f + `")
+	buat h_md5 = berkas.hash("` + f + `", "md5")
+	[h_sha, h_md5]
+	`
+	res := runCelangTestCode(t, code)
+	arr, ok := res.(*Array)
+	if !ok || len(arr.Elements) != 2 {
+		t.Fatalf("hash failed: %s", res.Inspect())
+	}
+	if arr.Elements[0].Inspect() != "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9" {
+		t.Errorf("sha256 mismatch: %s", arr.Elements[0].Inspect())
+	}
+	if arr.Elements[1].Inspect() != "5eb63bbbe01eeed093cb22bb8f5acdc3" {
+		t.Errorf("md5 mismatch: %s", arr.Elements[1].Inspect())
+	}
+}
+
+func TestStdlib_Berkas_CariGlob(t *testing.T) {
+	tmpDir := t.TempDir()
+	sub1 := filepath.Join(tmpDir, "src", "controllers")
+	sub2 := filepath.Join(tmpDir, "src", "models")
+	_ = os.MkdirAll(sub1, 0755)
+	_ = os.MkdirAll(sub2, 0755)
+	_ = os.WriteFile(filepath.Join(sub1, "user.ce"), []byte("// user"), 0644)
+	_ = os.WriteFile(filepath.Join(sub2, "post.ce"), []byte("// post"), 0644)
+	_ = os.WriteFile(filepath.Join(tmpDir, "readme.txt"), []byte("txt"), 0644)
+
+	code := `
+	buat matches = berkas.cari("` + filepath.ToSlash(filepath.Join(tmpDir, "src", "**", "*.ce")) + `")
+	panjang(matches)
+	`
+	res := runCelangTestCode(t, code)
+	if i, ok := res.(*Integer); !ok || i.Value != 2 {
+		t.Fatalf("glob expected 2 matches, got: %s", res.Inspect())
+	}
+}
+
+func TestStdlib_Berkas_TelusuriWalk(t *testing.T) {
+	tmpDir := t.TempDir()
+	sub := filepath.Join(tmpDir, "sub")
+	_ = os.MkdirAll(sub, 0755)
+	_ = os.WriteFile(filepath.Join(sub, "data.json"), []byte("{}"), 0644)
+	_ = os.WriteFile(filepath.Join(sub, "notes.txt"), []byte("hi"), 0644)
+
+	code := `
+	buat daftar = []
+	berkas.telusuri("` + tmpDir + `", fungsi (jalur, info) {
+		jika info.ekstensi == ".json" {
+			daftar.tambah(info.nama)
+		}
+	})
+	daftar
+	`
+	res := runCelangTestCode(t, code)
+	arr, ok := res.(*Array)
+	if !ok || len(arr.Elements) != 1 || arr.Elements[0].Inspect() != "data.json" {
+		t.Fatalf("telusuri failed: %s", res.Inspect())
+	}
+}
+
+func TestStdlib_Berkas_PantauWatch(t *testing.T) {
+	tmpDir := t.TempDir()
+	watchFile := filepath.Join(tmpDir, "watch_me.txt")
+	_ = os.WriteFile(watchFile, []byte("awal"), 0644)
+
+	code := `
+	buat pengawas = berkas.pantau("` + tmpDir + `")
+	pengawas
+	`
+	res := runCelangTestCode(t, code)
+	ch, ok := res.(*Channel)
+	if !ok {
+		t.Fatalf("expected Channel from pantau, got: %s", res.Inspect())
+	}
+	ch.Close()
+}
+
 func TestStdlib_MatematikaAndMath(t *testing.T) {
 	code := `
 	buat r_akar = matematika.akar(25)

@@ -2,12 +2,20 @@ package evaluator
 
 import (
 	"bufio"
+	"crypto/md5"
+	"crypto/sha1"
+	"crypto/sha256"
+	"crypto/sha512"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"hash"
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
+	"time"
 )
 
 func initStdlibBerkas(env *Environment) {
@@ -102,6 +110,179 @@ func initStdlibBerkas(env *Environment) {
 	definePublicFunction(env, "tambah", tambahFn)
 	definePublicFunction(env, "append", tambahFn)
 
+	// ganti_teks / replace_text (In-Place Find & Replace)
+	gantiTeksFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 3 {
+				return newError(nil, "berkas.ganti_teks mengharapkan 3 argumen: path, teksLama, teksBaru", "Contoh: berkas.ganti_teks(\"./file.txt\", \"lama\", \"baru\")")
+			}
+			pathStr, ok1 := args[0].(*String)
+			oldStr, ok2 := args[1].(*String)
+			newStr, ok3 := args[2].(*String)
+			if !ok1 || !ok2 || !ok3 {
+				return newError(nil, "argumen berkas.ganti_teks harus berupa teks", "")
+			}
+
+			dataBytes, err := os.ReadFile(pathStr.Value)
+			if err != nil {
+				suggestion := suggestSimilarFile(pathStr.Value)
+				hint := "Pastikan berkas ada."
+				if suggestion != "" {
+					hint = fmt.Sprintf("Maksud Anda mungkin '%s'?", suggestion)
+				}
+				return newError(nil, fmt.Sprintf("Gagal membaca berkas '%s': %v", pathStr.Value, err), hint)
+			}
+
+			content := strings.ReplaceAll(string(dataBytes), oldStr.Value, newStr.Value)
+			if err := atomicWriteFile(pathStr.Value, []byte(content), 0644); err != nil {
+				return newError(nil, fmt.Sprintf("Gagal menulis hasil ganti teks: %v", err), "")
+			}
+			return TRUE
+		},
+	}
+	definePublicFunction(env, "ganti_teks", gantiTeksFn)
+	definePublicFunction(env, "replace_text", gantiTeksFn)
+
+	// kepala / head (Baca n baris pertama)
+	kepalaFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) < 1 {
+				return newError(nil, "berkas.kepala mengharapkan setidaknya 1 argumen: path berkas, [jumlah_baris=10]", "Contoh: berkas.kepala(\"./app.log\", 5)")
+			}
+			pathStr, ok := args[0].(*String)
+			if !ok {
+				return newError(nil, "argumen path harus berupa teks", "")
+			}
+			nLines := int64(10)
+			if len(args) > 1 {
+				if i, ok := args[1].(*Integer); ok {
+					nLines = i.Value
+				}
+			}
+			if nLines <= 0 {
+				return &Array{Elements: []Object{}}
+			}
+
+			f, err := os.Open(pathStr.Value)
+			if err != nil {
+				suggestion := suggestSimilarFile(pathStr.Value)
+				hint := "Pastikan berkas ada."
+				if suggestion != "" {
+					hint = fmt.Sprintf("Maksud Anda mungkin '%s'?", suggestion)
+				}
+				return newError(nil, fmt.Sprintf("Gagal membuka berkas '%s': %v", pathStr.Value, err), hint)
+			}
+			defer f.Close()
+
+			scanner := bufio.NewScanner(f)
+			var lines []Object
+			for scanner.Scan() && int64(len(lines)) < nLines {
+				lines = append(lines, &String{Value: scanner.Text()})
+			}
+			return &Array{Elements: lines}
+		},
+	}
+	definePublicFunction(env, "kepala", kepalaFn)
+	definePublicFunction(env, "head", kepalaFn)
+
+	// ekor / tail (Baca n baris terakhir)
+	ekorFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) < 1 {
+				return newError(nil, "berkas.ekor mengharapkan setidaknya 1 argumen: path berkas, [jumlah_baris=10]", "Contoh: berkas.ekor(\"./app.log\", 10)")
+			}
+			pathStr, ok := args[0].(*String)
+			if !ok {
+				return newError(nil, "argumen path harus berupa teks", "")
+			}
+			nLines := int64(10)
+			if len(args) > 1 {
+				if i, ok := args[1].(*Integer); ok {
+					nLines = i.Value
+				}
+			}
+			if nLines <= 0 {
+				return &Array{Elements: []Object{}}
+			}
+
+			f, err := os.Open(pathStr.Value)
+			if err != nil {
+				suggestion := suggestSimilarFile(pathStr.Value)
+				hint := "Pastikan berkas ada."
+				if suggestion != "" {
+					hint = fmt.Sprintf("Maksud Anda mungkin '%s'?", suggestion)
+				}
+				return newError(nil, fmt.Sprintf("Gagal membuka berkas '%s': %v", pathStr.Value, err), hint)
+			}
+			defer f.Close()
+
+			scanner := bufio.NewScanner(f)
+			var ring []string
+			for scanner.Scan() {
+				ring = append(ring, scanner.Text())
+				if int64(len(ring)) > nLines {
+					ring = ring[1:]
+				}
+			}
+			var lines []Object
+			for _, l := range ring {
+				lines = append(lines, &String{Value: l})
+			}
+			return &Array{Elements: lines}
+		},
+	}
+	definePublicFunction(env, "ekor", ekorFn)
+	definePublicFunction(env, "tail", ekorFn)
+
+	// hash / checksum (SHA-256 / MD5 / SHA-1)
+	hashFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) < 1 {
+				return newError(nil, "berkas.hash mengharapkan 1 atau 2 argumen: path, [algoritma='sha256']", "Contoh: berkas.hash(\"./file.pdf\")")
+			}
+			pathStr, ok := args[0].(*String)
+			if !ok {
+				return newError(nil, "argumen path harus berupa teks", "")
+			}
+			algo := "sha256"
+			if len(args) > 1 {
+				if a, ok := args[1].(*String); ok {
+					algo = strings.ToLower(a.Value)
+				}
+			}
+
+			var hasher hash.Hash
+			switch algo {
+			case "md5":
+				hasher = md5.New()
+			case "sha1":
+				hasher = sha1.New()
+			case "sha512":
+				hasher = sha512.New()
+			default:
+				hasher = sha256.New()
+			}
+
+			f, err := os.Open(pathStr.Value)
+			if err != nil {
+				suggestion := suggestSimilarFile(pathStr.Value)
+				hint := "Pastikan berkas ada."
+				if suggestion != "" {
+					hint = fmt.Sprintf("Maksud Anda mungkin '%s'?", suggestion)
+				}
+				return newError(nil, fmt.Sprintf("Gagal membuka berkas '%s': %v", pathStr.Value, err), hint)
+			}
+			defer f.Close()
+
+			if _, err := io.Copy(hasher, f); err != nil {
+				return newError(nil, fmt.Sprintf("Gagal menghitung hash berkas '%s': %v", pathStr.Value, err), "")
+			}
+			return &String{Value: hex.EncodeToString(hasher.Sum(nil))}
+		},
+	}
+	definePublicFunction(env, "hash", hashFn)
+	definePublicFunction(env, "checksum", hashFn)
+
 	// -------------------------------------------------------------
 	// 2. Fitur Cerdas: muat & simpan (Auto JSON / Text)
 	// -------------------------------------------------------------
@@ -146,7 +327,7 @@ func initStdlibBerkas(env *Environment) {
 	definePublicFunction(env, "muat", muatFn)
 	definePublicFunction(env, "load", muatFn)
 
-	// simpan / save (Auto JSON formatting if Map/Array or .json extension)
+	// simpan / save
 	simpanFn := &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 2 {
@@ -209,7 +390,6 @@ func initStdlibBerkas(env *Environment) {
 				return newError(nil, fmt.Sprintf("Gagal membuka aliran berkas '%s': %v", pathStr.Value, err), hint)
 			}
 
-			// Buffer 64 baris untuk streaming lancar
 			ch := NewChannel(64, "Teks")
 
 			go func() {
@@ -217,7 +397,6 @@ func initStdlibBerkas(env *Environment) {
 				defer ch.Close()
 
 				scanner := bufio.NewScanner(f)
-				// Buffer maksimum baris hingga 1MB
 				buf := make([]byte, 64*1024)
 				scanner.Buffer(buf, 1024*1024)
 
@@ -241,8 +420,164 @@ func initStdlibBerkas(env *Environment) {
 	definePublicFunction(env, "stream", alirFn)
 
 	// -------------------------------------------------------------
-	// 4. Manajemen Direktori & Berkas
+	// 4. Manajemen Direktori & Penelusuran (Glob, Watch, Walk)
 	// -------------------------------------------------------------
+
+	// cari / glob (Recursive globbing: **/*.ce)
+	cariFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 {
+				return newError(nil, "berkas.cari mengharapkan 1 argumen pola path", "Contoh: berkas.cari(\"./src/**/*.ce\")")
+			}
+			patternStr, ok := args[0].(*String)
+			if !ok {
+				return newError(nil, "argumen pola harus berupa teks", "")
+			}
+
+			matches, err := globRecursive(patternStr.Value)
+			if err != nil {
+				return newError(nil, fmt.Sprintf("Pola pencarian tidak valid '%s': %v", patternStr.Value, err), "")
+			}
+
+			elements := make([]Object, 0, len(matches))
+			for _, m := range matches {
+				elements = append(elements, &String{Value: m})
+			}
+			return &Array{Elements: elements}
+		},
+	}
+	definePublicFunction(env, "cari", cariFn)
+	definePublicFunction(env, "glob", cariFn)
+
+	// telusuri / walk (Recursive directory walker with callback)
+	telusuriFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 2 {
+				return newError(nil, "berkas.telusuri mengharapkan 2 argumen: path dan fungsi callback", "Contoh: berkas.telusuri(\"./src\", (jalur, info) => { ... })")
+			}
+			pathStr, ok := args[0].(*String)
+			if !ok {
+				return newError(nil, "argumen path harus berupa teks", "")
+			}
+			callback := args[1]
+
+			err := filepath.WalkDir(pathStr.Value, func(p string, d os.DirEntry, err error) error {
+				if err != nil {
+					return nil
+				}
+				size := int64(0)
+				if fi, sErr := d.Info(); sErr == nil {
+					size = fi.Size()
+				}
+				infoMap := &Map{
+					Pairs: map[string]Object{
+						"nama":          &String{Value: d.Name()},
+						"apakah_folder": nativeBoolToBoolean(d.IsDir()),
+						"apakah_berkas": nativeBoolToBoolean(!d.IsDir()),
+						"ekstensi":      &String{Value: filepath.Ext(d.Name())},
+						"ukuran":        &Integer{Value: size},
+					},
+					Order: []string{"nama", "apakah_folder", "apakah_berkas", "ekstensi", "ukuran"},
+				}
+
+				res := ApplyFunction(callback, []Object{&String{Value: p}, infoMap}, nil)
+				if b, ok := res.(*Boolean); ok && !b.Value {
+					if d.IsDir() {
+						return filepath.SkipDir
+					}
+				}
+				return nil
+			})
+
+			if err != nil {
+				return newError(nil, fmt.Sprintf("Gagal menelusuri '%s': %v", pathStr.Value, err), "")
+			}
+			return TRUE
+		},
+	}
+	definePublicFunction(env, "telusuri", telusuriFn)
+	definePublicFunction(env, "walk", telusuriFn)
+
+	// pantau / watch (File & Folder watcher via Saluran or Callback)
+	pantauFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) < 1 {
+				return newError(nil, "berkas.pantau mengharapkan setidaknya 1 argumen: path, [callback]", "Contoh: untuk kejadian dalam berkas.pantau(\"./src\") { ... }")
+			}
+			pathStr, ok := args[0].(*String)
+			if !ok {
+				return newError(nil, "argumen path harus berupa teks", "")
+			}
+
+			var callback Object
+			if len(args) > 1 {
+				callback = args[1]
+			}
+
+			ch := NewChannel(32, "Kamus")
+
+			// Ambil snapshot awal
+			snapshot := make(map[string]time.Time)
+			_ = filepath.WalkDir(pathStr.Value, func(p string, d os.DirEntry, err error) error {
+				if err != nil || d.IsDir() {
+					return nil
+				}
+				if fi, err := d.Info(); err == nil {
+					snapshot[p] = fi.ModTime()
+				}
+				return nil
+			})
+
+			go func() {
+				ticker := time.NewTicker(300 * time.Millisecond)
+				defer ticker.Stop()
+				defer ch.Close()
+
+				for range ticker.C {
+					ch.mu.Lock()
+					closed := ch.Closed
+					ch.mu.Unlock()
+					if closed {
+						return
+					}
+
+					current := make(map[string]time.Time)
+					_ = filepath.WalkDir(pathStr.Value, func(p string, d os.DirEntry, err error) error {
+						if err != nil || d.IsDir() {
+							return nil
+						}
+						if fi, err := d.Info(); err == nil {
+							current[p] = fi.ModTime()
+						}
+						return nil
+					})
+
+					// 1. Berkas baru / dimodifikasi
+					for p, modTime := range current {
+						prevTime, exists := snapshot[p]
+						if !exists {
+							sendWatchEvent(ch, callback, p, "buat", "create")
+						} else if modTime.After(prevTime) {
+							sendWatchEvent(ch, callback, p, "ubah", "modify")
+						}
+					}
+
+					// 2. Berkas dihapus
+					for p := range snapshot {
+						if _, exists := current[p]; !exists {
+							sendWatchEvent(ch, callback, p, "hapus", "delete")
+						}
+					}
+
+					snapshot = current
+				}
+			}()
+
+			return ch
+		},
+	}
+	definePublicFunction(env, "pantau", pantauFn)
+	definePublicFunction(env, "watch", pantauFn)
 
 	// ada / exists
 	adaFn := &Builtin{
@@ -417,7 +752,6 @@ func initStdlibBerkas(env *Environment) {
 
 			err := os.Rename(srcStr.Value, dstStr.Value)
 			if err != nil {
-				// Fallback jika lintas filesystem: copy lalu remove
 				fi, statErr := os.Stat(srcStr.Value)
 				if statErr != nil {
 					return newError(nil, fmt.Sprintf("Gagal memindahkan '%s': %v", srcStr.Value, err), "")
@@ -662,8 +996,122 @@ func initStdlibBerkas(env *Environment) {
 }
 
 // -------------------------------------------------------------
-// Helper Functions (Atomic Write, Copy, Typo Suggestion)
+// Helper Functions (Atomic Write, Copy, Typo Suggestion, Watch, Glob)
 // -------------------------------------------------------------
+
+func sendWatchEvent(ch *Channel, callback Object, path, aksi, action string) {
+	eventMap := &Map{
+		Pairs: map[string]Object{
+			"path":   &String{Value: path},
+			"aksi":   &String{Value: aksi},
+			"action": &String{Value: action},
+		},
+		Order: []string{"path", "aksi", "action"},
+	}
+
+	if callback != nil {
+		_ = ApplyFunction(callback, []Object{eventMap}, nil)
+	}
+
+	ch.mu.Lock()
+	closed := ch.Closed
+	ch.mu.Unlock()
+	if !closed {
+		select {
+		case ch.Ch <- eventMap:
+		default:
+		}
+	}
+}
+
+func globRecursive(pattern string) ([]string, error) {
+	patternClean := filepath.Clean(pattern)
+	patternSlash := filepath.ToSlash(patternClean)
+
+	parts := strings.Split(patternSlash, "/")
+	baseDir := "."
+	wildcardIdx := -1
+	for i, part := range parts {
+		if strings.ContainsAny(part, "*?[]") {
+			wildcardIdx = i
+			break
+		}
+	}
+
+	if wildcardIdx == -1 {
+		if _, err := os.Stat(patternClean); err == nil {
+			return []string{patternClean}, nil
+		}
+		return []string{}, nil
+	}
+
+	if wildcardIdx > 0 {
+		baseDir = filepath.FromSlash(strings.Join(parts[:wildcardIdx], "/"))
+	}
+
+	re, err := globToRegex(patternSlash)
+	if err != nil {
+		return nil, err
+	}
+
+	var matches []string
+	err = filepath.WalkDir(baseDir, func(p string, d os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return nil
+		}
+		pSlash := filepath.ToSlash(filepath.Clean(p))
+		trimmed := strings.TrimPrefix(pSlash, "./")
+		pattTrimmed := strings.TrimPrefix(patternSlash, "./")
+
+		if re.MatchString(pSlash) || re.MatchString(trimmed) || re.MatchString("./"+trimmed) {
+			matches = append(matches, filepath.FromSlash(p))
+		} else if strings.HasPrefix(patternSlash, "**/") {
+			// Jika pola dimulai dengan **/, cocokkan nama relatif
+			if re.MatchString(trimmed) {
+				matches = append(matches, filepath.FromSlash(p))
+			}
+		} else if strings.HasPrefix(pattTrimmed, "*") && !d.IsDir() {
+			if matched, _ := filepath.Match(pattTrimmed, filepath.Base(p)); matched {
+				matches = append(matches, filepath.FromSlash(p))
+			}
+		}
+		return nil
+	})
+
+	return matches, err
+}
+
+func globToRegex(glob string) (*regexp.Regexp, error) {
+	var b strings.Builder
+	b.WriteString("^")
+	i := 0
+	for i < len(glob) {
+		if i+1 < len(glob) && glob[i:i+2] == "**" {
+			if i+2 < len(glob) && glob[i+2] == '/' {
+				b.WriteString("(?:.*/)?")
+				i += 3
+			} else {
+				b.WriteString(".*")
+				i += 2
+			}
+		} else if glob[i] == '*' {
+			b.WriteString("[^/]*")
+			i++
+		} else if glob[i] == '?' {
+			b.WriteString("[^/]")
+			i++
+		} else {
+			char := glob[i]
+			if strings.ContainsRune(`.+()|[]{}^$\`, rune(char)) {
+				b.WriteByte('\\')
+			}
+			b.WriteByte(char)
+			i++
+		}
+	}
+	b.WriteString("$")
+	return regexp.Compile(b.String())
+}
 
 func nativeBoolToBoolean(b bool) *Boolean {
 	if b {
