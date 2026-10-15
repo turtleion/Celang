@@ -833,6 +833,161 @@ func TestStdlib_WaktuAndTime(t *testing.T) {
 	}
 }
 
+func TestStdlib_Waktu_FormattingAndIndo(t *testing.T) {
+	code := `
+	buat t0 = waktu.urai("2026-10-14 20:30:00")
+	buat fmt_iso = waktu.format(t0, "YYYY-MM-DD HH:mm:ss")
+	buat fmt_slash = waktu.format(t0, "DD/MM/YYYY")
+	buat fmt_id_tgl = waktu.format_indonesia(t0, "tanggal")
+	buat fmt_id_hari = waktu.format_indonesia(t0, "hari_tanggal")
+
+	[fmt_iso, fmt_slash, fmt_id_tgl, fmt_id_hari]
+	`
+	res := runCelangTestCode(t, code)
+	arr, ok := res.(*Array)
+	if !ok {
+		t.Fatalf("expected array, got %s", res.Inspect())
+	}
+	if arr.Elements[0].Inspect() != "2026-10-14 20:30:00" {
+		t.Errorf("format YYYY-MM-DD HH:mm:ss expected '2026-10-14 20:30:00', got %s", arr.Elements[0].Inspect())
+	}
+	if arr.Elements[1].Inspect() != "14/10/2026" {
+		t.Errorf("format DD/MM/YYYY expected '14/10/2026', got %s", arr.Elements[1].Inspect())
+	}
+	if arr.Elements[2].Inspect() != "14 Oktober 2026" {
+		t.Errorf("format_indonesia tanggal expected '14 Oktober 2026', got %s", arr.Elements[2].Inspect())
+	}
+	if arr.Elements[3].Inspect() != "Rabu, 14 Oktober 2026" {
+		t.Errorf("format_indonesia hari_tanggal expected 'Rabu, 14 Oktober 2026', got %s", arr.Elements[3].Inspect())
+	}
+}
+
+func TestStdlib_Waktu_RelativeTime(t *testing.T) {
+	code := `
+	buat base = 1700000000000
+	buat t_just_now = waktu.lalu(base - 10000, base)
+	buat t_mins_ago = waktu.lalu(base - 5 * 60000, base)
+	buat t_hours_ago = waktu.lalu(base - 2 * 3600000, base)
+	buat t_days_ago = waktu.lalu(base - 3 * 86400000, base)
+	buat t_future = waktu.lalu(base + 10 * 60000, base)
+
+	[t_just_now, t_mins_ago, t_hours_ago, t_days_ago, t_future]
+	`
+	res := runCelangTestCode(t, code)
+	arr, ok := res.(*Array)
+	if !ok {
+		t.Fatalf("expected array, got %s", res.Inspect())
+	}
+	if arr.Elements[0].Inspect() != "baru saja" {
+		t.Errorf("expected 'baru saja', got %s", arr.Elements[0].Inspect())
+	}
+	if arr.Elements[1].Inspect() != "5 menit yang lalu" {
+		t.Errorf("expected '5 menit yang lalu', got %s", arr.Elements[1].Inspect())
+	}
+	if arr.Elements[2].Inspect() != "2 jam yang lalu" {
+		t.Errorf("expected '2 jam yang lalu', got %s", arr.Elements[2].Inspect())
+	}
+	if arr.Elements[3].Inspect() != "3 hari yang lalu" {
+		t.Errorf("expected '3 hari yang lalu', got %s", arr.Elements[3].Inspect())
+	}
+	if arr.Elements[4].Inspect() != "10 menit lagi" {
+		t.Errorf("expected '10 menit lagi', got %s", arr.Elements[4].Inspect())
+	}
+}
+
+func TestStdlib_Waktu_DateMathAndComponents(t *testing.T) {
+	code := `
+	buat t0 = waktu.urai("2026-10-14 20:30:00")
+	buat info = waktu.info(t0)
+	buat t_plus = waktu.tambah(t0, {"hari": 2, "jam": 1})
+	buat info_plus = waktu.info(t_plus)
+	buat t_minus = waktu.kurang(t0, {"hari": 1})
+	buat info_minus = waktu.info(t_minus)
+	buat diff = waktu.selisih(t0, t_plus)
+	buat kabisat_2024 = waktu.apakah_kabisat(2024)
+	buat kabisat_2023 = waktu.apakah_kabisat(2023)
+
+	[info.tahun, info.nama_bulan, info.hari, info_plus.hari, info_plus.jam, info_minus.hari, diff.hari, diff.jam, kabisat_2024, kabisat_2023]
+	`
+	res := runCelangTestCode(t, code)
+	arr, ok := res.(*Array)
+	if !ok {
+		t.Fatalf("expected array, got %s", res.Inspect())
+	}
+	if arr.Elements[0].Inspect() != "2026" {
+		t.Errorf("info.tahun expected 2026, got %s", arr.Elements[0].Inspect())
+	}
+	if arr.Elements[1].Inspect() != "Oktober" {
+		t.Errorf("info.nama_bulan expected 'Oktober', got %s", arr.Elements[1].Inspect())
+	}
+	if arr.Elements[2].Inspect() != "14" {
+		t.Errorf("info.hari expected 14, got %s", arr.Elements[2].Inspect())
+	}
+	if arr.Elements[3].Inspect() != "16" {
+		t.Errorf("info_plus.hari expected 16, got %s", arr.Elements[3].Inspect())
+	}
+	if arr.Elements[4].Inspect() != "21" {
+		t.Errorf("info_plus.jam expected 21, got %s", arr.Elements[4].Inspect())
+	}
+	if arr.Elements[5].Inspect() != "13" {
+		t.Errorf("info_minus.hari expected 13, got %s", arr.Elements[5].Inspect())
+	}
+	if arr.Elements[6].Inspect() != "2" {
+		t.Errorf("diff.hari expected 2, got %s", arr.Elements[6].Inspect())
+	}
+	if arr.Elements[7].Inspect() != "1" {
+		t.Errorf("diff.jam expected 1, got %s", arr.Elements[7].Inspect())
+	}
+	if arr.Elements[8].Inspect() != "true" {
+		t.Errorf("kabisat 2024 expected true")
+	}
+	if arr.Elements[9].Inspect() != "false" {
+		t.Errorf("kabisat 2023 expected false")
+	}
+}
+
+func TestStdlib_Waktu_DurasiAndUkur(t *testing.T) {
+	code := `
+	buat dur_str = waktu.format_durasi(7385000)
+	buat ms_detik = waktu.detik(5)
+	buat ms_menit = waktu.menit(2)
+	buat ms_jam = waktu.jam(1)
+	buat ms_hari = waktu.hari(1)
+	buat prof = waktu.ukur(fungsi() {
+		buat x = 10 + 20
+		kembalikan x * 2
+	})
+
+	[dur_str, ms_detik, ms_menit, ms_jam, ms_hari, prof.hasil, prof.durasi_ms >= 0]
+	`
+	res := runCelangTestCode(t, code)
+	arr, ok := res.(*Array)
+	if !ok {
+		t.Fatalf("expected array, got %s", res.Inspect())
+	}
+	if arr.Elements[0].Inspect() != "2 jam 3 menit 5 detik" {
+		t.Errorf("format_durasi expected '2 jam 3 menit 5 detik', got %s", arr.Elements[0].Inspect())
+	}
+	if arr.Elements[1].Inspect() != "5000" {
+		t.Errorf("waktu.detik(5) expected 5000, got %s", arr.Elements[1].Inspect())
+	}
+	if arr.Elements[2].Inspect() != "120000" {
+		t.Errorf("waktu.menit(2) expected 120000, got %s", arr.Elements[2].Inspect())
+	}
+	if arr.Elements[3].Inspect() != "3600000" {
+		t.Errorf("waktu.jam(1) expected 3600000, got %s", arr.Elements[3].Inspect())
+	}
+	if arr.Elements[4].Inspect() != "86400000" {
+		t.Errorf("waktu.hari(1) expected 86400000, got %s", arr.Elements[4].Inspect())
+	}
+	if arr.Elements[5].Inspect() != "60" {
+		t.Errorf("prof.hasil expected 60, got %s", arr.Elements[5].Inspect())
+	}
+	if arr.Elements[6].Inspect() != "true" {
+		t.Errorf("prof.durasi_ms >= 0 expected true")
+	}
+}
+
 func TestStdlib_JSON(t *testing.T) {
 	code := `
 	buat rawJSON = "{\"nama\": \"Celang\", \"versi\": 1, \"aktif\": true, \"fitur\": [\"stdlib\", \"pipeline\"]}"

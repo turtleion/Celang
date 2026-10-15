@@ -449,3 +449,18 @@ func TestVM_Matematika_ModernFeatures(t *testing.T) {
 		t.Errorf("expected %s, got %s", expected, res.Inspect())
 	}
 }
+
+func TestVM_Waktu_ModernFeatures(t *testing.T) {
+	input := `
+	buat t0 = waktu.urai("2026-10-15 12:00:00")
+	buat t_indo = waktu.format_indonesia(t0, "tanggal")
+	buat rel = waktu.lalu(t0 - 120000, t0)
+	buat dur = waktu.format_durasi(waktu.menit(5) + waktu.detik(30))
+	t_indo + " | " + rel + " | " + dur
+	`
+	res, _, _ := runVM(t, input)
+	expected := "\"15 Oktober 2026 | 2 menit yang lalu | 5 menit 30 detik\""
+	if res.Inspect() != expected && res.Inspect() != "15 Oktober 2026 | 2 menit yang lalu | 5 menit 30 detik" {
+		t.Errorf("expected %s, got %s", expected, res.Inspect())
+	}
+}
