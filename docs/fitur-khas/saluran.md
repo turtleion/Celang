@@ -1,4 +1,4 @@
-# Saluran Pengiriman Pesan (`saluran`)
+# Saluran Komunikasi Proses (Saluran / Channel CSP)
 
 Ketika Anda memiliki dua bagian program yang bekerja sendiri-sendiri, bagaimana cara keduanya saling bertukar informasi secara teratur tanpa saling mengganggu?
 

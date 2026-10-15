@@ -33,8 +33,8 @@ features:
     title: Bentuk Data & Kemudahan Menulis
     details: Kelompokkan data dengan rapi, bongkar isi daftar secara instan, dan sisipkan nilai ke dalam kalimat dengan sangat alami.
   - icon: 🌐
-    title: Pustaka Alat Dwibasa
-    details: Alat bantu matematika, pengolah teks, penunjuk waktu, pengelola berkas, dan pertukaran data JSON siap pakai dalam bahasa lokal maupun internasional.
+    title: Pustaka Standar Dwibahasa
+    details: Pustaka matematika, pengolah teks, penunjuk waktu, pengelola berkas, pertukaran data JSON, dan sistem operasi siap pakai dalam bahasa lokal maupun internasional.
   - icon: 💖
     title: Petunjuk Kesalahan yang Ramah
     details: Saat terjadi kesalahan, aplikasi menyajikan pesan yang menuntun dengan saran solusi nyata, bukan kode acak yang membingungkan.

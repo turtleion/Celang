@@ -1,4 +1,4 @@
-# Melakukan Banyak Pekerjaan Bersamaan (`sambil` & `bersamaan`)
+# Pemrograman Konkuren & Asinkron (`sambil` & `bersamaan`)
 
 Dalam kehidupan sehari-hari, kita sering melakukan banyak hal sekaligus: mendengarkan musik **sambil** menyapu lantai, atau memasak nasi dan memanggang ikan secara **bersamaan** agar matang pada waktu yang sama.
 

@@ -1,4 +1,4 @@
-# Penyaluran Data Berantai (`|>`)
+# Operator Penyaluran (Pipeline Operator `|>`)
 
 Ketika Anda mengolah data melalui beberapa tahap secara berturut-turut, menulis fungsi di dalam fungsi yang bertumpuk-tumpuk sering kali membuat kode sulit dibaca karena harus dibaca dari tengah ke luar:
 ```celang

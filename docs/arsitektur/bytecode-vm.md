@@ -1,4 +1,4 @@
-# Mesin Virtual Cepat: Bagaimana Celang Menjalankan Program
+# Kompiler Bytecode & Mesin Virtual (VM)
 
 Agar program Anda dapat berjalan secepat kilat tanpa membebani komputer, Celang menggunakan **Mesin Virtual Berbasis Instruksi Ringkas (Bytecode VM)** sebagai mesin penggerak utamanya.
 

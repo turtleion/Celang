@@ -1,4 +1,4 @@
-# Tanda Hitung & Kata Penghubung (Operator)
+# Operator & Ekspresi Logika
 
 Operator adalah simbol atau kata penghubung khusus yang digunakan untuk menghitung angka, membandingkan dua nilai, atau merangkai logika pengambilan keputusan di dalam program Celang.
 

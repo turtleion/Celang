@@ -1,4 +1,4 @@
-# Membongkar Isi Paket Data (Destrukturisasi)
+# Destrukturisasi (Destructuring Array & Map)
 
 Bayangkan Anda baru pulang belanja dan membawa sekantong belanjaan berisi apel, jeruk, dan mangga. Daripada mengambil barang satu per satu dengan tangan kanan berkali-kali, Anda langsung membongkar kantong tersebut dan menaruh masing-masing buah ke mangkuknya masing-masing dalam satu gerakan.
 
