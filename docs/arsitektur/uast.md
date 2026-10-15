@@ -1,4 +1,4 @@
-# Bagaimana Celang Mengingat Kode: Pohon Logika Murni (U-AST)
+# Pohon Sintaks Universal (Universal AST / U-AST)
 
 Pernahkah Anda memikirkan sebuah ide, lalu Anda bisa menceritakan ide tersebut dalam Bahasa Indonesia, Bahasa Inggris, atau Bahasa Sunda? 
 

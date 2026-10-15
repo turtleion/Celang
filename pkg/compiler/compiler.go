@@ -11,8 +11,9 @@ import (
 
 // Local represents a variable stored on the VM stack within a lexical scope.
 type Local struct {
-	Name  string
-	Depth int
+	Name      string
+	Depth     int
+	IsMutable bool
 }
 
 // Compiler translates U-AST nodes into bytecode chunks.
@@ -23,14 +24,23 @@ type Compiler struct {
 	scopeDepth int
 	fnName     string
 	numParams  int
+	globals    map[string]bool
+	env        *evaluator.Environment
 }
 
 // NewCompiler creates a new top-level Compiler.
 func NewCompiler() *Compiler {
+	return NewCompilerWithEnv(nil)
+}
+
+// NewCompilerWithEnv creates a new top-level Compiler with an optional existing Environment.
+func NewCompilerWithEnv(env *evaluator.Environment) *Compiler {
 	return &Compiler{
 		chunk:      bytecode.NewChunk(),
 		locals:     make([]Local, 0, 32),
 		scopeDepth: 0,
+		globals:    make(map[string]bool),
+		env:        env,
 	}
 }
 
@@ -42,6 +52,8 @@ func newFunctionCompiler(parent *Compiler, name string, numParams int) *Compiler
 		scopeDepth: 0,
 		fnName:     name,
 		numParams:  numParams,
+		globals:    parent.globals,
+		env:        parent.env,
 	}
 }
 
@@ -98,11 +110,16 @@ func (c *Compiler) compileStatement(stmt uast.Statement) error {
 
 		if c.scopeDepth > 0 || c.parent != nil {
 			// Local variable on stack
-			c.addLocal(s.Name)
+			c.addLocal(s.Name, s.IsMutable)
 		} else {
 			// Global variable
+			c.globals[s.Name] = s.IsMutable
 			constIdx := c.chunk.AddConstant(&evaluator.String{Value: s.Name})
-			c.emitOp(bytecode.OpDefineGlobal, line)
+			if s.IsMutable {
+				c.emitOp(bytecode.OpDefineGlobal, line)
+			} else {
+				c.emitOp(bytecode.OpDefineGlobalConst, line)
+			}
 			c.chunk.WriteUint16(constIdx, line)
 		}
 		return nil
@@ -111,6 +128,16 @@ func (c *Compiler) compileStatement(stmt uast.Statement) error {
 		switch target := s.Target.(type) {
 		case *uast.Identifier:
 			slot, isLocal := c.resolveLocal(target.Name)
+			if isLocal {
+				if !c.locals[slot].IsMutable {
+					return fmt.Errorf("variabel '%s' bersifat tetap (immutable) dan tidak dapat diubah", target.Name)
+				}
+			} else {
+				if isMut, exists := c.resolveGlobalMutability(target.Name); exists && !isMut {
+					return fmt.Errorf("variabel '%s' bersifat tetap (immutable) dan tidak dapat diubah", target.Name)
+				}
+			}
+
 			if s.Operator != "=" && len(s.Operator) > 1 && s.Operator[len(s.Operator)-1] == '=' {
 				// Push current target value
 				if isLocal {
@@ -321,12 +348,12 @@ func (c *Compiler) compileStatement(stmt uast.Statement) error {
 		}
 		c.emitOp(bytecode.OpGetIter, line)
 		iterSlot := len(c.locals)
-		c.addLocal("__iter")
+		c.addLocal("__iter", true)
 
 		// 2. Reserve slot for user item variable
 		c.emitOp(bytecode.OpNull, line)
 		itemSlot := len(c.locals)
-		c.addLocal(s.Item)
+		c.addLocal(s.Item, true)
 
 		// 3. Loop condition / fetch next item
 		loopStart := len(c.chunk.Instructions)
@@ -394,7 +421,7 @@ func (c *Compiler) compileStatement(stmt uast.Statement) error {
 
 		fnComp := newFunctionCompiler(c, s.Name, len(s.Parameters))
 		for _, p := range s.Parameters {
-			fnComp.addLocal(p.Name)
+			fnComp.addLocal(p.Name, true)
 		}
 		if s.Body != nil {
 			for _, child := range s.Body.Statements {
@@ -416,7 +443,7 @@ func (c *Compiler) compileStatement(stmt uast.Statement) error {
 		c.chunk.WriteUint16(constIdx, line)
 
 		if c.scopeDepth > 0 || c.parent != nil {
-			c.addLocal(s.Name)
+			c.addLocal(s.Name, false)
 		} else {
 			nameIdx := c.chunk.AddConstant(&evaluator.String{Value: s.Name})
 			c.emitOp(bytecode.OpDefineGlobal, line)
@@ -798,11 +825,28 @@ func (c *Compiler) endScope(line int) {
 	}
 }
 
-func (c *Compiler) addLocal(name string) {
+func (c *Compiler) addLocal(name string, isMutable bool) {
 	c.locals = append(c.locals, Local{
-		Name:  name,
-		Depth: c.scopeDepth,
+		Name:      name,
+		Depth:     c.scopeDepth,
+		IsMutable: isMutable,
 	})
+}
+
+func (c *Compiler) resolveGlobalMutability(name string) (bool, bool) {
+	if isMut, ok := c.globals[name]; ok {
+		return isMut, true
+	}
+	if c.env != nil {
+		if entry, ok := c.env.GetEntry(name); ok {
+			root := entry.Resolve()
+			return root.IsMutable, true
+		}
+	}
+	if c.parent != nil {
+		return c.parent.resolveGlobalMutability(name)
+	}
+	return true, false
 }
 
 func (c *Compiler) resolveLocal(name string) (uint16, bool) {

@@ -25,6 +25,8 @@ var StdlibNames = map[string]string{
 	"waktu":      "waktu",
 	"time":       "waktu",
 	"json":       "json",
+	"sistem":     "sistem",
+	"os":         "sistem",
 }
 
 func isStdlibModule(name string) bool {
@@ -75,6 +77,8 @@ func getStdlibModuleEnvironment(canonicalName string) (*Environment, error) {
 		initStdlibWaktu(newEnv)
 	case "json":
 		initStdlibJSON(newEnv)
+	case "sistem":
+		initStdlibSistem(newEnv)
 	default:
 		return nil, fmt.Errorf("modul standar '%s' belum diimplementasikan", canonicalName)
 	}
@@ -103,9 +107,9 @@ func getStdlibModuleMap(canonicalName string) *Map {
 	return stdlibMaps[canonicalName]
 }
 
-// RegisterStdlibGlobals injects standard library modules as global objects (e.g., berkas, fs, matematika, math, teks, strings, waktu, time, json).
+// RegisterStdlibGlobals injects standard library modules as global objects (e.g., berkas, fs, matematika, math, teks, strings, waktu, time, json, sistem, os).
 func RegisterStdlibGlobals(env *Environment) {
-	canonicalList := []string{"berkas", "matematika", "teks", "waktu", "json"}
+	canonicalList := []string{"berkas", "matematika", "teks", "waktu", "json", "sistem"}
 	for _, canon := range canonicalList {
 		modMap := getStdlibModuleMap(canon)
 		// Register canonical Indonesian name
@@ -121,6 +125,8 @@ func RegisterStdlibGlobals(env *Environment) {
 			env.Define("strings", modMap, false, "Map")
 		case "waktu":
 			env.Define("time", modMap, false, "Map")
+		case "sistem":
+			env.Define("os", modMap, false, "Map")
 		}
 	}
 }

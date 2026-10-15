@@ -1,4 +1,4 @@
-# Pengambilan Keputusan, Perulangan, & Kendala
+# Kontrol Alur & Penanganan Galat
 
 Sebuah program komputer menjadi pintar karena ia mampu **mengambil keputusan** berdasarkan situasi yang terjadi, **mengulangi pekerjaan** yang sama berkali-kali tanpa lelah, dan **menangani kendala** jika ada sesuatu yang tidak terduga.
 

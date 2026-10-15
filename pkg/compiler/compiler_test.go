@@ -100,3 +100,36 @@ func TestCompiler_FunctionsAndDataStructures(t *testing.T) {
 		t.Errorf("Expected OP_CALL, got:\n%s", disasm)
 	}
 }
+
+func TestCompiler_ConstImmutability(t *testing.T) {
+	// 1. Global const reassignment should fail at compile time
+	inputGlobal := `
+	const x = 10
+	x = 20
+	`
+	l := parser.NewLexer(inputGlobal)
+	p := parser.NewParser(l)
+	prog, _ := p.ParseProgram()
+	comp := compiler.NewCompiler()
+	_, err := comp.Compile(prog)
+	if err == nil || !strings.Contains(err.Error(), "bersifat tetap") {
+		t.Fatalf("expected const reassignment error, got: %v", err)
+	}
+
+	// 2. Local const reassignment should fail at compile time
+	inputLocal := `
+	fungsi test() {
+		konstanta lokal = 5
+		lokal = 99
+	}
+	`
+	l2 := parser.NewLexer(inputLocal)
+	p2 := parser.NewParser(l2)
+	prog2, _ := p2.ParseProgram()
+	comp2 := compiler.NewCompiler()
+	_, err2 := comp2.Compile(prog2)
+	if err2 == nil || !strings.Contains(err2.Error(), "bersifat tetap") {
+		t.Fatalf("expected local const reassignment error, got: %v", err2)
+	}
+}
+

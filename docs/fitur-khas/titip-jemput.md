@@ -1,4 +1,4 @@
-# Menitipkan Pekerjaan & Menjemput Hasil (`titip` & `jemput`)
+# Tugas Latar Belakang (Titip & Jemput / Future & Promise)
 
 Pernahkah Anda memesan makanan di kedai, lalu kasir memberi Anda nomor antrean atau tiket? Anda tidak perlu berdiri mematung di depan dapur; Anda bisa duduk santai membaca buku. Ketika pesanan selesai dipanggil, barulah Anda menukar nomor antrean tersebut untuk mengambil makanan Anda.
 

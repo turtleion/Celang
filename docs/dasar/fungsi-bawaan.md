@@ -1,4 +1,4 @@
-# Perintah & Fungsi Bawaan Siap Pakai
+# Fungsi Bawaan Global (Built-in Functions)
 
 Celang menyediakan sejumlah perintah dan fungsi bawaan yang **selalu siap digunakan langsung** di mana saja di dalam program Anda, tanpa perlu memuat berkas atau modul tambahan.
 

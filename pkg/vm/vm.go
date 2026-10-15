@@ -70,6 +70,7 @@ type VM struct {
 	stack      [StackMax]evaluator.Object
 	sp         int
 	globals    map[string]evaluator.Object
+	constants  map[string]bool
 	env        *evaluator.Environment
 }
 
@@ -87,9 +88,10 @@ func NewWithEnv(chunk *bytecode.Chunk, env *evaluator.Environment) *VM {
 	}
 
 	vm := &VM{
-		globals: make(map[string]evaluator.Object),
-		env:     env,
-		sp:      0,
+		globals:   make(map[string]evaluator.Object),
+		constants: make(map[string]bool),
+		env:       env,
+		sp:        0,
 	}
 
 	vm.frames[0] = CallFrame{
@@ -275,8 +277,24 @@ func (vm *VM) Run() (evaluator.Object, error) {
 			name := chunk.Constants[constIdx].(*evaluator.String).Value
 			val := vm.pop()
 			vm.globals[name] = val
+			if vm.constants != nil {
+				delete(vm.constants, name)
+			}
 			if vm.env != nil {
 				vm.env.Define(name, val, true, "")
+			}
+
+		case bytecode.OpDefineGlobalConst:
+			constIdx := chunk.ReadUint16(frame.ip)
+			frame.ip += 2
+			name := chunk.Constants[constIdx].(*evaluator.String).Value
+			val := vm.pop()
+			vm.globals[name] = val
+			if vm.constants != nil {
+				vm.constants[name] = true
+			}
+			if vm.env != nil {
+				vm.env.Define(name, val, false, "")
 			}
 
 		case bytecode.OpGetGlobal:
@@ -301,14 +319,26 @@ func (vm *VM) Run() (evaluator.Object, error) {
 			frame.ip += 2
 			name := chunk.Constants[constIdx].(*evaluator.String).Value
 			val := vm.peek(0)
+			if vm.constants != nil && vm.constants[name] {
+				return nil, fmt.Errorf("variabel '%s' bersifat tetap (immutable) dan tidak dapat diubah", name)
+			}
 			if vm.env != nil {
-				vm.env.Assign(name, val)
+				if entry, ok := vm.env.GetEntry(name); ok {
+					root := entry.Resolve()
+					if !root.IsMutable {
+						return nil, fmt.Errorf("variabel '%s' bersifat tetap (immutable) dan tidak dapat diubah", name)
+					}
+				}
+				if err := vm.env.Assign(name, val); err != nil {
+					return nil, err
+				}
 				if entry, ok := vm.env.GetEntry(name); ok {
 					root := entry.Resolve()
 					vm.globals[root.Name] = root.Current()
 				}
+			} else {
+				vm.globals[name] = val
 			}
-			vm.globals[name] = val
 
 		case bytecode.OpGetLocal:
 			slot := chunk.ReadUint16(frame.ip)

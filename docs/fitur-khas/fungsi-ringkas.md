@@ -1,4 +1,4 @@
-# Rumus Cepat Panah (`=>`)
+# Fungsi Panah Ringkas (Arrow Functions `=>`)
 
 Terkadang kita hanya ingin membuat rumus perhitungan sederhana tanpa perlu mengetik kata `fungsi`, kurung kurawal, dan kata `kembalikan` yang panjang.
 
