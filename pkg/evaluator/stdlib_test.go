@@ -1210,3 +1210,188 @@ func TestStdlib_VirtualModuleImports(t *testing.T) {
 		t.Errorf("expected PI > 3.0")
 	}
 }
+
+func TestStdlib_Sistem(t *testing.T) {
+	// 1. Host and Platform Information
+	codeHost := `
+	buat plat = sistem.os()
+	buat arsitek = sistem.arsitektur()
+	buat cpus = sistem.jumlah_cpu()
+	buat host = sistem.nama_host()
+	buat home = sistem.folder_home()
+	buat tmp = sistem.folder_sementara()
+	buat p_id = sistem.pid()
+	buat aktif = sistem.waktu_aktif()
+	buat aktif_ms = sistem.waktu_aktif("ms")
+
+	[plat != "", arsitek != "", cpus > 0, host != "", home != "", tmp != "", p_id > 0, aktif >= 0, aktif_ms >= 0]
+	`
+	res := runCelangTestCode(t, codeHost)
+	arr, ok := res.(*Array)
+	if !ok {
+		t.Fatalf("expected array, got %s", res.Inspect())
+	}
+	for i, elem := range arr.Elements {
+		if b, ok := elem.(*Boolean); !ok || !b.Value {
+			t.Errorf("item %d failed: expected true, got %s", i, elem.Inspect())
+		}
+	}
+
+	// 2. English Aliases (os.platform, os.arch, os.cpu_count, etc.)
+	codeAlias := `
+	buat p = os.platform()
+	buat a = os.arch()
+	buat c = os.cpu_count()
+	buat h = os.homedir()
+	buat td = os.tmpdir()
+	[p == sistem.os(), a == sistem.arsitektur(), c == sistem.jumlah_cpu(), h == sistem.folder_home(), td == sistem.folder_sementara()]
+	`
+	res = runCelangTestCode(t, codeAlias)
+	arr = res.(*Array)
+	for i, elem := range arr.Elements {
+		if b, ok := elem.(*Boolean); !ok || !b.Value {
+			t.Errorf("alias item %d failed: %s", i, elem.Inspect())
+		}
+	}
+
+	// 3. Working Directory (cwd & chdir)
+	codeCwd := `
+	buat dir_awal = sistem.direktori_kerja()
+	buat tmp = sistem.folder_sementara()
+	buat ubah1 = sistem.ubah_direktori(tmp)
+	buat dir_tmp = sistem.direktori_kerja()
+	buat ubah2 = sistem.ubah_direktori(dir_awal)
+	buat dir_akhir = sistem.direktori_kerja()
+
+	[dir_awal != "", ubah1, ubah2, dir_awal == dir_akhir]
+	`
+	res = runCelangTestCode(t, codeCwd)
+	arr = res.(*Array)
+	for i, elem := range arr.Elements {
+		if b, ok := elem.(*Boolean); !ok || !b.Value {
+			t.Errorf("cwd item %d failed: %s", i, elem.Inspect())
+		}
+	}
+
+	// 4. Environment Variables
+	codeEnv := `
+	sistem.setel_env("CELANG_TEST_FOO", "bar123")
+	buat ada_awal = sistem.ada_env("CELANG_TEST_FOO")
+	buat val1 = sistem.dapatkan_env("CELANG_TEST_FOO")
+	buat val_def = sistem.dapatkan_env("CELANG_TIDAK_ADA", "default_val")
+
+	sistem.hapus_env("CELANG_TEST_FOO")
+	buat ada_akhir = sistem.ada_env("CELANG_TEST_FOO")
+	buat semua = sistem.semua_env()
+
+	[ada_awal, val1 == "bar123", val_def == "default_val", !ada_akhir, semua["PATH"] != ""]
+	`
+	res = runCelangTestCode(t, codeEnv)
+	arr = res.(*Array)
+	for i, elem := range arr.Elements {
+		if b, ok := elem.(*Boolean); !ok || !b.Value {
+			t.Errorf("env item %d failed: %s", i, elem.Inspect())
+		}
+	}
+
+	// 5. Memory & Garbage Collection
+	codeMem := `
+	sistem.gc()
+	buat mem = sistem.memori()
+	[mem.alokasi > 0, mem.total_alokasi > 0, mem.sistem > 0, mem.alloc == mem.alokasi]
+	`
+	res = runCelangTestCode(t, codeMem)
+	arr = res.(*Array)
+	for i, elem := range arr.Elements {
+		if b, ok := elem.(*Boolean); !ok || !b.Value {
+			t.Errorf("mem item %d failed: %s", i, elem.Inspect())
+		}
+	}
+
+	// 6. Command Execution (sistem.jalankan & os.exec)
+	codeExec := `
+	buat r1 = sistem.jalankan("echo 'celang_exec_test'")
+	buat r2 = os.exec(["echo", "celang_array_exec"])
+	[r1.sukses, r1.kode_keluar == 0, r1.keluaran != "", r2.success, r2.exit_code == 0]
+	`
+	res = runCelangTestCode(t, codeExec)
+	arr = res.(*Array)
+	for i, elem := range arr.Elements {
+		if b, ok := elem.(*Boolean); !ok || !b.Value {
+			t.Errorf("exec item %d failed: %s", i, elem.Inspect())
+		}
+	}
+
+	// 7. CLI Arguments
+	SetScriptArgs([]string{"arg1", "arg2", "arg3"})
+	codeArgs := `
+	buat semua_arg = sistem.argumen()
+	buat arg0 = sistem.argumen(0)
+	buat arg1 = os.args(1)
+	buat arg99 = sistem.argumen(99, "bawaan")
+	[panjang(semua_arg) == 3, arg0 == "arg1", arg1 == "arg2", arg99 == "bawaan"]
+	`
+	res = runCelangTestCode(t, codeArgs)
+	arr = res.(*Array)
+	for i, elem := range arr.Elements {
+		if b, ok := elem.(*Boolean); !ok || !b.Value {
+			t.Errorf("args item %d failed: %s", i, elem.Inspect())
+		}
+	}
+
+	// 8. cari_program / which
+	codeWhich := `
+	buat cari = sistem.cari_program("echo")
+	buat cari_asal = sistem.cari_program("program_pasti_tidak_ada_xyz_123")
+	[cari != kosong && cari != "", cari_asal == kosong]
+	`
+	res = runCelangTestCode(t, codeWhich)
+	arr = res.(*Array)
+	for i, elem := range arr.Elements {
+		if b, ok := elem.(*Boolean); !ok || !b.Value {
+			t.Errorf("which item %d failed: %s", i, elem.Inspect())
+		}
+	}
+
+	// 9. Constants
+	codeConst := `
+	[sistem.PEMISAH_BERKAS != "", sistem.PEMISAH_JALUR != "", sistem.DEV_NULL != "", sistem.GARIS_BARU != ""]
+	`
+	res = runCelangTestCode(t, codeConst)
+	arr = res.(*Array)
+	for i, elem := range arr.Elements {
+		if b, ok := elem.(*Boolean); !ok || !b.Value {
+			t.Errorf("constants item %d failed: %s", i, elem.Inspect())
+		}
+	}
+
+	// 10. Process Exit Mocking
+	exitCalled := false
+	exitCodeCaptured := -1
+	oldExit := osExitFunc
+	osExitFunc = func(code int) {
+		exitCalled = true
+		exitCodeCaptured = code
+	}
+	defer func() { osExitFunc = oldExit }()
+
+	codeExit := `
+	sistem.keluar(7)
+	`
+	runCelangTestCode(t, codeExit)
+	if !exitCalled || exitCodeCaptured != 7 {
+		t.Errorf("expected exit with code 7, got called=%v code=%d", exitCalled, exitCodeCaptured)
+	}
+
+	// 11. Import syntax (ambil { ... } dari "sistem")
+	codeImport := `
+	ambil { os, dapatkan_env } dari "sistem"
+	buat nama_os = os()
+	nama_os != ""
+	`
+	res = runCelangTestCode(t, codeImport)
+	if b, ok := res.(*Boolean); !ok || !b.Value {
+		t.Errorf("import from sistem failed: %s", res.Inspect())
+	}
+}
+

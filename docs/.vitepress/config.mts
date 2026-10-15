@@ -117,7 +117,8 @@ export default defineConfig({
           { text: 'Pengolah Teks (teks / strings)', link: '/pustaka-standar/teks' },
           { text: 'Pengelola Berkas (berkas / fs)', link: '/pustaka-standar/berkas' },
           { text: 'Penunjuk Waktu (waktu / time)', link: '/pustaka-standar/waktu' },
-          { text: 'Pertukaran Data (json)', link: '/pustaka-standar/json' }
+          { text: 'Pertukaran Data (json)', link: '/pustaka-standar/json' },
+          { text: 'Sistem Operasi (sistem / os)', link: '/pustaka-standar/sistem' }
         ]
       },
       {

@@ -213,6 +213,7 @@ func runFile(filePath string, scriptArgs []string, useAST bool) {
 	evaluator.RegisterBuiltins(env, os.Stdout)
 
 	// Inject CLI arguments into global 'argumen' and 'args'
+	evaluator.SetScriptArgs(scriptArgs)
 	argElements := make([]evaluator.Object, len(scriptArgs))
 	for i, arg := range scriptArgs {
 		argElements[i] = &evaluator.String{Value: arg}

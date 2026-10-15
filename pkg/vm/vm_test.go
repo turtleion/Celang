@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"celang/pkg/compiler"
@@ -480,3 +481,23 @@ func TestVM_JSON_ModernFeatures(t *testing.T) {
 		t.Errorf("expected %s, got %s", expected, res.Inspect())
 	}
 }
+
+func TestVM_Sistem_ModernFeatures(t *testing.T) {
+	evaluator.SetScriptArgs([]string{"halo_vm", "arg_kedua"})
+	input := `
+	buat plat = sistem.os()
+	sistem.setel_env("CELANG_VM_ENV", "nilai_123")
+	buat val = sistem.dapatkan_env("CELANG_VM_ENV")
+	sistem.hapus_env("CELANG_VM_ENV")
+	buat arg0 = sistem.argumen(0)
+	buat res = os.exec(["echo", "vm_eksekusi"])
+	buat out = teks.trim(res.keluaran)
+	plat + " | " + val + " | " + arg0 + " | " + out
+	`
+	res, _, _ := runVM(t, input)
+	expected := "\"" + runtime.GOOS + " | nilai_123 | halo_vm | vm_eksekusi\""
+	if res.Inspect() != expected && res.Inspect() != runtime.GOOS+" | nilai_123 | halo_vm | vm_eksekusi" {
+		t.Errorf("expected %s, got %s", expected, res.Inspect())
+	}
+}
+
