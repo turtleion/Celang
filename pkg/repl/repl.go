@@ -276,7 +276,7 @@ func evaluateInput(input string, env *evaluator.Environment, profile *syntax.Sty
 	}
 
 	for _, stmt := range prog.Body {
-		comp := compiler.NewCompiler()
+		comp := compiler.NewCompilerWithEnv(env)
 		var chunk *bytecode.Chunk
 		var compErr error
 		isExprStmt := false

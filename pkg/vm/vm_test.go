@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	"celang/pkg/compiler"
@@ -500,4 +501,33 @@ func TestVM_Sistem_ModernFeatures(t *testing.T) {
 		t.Errorf("expected %s, got %s", expected, res.Inspect())
 	}
 }
+
+func TestVM_ConstImmutability(t *testing.T) {
+	env := evaluator.NewEnvironment()
+	evaluator.RegisterBuiltins(env, os.Stdout)
+
+	// Step 1: Define const t = 3
+	prog1, _ := parser.NewParser(parser.NewLexer("const t = 3")).ParseProgram()
+	chunk1, _ := compiler.NewCompilerWithEnv(env).Compile(prog1)
+	vm1 := vm.NewWithEnv(chunk1, env)
+	if _, err := vm1.Run(); err != nil {
+		t.Fatalf("failed to define const: %v", err)
+	}
+
+	// Step 2: Try to reassign t = 4 in the same environment
+	prog2, _ := parser.NewParser(parser.NewLexer("t = 4")).ParseProgram()
+	comp2 := compiler.NewCompilerWithEnv(env)
+	chunk2, errComp := comp2.Compile(prog2)
+	if errComp == nil {
+		// If compile succeeded (e.g. dynamic), VM must catch it at runtime
+		vm2 := vm.NewWithEnv(chunk2, env)
+		_, errRun := vm2.Run()
+		if errRun == nil || !strings.Contains(errRun.Error(), "bersifat tetap") {
+			t.Fatalf("expected VM runtime error for const reassignment, got: %v", errRun)
+		}
+	} else if !strings.Contains(errComp.Error(), "bersifat tetap") {
+		t.Fatalf("expected compile error mentioning 'bersifat tetap', got: %v", errComp)
+	}
+}
+
 

@@ -30,9 +30,10 @@ const (
 	OpNot          // pop a, push (!a)
 
 	// Variables & Scope
-	OpPop          // discard top of stack
-	OpDefineGlobal // [OpDefineGlobal, idx_high, idx_low]
-	OpGetGlobal    // [OpGetGlobal, idx_high, idx_low]
+	OpPop               // discard top of stack
+	OpDefineGlobal      // [OpDefineGlobal, idx_high, idx_low]
+	OpDefineGlobalConst // [OpDefineGlobalConst, idx_high, idx_low]
+	OpGetGlobal         // [OpGetGlobal, idx_high, idx_low]
 	OpSetGlobal    // [OpSetGlobal, idx_high, idx_low]
 	OpGetLocal     // [OpGetLocal, slot_high, slot_low]
 	OpSetLocal     // [OpSetLocal, slot_high, slot_low]
@@ -81,8 +82,9 @@ var OpcodeNames = map[Opcode]string{
 	OpLessEqual:    "OP_LESS_EQUAL",
 	OpNot:          "OP_NOT",
 	OpPop:          "OP_POP",
-	OpDefineGlobal: "OP_DEFINE_GLOBAL",
-	OpGetGlobal:    "OP_GET_GLOBAL",
+	OpDefineGlobal:      "OP_DEFINE_GLOBAL",
+	OpDefineGlobalConst: "OP_DEFINE_GLOBAL_CONST",
+	OpGetGlobal:         "OP_GET_GLOBAL",
 	OpSetGlobal:    "OP_SET_GLOBAL",
 	OpGetLocal:     "OP_GET_LOCAL",
 	OpSetLocal:     "OP_SET_LOCAL",

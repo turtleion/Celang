@@ -76,7 +76,7 @@ func (c *Chunk) DisassembleInstruction(offset int) (string, int) {
 	prefix := fmt.Sprintf("%04d  line %3d  %-16s", offset, line, op.String())
 
 	switch op {
-	case OpConstant, OpDefineGlobal, OpGetGlobal, OpSetGlobal:
+	case OpConstant, OpDefineGlobal, OpDefineGlobalConst, OpGetGlobal, OpSetGlobal:
 		if offset+2 >= len(c.Instructions) {
 			return fmt.Sprintf("%s [truncated]", prefix), offset + 1
 		}
