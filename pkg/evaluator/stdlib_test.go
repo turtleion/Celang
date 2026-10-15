@@ -1026,6 +1026,135 @@ func TestStdlib_JSON(t *testing.T) {
 	}
 }
 
+func TestStdlib_JSON_PathAndMutation(t *testing.T) {
+	code := `
+	buat raw = "{\"pengguna\": {\"nama\": \"Andi\", \"alamat\": {\"kota\": \"Jakarta\"}}, \"hobi\": [\"coding\", \"gaming\"]}"
+	buat data = json.uraikan(raw)
+
+	buat kota = json.dapatkan(data, "pengguna.alamat.kota")
+	buat hobi2 = json.dapatkan(data, "hobi[1]")
+	buat fallback = json.dapatkan(data, "pengguna.kontak.telepon", "0812")
+
+	json.setel(data, "pengguna.alamat.kota", "Bandung")
+	buat kota_baru = json.dapatkan(data, "pengguna.alamat.kota")
+
+	json.setel(data, "pengguna.profil.umur", 25)
+	buat umur = json.dapatkan(data, "pengguna.profil.umur")
+
+	json.hapus(data, "pengguna.nama")
+	buat nama_dihapus = json.dapatkan(data, "pengguna.nama", "KOSONG")
+
+	[kota, hobi2, fallback, kota_baru, umur, nama_dihapus]
+	`
+	res := runCelangTestCode(t, code)
+	arr, ok := res.(*Array)
+	if !ok {
+		t.Fatalf("expected array, got %s", res.Inspect())
+	}
+	if arr.Elements[0].Inspect() != "Jakarta" {
+		t.Errorf("expected 'Jakarta', got %s", arr.Elements[0].Inspect())
+	}
+	if arr.Elements[1].Inspect() != "gaming" {
+		t.Errorf("expected 'gaming', got %s", arr.Elements[1].Inspect())
+	}
+	if arr.Elements[2].Inspect() != "0812" {
+		t.Errorf("expected '0812', got %s", arr.Elements[2].Inspect())
+	}
+	if arr.Elements[3].Inspect() != "Bandung" {
+		t.Errorf("expected 'Bandung', got %s", arr.Elements[3].Inspect())
+	}
+	if arr.Elements[4].Inspect() != "25" {
+		t.Errorf("expected 25, got %s", arr.Elements[4].Inspect())
+	}
+	if arr.Elements[5].Inspect() != "KOSONG" {
+		t.Errorf("expected 'KOSONG', got %s", arr.Elements[5].Inspect())
+	}
+}
+
+func TestStdlib_JSON_MergeAndMask(t *testing.T) {
+	code := `
+	buat defConfig = {"tema": "terang", "log": {"level": "info", "simpan": salah}}
+	buat userConfig = {"tema": "gelap", "log": {"simpan": benar, "jalur": "/var/log"}}
+	buat merged = json.gabung(defConfig, userConfig)
+
+	buat sensitive = {
+		"nama": "Budi",
+		"kata_sandi": "rahasia123",
+		"kartu_kredit": "4111222233334444",
+		"detail": {"api_key": "xyz987"}
+	}
+	buat masked = json.samarkan(sensitive)
+
+	buat isValid1 = json.apakah_valid("{\"a\": 1}")
+	buat isValid2 = json.apakah_valid("\{bukan json}")
+
+	[merged.tema, merged.log.level, merged.log.simpan, merged.log.jalur, masked.kata_sandi, masked.kartu_kredit, masked.detail.api_key, isValid1, isValid2]
+	`
+	res := runCelangTestCode(t, code)
+	arr, ok := res.(*Array)
+	if !ok {
+		t.Fatalf("expected array, got %s", res.Inspect())
+	}
+	if arr.Elements[0].Inspect() != "gelap" {
+		t.Errorf("merged.tema expected 'gelap', got %s", arr.Elements[0].Inspect())
+	}
+	if arr.Elements[1].Inspect() != "info" {
+		t.Errorf("merged.log.level expected 'info', got %s", arr.Elements[1].Inspect())
+	}
+	if arr.Elements[2].Inspect() != "true" {
+		t.Errorf("merged.log.simpan expected true, got %s", arr.Elements[2].Inspect())
+	}
+	if arr.Elements[3].Inspect() != "/var/log" {
+		t.Errorf("merged.log.jalur expected '/var/log', got %s", arr.Elements[3].Inspect())
+	}
+	if arr.Elements[4].Inspect() != "***" {
+		t.Errorf("masked kata_sandi expected '***', got %s", arr.Elements[4].Inspect())
+	}
+	if arr.Elements[5].Inspect() != "***" {
+		t.Errorf("masked kartu_kredit expected '***', got %s", arr.Elements[5].Inspect())
+	}
+	if arr.Elements[6].Inspect() != "***" {
+		t.Errorf("masked api_key expected '***', got %s", arr.Elements[6].Inspect())
+	}
+	if arr.Elements[7].Inspect() != "true" {
+		t.Errorf("isValid1 expected true")
+	}
+	if arr.Elements[8].Inspect() != "false" {
+		t.Errorf("isValid2 expected false")
+	}
+}
+
+func TestStdlib_JSON_LinesAndFlatten(t *testing.T) {
+	code := `
+	buat jsonl = "{\"id\": 1, \"pesan\": \"halo\"}\n{\"id\": 2, \"pesan\": \"dunia\"}\n"
+	buat lines = json.uraikan_baris(jsonl)
+	buat formatted_lines = json.format_baris(lines)
+
+	buat nested = {"user": {"nama": "Andi", "usia": 20}}
+	buat flat = json.ratakan(nested)
+	buat unflat = json.susun(flat)
+
+	[lines[0].pesan, lines[1].id, flat["user.nama"], unflat.user.usia]
+	`
+	res := runCelangTestCode(t, code)
+	arr, ok := res.(*Array)
+	if !ok {
+		t.Fatalf("expected array, got %s", res.Inspect())
+	}
+	if arr.Elements[0].Inspect() != "halo" {
+		t.Errorf("lines[0].pesan expected 'halo', got %s", arr.Elements[0].Inspect())
+	}
+	if arr.Elements[1].Inspect() != "2" {
+		t.Errorf("lines[1].id expected 2, got %s", arr.Elements[1].Inspect())
+	}
+	if arr.Elements[2].Inspect() != "Andi" {
+		t.Errorf("flat['user.nama'] expected 'Andi', got %s", arr.Elements[2].Inspect())
+	}
+	if arr.Elements[3].Inspect() != "20" {
+		t.Errorf("unflat.user.usia expected 20, got %s", arr.Elements[3].Inspect())
+	}
+}
+
 func TestStdlib_VirtualModuleImports(t *testing.T) {
 	tmpDir := t.TempDir()
 	callerFile := filepath.Join(tmpDir, "main.ce")

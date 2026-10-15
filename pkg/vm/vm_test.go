@@ -464,3 +464,19 @@ func TestVM_Waktu_ModernFeatures(t *testing.T) {
 		t.Errorf("expected %s, got %s", expected, res.Inspect())
 	}
 }
+
+func TestVM_JSON_ModernFeatures(t *testing.T) {
+	input := `
+	buat data = json.uraikan("{\"app\": {\"nama\": \"Celang\", \"versi\": 2}}")
+	json.setel(data, "app.fitur.modern", benar)
+	buat nama = json.dapatkan(data, "app.nama")
+	buat modern = json.dapatkan(data, "app.fitur.modern")
+	buat masked = json.samarkan({"user": "Andi", "token": "secret123"})
+	nama + " | " + modern + " | " + masked.token
+	`
+	res, _, _ := runVM(t, input)
+	expected := "\"Celang | true | ***\""
+	if res.Inspect() != expected && res.Inspect() != "Celang | true | ***" {
+		t.Errorf("expected %s, got %s", expected, res.Inspect())
+	}
+}
