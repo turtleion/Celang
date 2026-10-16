@@ -113,9 +113,10 @@ type Environment struct {
 	FilePath       string
 	ModuleRoot     string
 	ModuleRegistry *ModuleRegistry
-	defers         []uast.Statement
-	savepoints     []map[*VariableEntry]transactionSavepoint
-	activeTracker  *VariableEntry
+	defers          []uast.Statement
+	savepoints      []*transactionFrame
+	reactivityDepth int
+	activeTracker   *VariableEntry
 }
 
 func NewEnvironment() *Environment {
@@ -174,6 +175,17 @@ func (e *Environment) DefineWithVisibility(name string, val Object, isMutable bo
 
 	if vis == nil {
 		vis = &uast.Visibility{Kind: uast.VisibilityPrivate}
+	}
+
+	// Track newly defined variable in active transaction frame
+	curr := e
+	for curr != nil {
+		if len(curr.savepoints) > 0 {
+			top := curr.savepoints[len(curr.savepoints)-1]
+			top.created = append(top.created, name)
+			break
+		}
+		curr = curr.outer
 	}
 
 	entry := &VariableEntry{
@@ -260,8 +272,39 @@ func (e *Environment) DefineReference(aliasName string, target *VariableEntry) (
 }
 
 // Assign updates an existing variable and records the change into its timeline history.
+func (e *Environment) getReactivityDepth() int {
+	curr := e
+	for curr.outer != nil {
+		curr = curr.outer
+	}
+	return curr.reactivityDepth
+}
+
+func (e *Environment) incReactivityDepth() {
+	curr := e
+	for curr.outer != nil {
+		curr = curr.outer
+	}
+	curr.reactivityDepth++
+}
+
+func (e *Environment) decReactivityDepth() {
+	curr := e
+	for curr.outer != nil {
+		curr = curr.outer
+	}
+	curr.reactivityDepth--
+}
+
+// Assign updates an existing variable and records the change into its timeline history.
 func (e *Environment) Assign(name string, val Object) error {
 	e.mu.Lock()
+
+	// Guard against infinite recursive watcher loops
+	if e.getReactivityDepth() >= 50 {
+		e.mu.Unlock()
+		return fmt.Errorf("terdeteksi rekursi pengamat melebihi batas (maksimum 50 siklus pengamat)")
+	}
 
 	entry, ok := e.store[name]
 	if !ok {
@@ -303,7 +346,9 @@ func (e *Environment) Assign(name string, val Object) error {
 
 	// Propagate Reactivity and Watchers outside mutex lock
 	if hasReactivity {
-		e.triggerReactivity(target, val, oldVal, make(map[*VariableEntry]bool))
+		if errObj := e.triggerReactivity(target, val, oldVal, make(map[*VariableEntry]bool)); errObj != nil && isError(errObj) {
+			return fmt.Errorf("%s", errObj.Inspect())
+		}
 	}
 
 	return nil
@@ -374,15 +419,20 @@ type transactionSavepoint struct {
 	historyLen int
 }
 
+type transactionFrame struct {
+	mutations map[*VariableEntry]transactionSavepoint
+	created   []string
+}
+
 func (e *Environment) recordSavepoint(target *VariableEntry) {
 	curr := e
 	for curr != nil {
 		for i := range curr.savepoints {
-			spMap := curr.savepoints[i]
-			if _, exists := spMap[target]; !exists {
-				spMap[target] = transactionSavepoint{
-					val:        target.CurrentVal,
-					prevVal:    target.PreviousVal,
+			frame := curr.savepoints[i]
+			if _, exists := frame.mutations[target]; !exists {
+				frame.mutations[target] = transactionSavepoint{
+					val:        deepClone(target.CurrentVal),
+					prevVal:    deepClone(target.PreviousVal),
 					historyLen: len(target.History),
 				}
 			}
@@ -391,11 +441,22 @@ func (e *Environment) recordSavepoint(target *VariableEntry) {
 	}
 }
 
+// RecordSavepointForVar records a savepoint for an existing variable before its internal fields/elements are mutated.
+func (e *Environment) RecordSavepointForVar(name string) {
+	entry, ok := e.GetEntry(name)
+	if ok && entry != nil {
+		e.recordSavepoint(entry.Resolve())
+	}
+}
+
 // BeginTransaction starts a new transactional frame where all variable mutations can be rolled back.
 func (e *Environment) BeginTransaction() {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	e.savepoints = append(e.savepoints, make(map[*VariableEntry]transactionSavepoint))
+	e.savepoints = append(e.savepoints, &transactionFrame{
+		mutations: make(map[*VariableEntry]transactionSavepoint),
+		created:   make([]string, 0),
+	})
 }
 
 // CommitTransaction confirms all mutations within the active transaction frame.
@@ -418,6 +479,12 @@ func (e *Environment) RollbackTransaction() {
 	top := e.savepoints[len(e.savepoints)-1]
 	e.savepoints = e.savepoints[:len(e.savepoints)-1]
 
+	// 1. Remove variables declared in this transaction frame
+	for _, createdName := range top.created {
+		delete(e.store, createdName)
+	}
+
+	// 2. Restore mutated variables to their pre-transaction snapshot
 	type rollItem struct {
 		entry *VariableEntry
 		newV  Object
@@ -425,7 +492,7 @@ func (e *Environment) RollbackTransaction() {
 	}
 	var toTrigger []rollItem
 
-	for entry, sp := range top {
+	for entry, sp := range top.mutations {
 		oldVal := entry.CurrentVal
 		entry.CurrentVal = sp.val
 		entry.PreviousVal = sp.prevVal
@@ -475,11 +542,14 @@ func (e *Environment) DefineReactive(name string, expr uast.Expression, evalEnv 
 	return entry, nil
 }
 
-func (e *Environment) triggerReactivity(target *VariableEntry, newVal, oldVal Object, visited map[*VariableEntry]bool) {
+func (e *Environment) triggerReactivity(target *VariableEntry, newVal, oldVal Object, visited map[*VariableEntry]bool) Object {
 	if visited[target] {
-		return
+		return nil
 	}
 	visited[target] = true
+
+	e.incReactivityDepth()
+	defer e.decReactivityDepth()
 
 	var watchers []*ReactiveWatcher
 	if len(target.Watchers) > 0 {
@@ -504,7 +574,10 @@ func (e *Environment) triggerReactivity(target *VariableEntry, newVal, oldVal Ob
 			}
 			wEnv.Define(w.NewValVar, nVal, false, "")
 			wEnv.Define(w.OldValVar, oVal, false, "")
-			Eval(w.Body, wEnv)
+			res := Eval(w.Body, wEnv)
+			if isError(res) {
+				return res
+			}
 		}
 	}
 
@@ -515,12 +588,26 @@ func (e *Environment) triggerReactivity(target *VariableEntry, newVal, oldVal Ob
 			dep.ReactiveEnv.SetActiveTracker(dep)
 			depNew := Eval(dep.ReactiveExpr, dep.ReactiveEnv)
 			dep.ReactiveEnv.SetActiveTracker(nil)
+			if isError(depNew) {
+				return depNew
+			}
 			dep.PreviousVal = depOld
 			dep.CurrentVal = depNew
-			if len(dep.History) < dep.HistoryCap {
+
+			capLimit := dep.HistoryCap
+			if capLimit <= 0 {
+				capLimit = DefaultHistoryCapacity
+			}
+			if len(dep.History) >= capLimit {
+				copy(dep.History, dep.History[1:])
+				dep.History[len(dep.History)-1] = depNew
+			} else {
 				dep.History = append(dep.History, depNew)
 			}
-			e.triggerReactivity(dep, depNew, depOld, visited)
+			if errRes := e.triggerReactivity(dep, depNew, depOld, visited); errRes != nil && isError(errRes) {
+				return errRes
+			}
 		}
 	}
+	return nil
 }

@@ -14,6 +14,9 @@ var satuanKata = []string{
 // TerbilangAngka mengonversi bilangan bulat (int64) ke dalam kata-kata bahasa Indonesia.
 // Contoh: 15 -> "lima belas", 1000 -> "seribu", 50000 -> "lima puluh ribu"
 func TerbilangAngka(n int64) string {
+	if n == math.MinInt64 {
+		return "minus sembilan kuantiliun dua ratus dua puluh tiga triliun tiga ratus tujuh puluh dua miliar tiga puluh enam juta delapan ratus lima puluh empat ribu tujuh ratus tujuh puluh delapan"
+	}
 	if n < 0 {
 		return "minus " + TerbilangAngka(-n)
 	}
@@ -98,9 +101,14 @@ func Terbilang(obj Object) string {
 	}
 
 	// Bilangan berkoma (Float)
+	prefix := ""
+	if floatVal < 0 {
+		prefix = "minus "
+		floatVal = -floatVal
+	}
 	intPart := int64(math.Trunc(floatVal))
 	decPart := math.Abs(floatVal - float64(intPart))
-	str := TerbilangAngka(intPart)
+	str := prefix + TerbilangAngka(intPart)
 
 	if decPart > 0.0001 {
 		decStr := fmt.Sprintf("%.2f", decPart)
@@ -128,7 +136,14 @@ func KataAngka(obj Object) string {
 
 	intPart := int64(math.Trunc(floatVal))
 	decPart := math.Abs(floatVal - float64(intPart))
-	str := TerbilangAngka(intPart)
+	prefix := ""
+	if floatVal < 0 {
+		prefix = "minus "
+		floatVal = -floatVal
+		intPart = int64(math.Trunc(floatVal))
+		decPart = math.Abs(floatVal - float64(intPart))
+	}
+	str := prefix + TerbilangAngka(intPart)
 
 	if decPart > 0.0001 {
 		decStr := fmt.Sprintf("%.2f", decPart)
@@ -152,20 +167,35 @@ func FormatRupiah(obj Object) string {
 	}
 
 	if isInt {
+		if intVal < 0 {
+			if intVal == math.MinInt64 {
+				return "-Rp 9.223.372.036.854.775.808"
+			}
+			return "-Rp " + formatRibuan(-intVal)
+		}
 		return "Rp " + formatRibuan(intVal)
+	}
+
+	sign := ""
+	if floatVal < 0 {
+		sign = "-"
+		floatVal = -floatVal
 	}
 
 	intPart := int64(math.Trunc(floatVal))
 	decPart := math.Abs(floatVal - float64(intPart))
 	if decPart < 0.0001 {
-		return "Rp " + formatRibuan(intPart)
+		return sign + "Rp " + formatRibuan(intPart)
 	}
 	decStr := fmt.Sprintf("%.2f", decPart)
 	decStr = strings.TrimPrefix(decStr, "0.")
-	return "Rp " + formatRibuan(intPart) + "," + decStr
+	return sign + "Rp " + formatRibuan(intPart) + "," + decStr
 }
 
 func formatRibuan(n int64) string {
+	if n == math.MinInt64 {
+		return "-9.223.372.036.854.775.808"
+	}
 	sign := ""
 	if n < 0 {
 		sign = "-"

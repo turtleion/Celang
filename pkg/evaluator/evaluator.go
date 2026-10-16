@@ -40,7 +40,7 @@ func Eval(node uast.Node, env *Environment) Object {
 		var val Object = NULL
 		if n.Value != nil {
 			val = Eval(n.Value, env)
-			if isError(val) {
+			if isError(val) || (val != nil && val.Type() == ROLLBACK_SIGNAL_OBJ) {
 				return val
 			}
 		}
@@ -51,7 +51,7 @@ func Eval(node uast.Node, env *Environment) Object {
 
 	case *uast.DestructureDeclaration:
 		val := Eval(n.Value, env)
-		if isError(val) {
+		if isError(val) || (val != nil && val.Type() == ROLLBACK_SIGNAL_OBJ) {
 			return val
 		}
 		switch n.Kind {
@@ -89,7 +89,7 @@ func Eval(node uast.Node, env *Environment) Object {
 
 	case *uast.DestructureAssignment:
 		val := Eval(n.Value, env)
-		if isError(val) {
+		if isError(val) || (val != nil && val.Type() == ROLLBACK_SIGNAL_OBJ) {
 			return val
 		}
 		switch n.Kind {
@@ -274,7 +274,7 @@ func Eval(node uast.Node, env *Environment) Object {
 
 	case *uast.AssignmentStatement:
 		val := Eval(n.Value, env)
-		if isError(val) {
+		if isError(val) || (val != nil && val.Type() == ROLLBACK_SIGNAL_OBJ) {
 			return val
 		}
 		switch target := n.Target.(type) {
@@ -318,6 +318,9 @@ func Eval(node uast.Node, env *Environment) Object {
 			return newError(n.GetMetadata(), "Target assignment tidak valid", "Assignment hanya dapat dilakukan ke variabel atau elemen pointer.")
 
 		case *uast.MemberExpression:
+			if rootName := findRootIdentifier(target.Object); rootName != "" {
+				env.RecordSavepointForVar(rootName)
+			}
 			obj := Eval(target.Object, env)
 			if isError(obj) {
 				return obj
@@ -1054,7 +1057,18 @@ func Eval(node uast.Node, env *Environment) Object {
 		}
 
 		// 3d. Numeric cultural, nominal, terbilang, data size & duration helpers (e.g. 50.ribu, 3.detik, 10.mb, 15000.rupiah, 50000.terbilang)
-		if res, ok := EvalNumericMember(obj, n.Property); ok {
+		numProp := n.Property
+		if n.Computed && n.PropertyExpr != nil {
+			pObj := Eval(n.PropertyExpr, env)
+			if !isError(pObj) {
+				if s, ok := pObj.(*String); ok {
+					numProp = s.Value
+				} else {
+					numProp = pObj.Inspect()
+				}
+			}
+		}
+		if res, ok := EvalNumericMember(obj, numProp); ok {
 			return res
 		}
 
@@ -2128,4 +2142,20 @@ func evalStringSlice(str *String, rng *uast.RangeExpression, env *Environment, m
 
 	return &String{Value: string(runes[start:end])}
 }
+
+func findRootIdentifier(expr uast.Expression) string {
+	curr := expr
+	for curr != nil {
+		switch e := curr.(type) {
+		case *uast.Identifier:
+			return e.Name
+		case *uast.MemberExpression:
+			curr = e.Object
+		default:
+			return ""
+		}
+	}
+	return ""
+}
+
 

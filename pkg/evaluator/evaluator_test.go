@@ -2,6 +2,7 @@ package evaluator_test
 
 import (
 	"bytes"
+	"math"
 	"strings"
 	"sync"
 	"testing"
@@ -1928,6 +1929,148 @@ func TestFeature_ReaktifDanPengamat(t *testing.T) {
 	}
 	if catatanArr.Elements[0].(*evaluator.Integer).Value != 200 {
 		t.Errorf("expected note 200 (reverted), got: %v", catatanArr.Elements[0])
+	}
+}
+
+func TestFeature_BugFixesAudit(t *testing.T) {
+	// 1. Bug 1: Computed properties on numeric members (num[prop])
+	codeComp := `
+	buat prop = "rupiah"
+	buat harga = 50.ribu
+	harga[prop]
+	`
+	resComp := testEvalSource(t, codeComp)
+	if s, ok := resComp.(*evaluator.String); !ok || s.Value != "Rp 50.000" {
+		t.Errorf("expected 'Rp 50.000' for computed numeric property, got: %v", resComp)
+	}
+
+	// 2. Bug 2: math.MinInt64 does not overflow or crash
+	minStr := evaluator.TerbilangAngka(math.MinInt64)
+	if !strings.HasPrefix(minStr, "minus ") {
+		t.Errorf("expected MinInt64 to start with 'minus ', got: %s", minStr)
+	}
+
+	// 3. Bug 3: Negative float formatting retains minus sign
+	codeNeg := `
+	buat f = -0.5
+	[f.terbilang, f.rupiah, format_rupiah(f)]
+	`
+	resNeg := testEvalSource(t, codeNeg)
+	arrNeg, ok := resNeg.(*evaluator.Array)
+	if !ok || len(arrNeg.Elements) != 3 {
+		t.Fatalf("expected 3 elements for negative float, got: %v", resNeg)
+	}
+	if arrNeg.Elements[0].(*evaluator.String).Value != "minus nol koma lima nol rupiah" {
+		t.Errorf("expected 'minus nol koma lima nol rupiah', got: %v", arrNeg.Elements[0])
+	}
+	if arrNeg.Elements[1].(*evaluator.String).Value != "-Rp 0,50" {
+		t.Errorf("expected '-Rp 0,50', got: %v", arrNeg.Elements[1])
+	}
+	if arrNeg.Elements[2].(*evaluator.String).Value != "-Rp 0,50" {
+		t.Errorf("expected '-Rp 0,50', got: %v", arrNeg.Elements[2])
+	}
+
+	// 4. Bug 4: RollbackSignal returned from function aborts variable assignment
+	codeFnRollback := `
+	buat saldo = 100
+	fungsi gagal() {
+		saldo = 50
+		batalkan "batal dari fungsi"
+		saldo = 0
+	}
+	transaksi {
+		buat x = gagal()
+	} pulihkan (err) {
+		saldo
+	}
+	saldo
+	`
+	resFnRollback := testEvalSource(t, codeFnRollback)
+	if i, ok := resFnRollback.(*evaluator.Integer); !ok || i.Value != 100 {
+		t.Errorf("expected saldo reverted to 100 after function batalkan, got: %v", resFnRollback)
+	}
+
+	// 5. Bug 5: Phantom variables created inside rolled-back transaction are deleted
+	codePhantom := `
+	transaksi {
+		buat akun_rahasia = 999
+		batalkan "batal transaksi"
+	}
+	coba {
+		akun_rahasia
+	} tangkap (e) {
+		"terhapus"
+	}
+	`
+	resPhantom := testEvalSource(t, codePhantom)
+	if s, ok := resPhantom.(*evaluator.String); !ok || s.Value != "terhapus" {
+		t.Errorf("expected phantom variable to be deleted after rollback, got: %v", resPhantom)
+	}
+
+	// 6. Bug 6: In-place array element, map property, and nested mutations rollback
+	codeCompositeRollback := `
+	buat data = [10, 20, 30]
+	buat user = { "nama": "Budi", "poin": 100 }
+	buat matriks = [[1, 2], [3, 4]]
+	transaksi {
+		data[0] = 999
+		user.poin = 500
+		matriks[0][1] = 888
+		batalkan "batal mutasi komposit"
+	}
+	[data[0], user.poin, matriks[0][1]]
+	`
+	resCompRollback := testEvalSource(t, codeCompositeRollback)
+	arrCompRollback, ok := resCompRollback.(*evaluator.Array)
+	if !ok || len(arrCompRollback.Elements) != 3 {
+		t.Fatalf("expected 3 elements for composite rollback, got: %v", resCompRollback)
+	}
+	if arrCompRollback.Elements[0].(*evaluator.Integer).Value != 10 {
+		t.Errorf("expected data[0] reverted to 10, got: %v", arrCompRollback.Elements[0])
+	}
+	if arrCompRollback.Elements[1].(*evaluator.Integer).Value != 100 {
+		t.Errorf("expected user.poin reverted to 100, got: %v", arrCompRollback.Elements[1])
+	}
+	if arrCompRollback.Elements[2].(*evaluator.Integer).Value != 2 {
+		t.Errorf("expected matriks[0][1] reverted to 2, got: %v", arrCompRollback.Elements[2])
+	}
+
+	// 7. Bug 7: Infinite recursion guard on self-mutating watcher
+	codeWatcherLoop := `
+	buat count = 1
+	pantau count (baru, lama) {
+		count = count + 1
+	}
+	coba {
+		count = 2
+	} tangkap (err) {
+		"berhasil dicegah"
+	}
+	`
+	resWatcherLoop := testEvalSource(t, codeWatcherLoop)
+	if s, ok := resWatcherLoop.(*evaluator.String); !ok || s.Value != "berhasil dicegah" {
+		t.Errorf("expected watcher infinite recursion to be guarded, got: %v", resWatcherLoop)
+	}
+
+	// 8. Bug 8: Reactive variable history sliding window after 50 updates
+	codeHistSliding := `
+	buat val = 0
+	reaktif derived = val * 2
+	untuk i dalam rentang(1, 60) {
+		val = i
+	}
+	[panjang(derived.histori), derived.sebelumnya]
+	`
+	resHistSliding := testEvalSource(t, codeHistSliding)
+	arrHistSliding, ok := resHistSliding.(*evaluator.Array)
+	if !ok || len(arrHistSliding.Elements) != 2 {
+		t.Fatalf("expected 2 elements for sliding history, got: %v", resHistSliding)
+	}
+	if arrHistSliding.Elements[0].(*evaluator.Integer).Value != 50 {
+		t.Errorf("expected history capped at 50, got: %v", arrHistSliding.Elements[0])
+	}
+	if arrHistSliding.Elements[1].(*evaluator.Integer).Value != 118 {
+		t.Errorf("expected previous derived value 118, got: %v", arrHistSliding.Elements[1])
 	}
 }
 
