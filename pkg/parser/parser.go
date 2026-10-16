@@ -1632,6 +1632,10 @@ func (p *Parser) parseBlockStatement() *uast.BlockStatement {
 		p.nextToken()
 	}
 
+	if !p.curTokenIs(RBRACE) {
+		p.addError("Diharapkan '}' untuk menutup blok kode kurung kurawal")
+	}
+
 	return block
 }
 

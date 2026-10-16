@@ -1,0 +1,7 @@
+buat nilai = 80
+
+jika nilai > 50 {
+    buat status = "Lulus"
+    cetak("Selamat kamu", status)
+
+cetak("Program selesai.")

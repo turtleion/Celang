@@ -1,0 +1,7 @@
+buat skor = 75
+
+jika skor >= 90 {
+    cetak("Lulus Istimewa")
+} bukan {
+    cetak("Coba lagi")
+}

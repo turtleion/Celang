@@ -1,0 +1,5 @@
+// Kesalahan: Menggunakan kata kunci 'kelas' (di Celang menggunakan 'bentuk')
+kelas Karyawan {
+    buat nama = "Budi"
+    buat gaji = 5.juta
+}

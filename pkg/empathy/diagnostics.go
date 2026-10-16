@@ -221,6 +221,9 @@ func suggestSyntaxHint(msg string, line, col int, sourceCode string) string {
 	if strings.Contains(combinedContext, "function ") {
 		return "Di Celang, gunakan kata kunci 'fungsi' atau 'def' untuk membuat fungsi."
 	}
+	if strings.Contains(combinedContext, "kelas ") || strings.Contains(combinedContext, "class ") {
+		return "Di Celang, gunakan kata kunci 'bentuk' untuk membuat struktur data atau class (contoh: bentuk Pengguna { ... })."
+	}
 	if strings.Contains(combinedContext, "print(") || strings.Contains(combinedContext, "console.log(") {
 		return "Gunakan fungsi 'cetak(...)' untuk menampilkan teks ke layar."
 	}
@@ -250,8 +253,8 @@ func suggestSyntaxHint(msg string, line, col int, sourceCode string) string {
 	}
 
 	// 5. Braces & Parentheses
-	if strings.Contains(lowerMsg, "diharapkan token '}'") || strings.Contains(lowerMsg, "diharapkan token '{'") {
-		return "Pastikan setiap kurung buka '{' memiliki kurung tutup '}' pasangannya."
+	if strings.Contains(lowerMsg, "'}'") || strings.Contains(lowerMsg, "'{'") || strings.Contains(lowerMsg, "kurung kurawal") {
+		return "Ada kurung kurawal buka '{' yang belum ditutup, atau kurung tutup '}' yang berlebih. Pastikan setiap blok kurung kurawal memiliki kurung tutup pasangannya."
 	}
 	if strings.Contains(lowerMsg, "diharapkan token ')'") || strings.Contains(lowerMsg, "diharapkan token '('") {
 		return "Pastikan setiap tanda kurung buka '(' memiliki tanda kurung tutup ')' pasangannya."

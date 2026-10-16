@@ -1,0 +1,7 @@
+buat pengguna = {
+    nama: "Budi",
+    umur 25,
+    kota: "Bandung"
+}
+
+cetak("Nama pengguna: ", pengguna.nama)

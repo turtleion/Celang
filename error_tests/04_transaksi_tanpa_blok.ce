@@ -1,0 +1,6 @@
+// Kesalahan: 'pulihkan' berdiri sendiri tanpa blok 'transaksi'
+buat saldo = 50.ribu
+
+pulihkan (alasan) {
+    cetak("Terjadi kendala: ", alasan)
+}
