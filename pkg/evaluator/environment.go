@@ -12,6 +12,15 @@ const DefaultHistoryCapacity = 50
 // VariableEntry stores the state and timeline history for a variable.
 // Uses an Anchor Snapshot + Bounded Ring Buffer architecture to guarantee O(1) memory usage
 // even in long-running loops with millions of mutations.
+// ReactiveWatcher represents an observer listening to changes on a variable (pantau).
+type ReactiveWatcher struct {
+	TargetName string
+	NewValVar  string
+	OldValVar  string
+	Body       *uast.BlockStatement
+	Env        *Environment
+}
+
 type VariableEntry struct {
 	Name         string
 	InitialVal   Object
@@ -23,6 +32,13 @@ type VariableEntry struct {
 	TypeHint     string
 	Visibility   *uast.Visibility
 	AliasedEntry *VariableEntry
+
+	// Reactive & Observer extensions
+	IsReactive   bool
+	ReactiveExpr uast.Expression
+	ReactiveEnv  *Environment
+	Dependents   []*VariableEntry
+	Watchers     []*ReactiveWatcher
 }
 
 // Resolve unwraps any reference chain and returns the root VariableEntry.
@@ -98,6 +114,8 @@ type Environment struct {
 	ModuleRoot     string
 	ModuleRegistry *ModuleRegistry
 	defers         []uast.Statement
+	savepoints     []map[*VariableEntry]transactionSavepoint
+	activeTracker  *VariableEntry
 }
 
 func NewEnvironment() *Environment {
@@ -244,10 +262,10 @@ func (e *Environment) DefineReference(aliasName string, target *VariableEntry) (
 // Assign updates an existing variable and records the change into its timeline history.
 func (e *Environment) Assign(name string, val Object) error {
 	e.mu.Lock()
-	defer e.mu.Unlock()
 
 	entry, ok := e.store[name]
 	if !ok {
+		e.mu.Unlock()
 		if e.outer != nil {
 			return e.outer.Assign(name, val)
 		}
@@ -256,9 +274,14 @@ func (e *Environment) Assign(name string, val Object) error {
 
 	target := entry.Resolve()
 	if !target.IsMutable {
+		e.mu.Unlock()
 		return fmt.Errorf("variabel '%s' bersifat tetap (immutable) dan tidak dapat diubah", target.Name)
 	}
 
+	// Record savepoint for active transaction rollback
+	e.recordSavepoint(target)
+
+	oldVal := target.CurrentVal
 	target.PreviousVal = target.CurrentVal
 	target.CurrentVal = val
 
@@ -275,35 +298,229 @@ func (e *Environment) Assign(name string, val Object) error {
 		target.History = append(target.History, val)
 	}
 
+	hasReactivity := len(target.Dependents) > 0 || len(target.Watchers) > 0
+	e.mu.Unlock()
+
+	// Propagate Reactivity and Watchers outside mutex lock
+	if hasReactivity {
+		e.triggerReactivity(target, val, oldVal, make(map[*VariableEntry]bool))
+	}
+
 	return nil
 }
 
 // Get retrieves the current value of a variable.
 func (e *Environment) Get(name string) (Object, bool) {
-	e.mu.RLock()
-	defer e.mu.RUnlock()
-
-	entry, ok := e.store[name]
-	if !ok && e.outer != nil {
-		return e.outer.Get(name)
-	}
-	if !ok {
+	entry, ok := e.GetEntry(name)
+	if !ok || entry == nil {
 		return nil, false
 	}
 	return entry.Resolve().Current(), true
 }
 
-// GetEntry retrieves the VariableEntry to inspect its time-travel history.
+// GetEntry retrieves the VariableEntry to inspect its time-travel history or track reactive dependencies.
 func (e *Environment) GetEntry(name string) (*VariableEntry, bool) {
 	e.mu.RLock()
-	defer e.mu.RUnlock()
-
 	entry, ok := e.store[name]
-	if !ok && e.outer != nil {
+	tracker := e.getActiveTracker()
+	e.mu.RUnlock()
+
+	if ok {
+		root := entry.Resolve()
+		if tracker != nil && tracker != root {
+			e.mu.Lock()
+			found := false
+			for _, dep := range root.Dependents {
+				if dep == tracker {
+					found = true
+					break
+				}
+			}
+			if !found {
+				root.Dependents = append(root.Dependents, tracker)
+			}
+			e.mu.Unlock()
+		}
+		return root, true
+	}
+
+	if e.outer != nil {
 		return e.outer.GetEntry(name)
 	}
-	if !ok {
-		return nil, false
+	return nil, false
+}
+
+// SetActiveTracker sets the reactive entry that is currently collecting dependencies.
+func (e *Environment) SetActiveTracker(entry *VariableEntry) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.activeTracker = entry
+}
+
+func (e *Environment) getActiveTracker() *VariableEntry {
+	curr := e
+	for curr != nil {
+		if curr.activeTracker != nil {
+			return curr.activeTracker
+		}
+		curr = curr.outer
 	}
-	return entry.Resolve(), true
+	return nil
+}
+
+type transactionSavepoint struct {
+	val        Object
+	prevVal    Object
+	historyLen int
+}
+
+func (e *Environment) recordSavepoint(target *VariableEntry) {
+	curr := e
+	for curr != nil {
+		for i := range curr.savepoints {
+			spMap := curr.savepoints[i]
+			if _, exists := spMap[target]; !exists {
+				spMap[target] = transactionSavepoint{
+					val:        target.CurrentVal,
+					prevVal:    target.PreviousVal,
+					historyLen: len(target.History),
+				}
+			}
+		}
+		curr = curr.outer
+	}
+}
+
+// BeginTransaction starts a new transactional frame where all variable mutations can be rolled back.
+func (e *Environment) BeginTransaction() {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.savepoints = append(e.savepoints, make(map[*VariableEntry]transactionSavepoint))
+}
+
+// CommitTransaction confirms all mutations within the active transaction frame.
+func (e *Environment) CommitTransaction() {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if len(e.savepoints) == 0 {
+		return
+	}
+	e.savepoints = e.savepoints[:len(e.savepoints)-1]
+}
+
+// RollbackTransaction reverts all mutations made during the current transaction frame.
+func (e *Environment) RollbackTransaction() {
+	e.mu.Lock()
+	if len(e.savepoints) == 0 {
+		e.mu.Unlock()
+		return
+	}
+	top := e.savepoints[len(e.savepoints)-1]
+	e.savepoints = e.savepoints[:len(e.savepoints)-1]
+
+	type rollItem struct {
+		entry *VariableEntry
+		newV  Object
+		oldV  Object
+	}
+	var toTrigger []rollItem
+
+	for entry, sp := range top {
+		oldVal := entry.CurrentVal
+		entry.CurrentVal = sp.val
+		entry.PreviousVal = sp.prevVal
+		if sp.historyLen <= len(entry.History) {
+			entry.History = entry.History[:sp.historyLen]
+		}
+		if len(entry.Dependents) > 0 || len(entry.Watchers) > 0 {
+			toTrigger = append(toTrigger, rollItem{entry: entry, newV: sp.val, oldV: oldVal})
+		}
+	}
+	e.mu.Unlock()
+
+	for _, item := range toTrigger {
+		e.triggerReactivity(item.entry, item.newV, item.oldV, make(map[*VariableEntry]bool))
+	}
+}
+
+// DefineReactive registers a reactive derived variable and tracks its dependencies.
+func (e *Environment) DefineReactive(name string, expr uast.Expression, evalEnv *Environment) (*VariableEntry, error) {
+	e.mu.Lock()
+	entry := &VariableEntry{
+		Name:         name,
+		IsMutable:    true,
+		IsReactive:   true,
+		ReactiveExpr: expr,
+		ReactiveEnv:  evalEnv,
+		HistoryCap:   DefaultHistoryCapacity,
+		Visibility:   &uast.Visibility{Kind: uast.VisibilityPrivate},
+	}
+	e.store[name] = entry
+	e.mu.Unlock()
+
+	evalEnv.SetActiveTracker(entry)
+	initialVal := Eval(expr, evalEnv)
+	evalEnv.SetActiveTracker(nil)
+
+	if isError(initialVal) {
+		return nil, fmt.Errorf("%s", initialVal.Inspect())
+	}
+
+	e.mu.Lock()
+	entry.InitialVal = initialVal
+	entry.CurrentVal = initialVal
+	entry.History = []Object{initialVal}
+	e.mu.Unlock()
+
+	return entry, nil
+}
+
+func (e *Environment) triggerReactivity(target *VariableEntry, newVal, oldVal Object, visited map[*VariableEntry]bool) {
+	if visited[target] {
+		return
+	}
+	visited[target] = true
+
+	var watchers []*ReactiveWatcher
+	if len(target.Watchers) > 0 {
+		watchers = append([]*ReactiveWatcher{}, target.Watchers...)
+	}
+	var dependents []*VariableEntry
+	if len(target.Dependents) > 0 {
+		dependents = append([]*VariableEntry{}, target.Dependents...)
+	}
+
+	// 1. Notify watchers (pantau)
+	for _, w := range watchers {
+		if w.Body != nil && w.Env != nil {
+			wEnv := NewEnclosedEnvironment(w.Env)
+			nVal := newVal
+			if nVal == nil {
+				nVal = NULL
+			}
+			oVal := oldVal
+			if oVal == nil {
+				oVal = NULL
+			}
+			wEnv.Define(w.NewValVar, nVal, false, "")
+			wEnv.Define(w.OldValVar, oVal, false, "")
+			Eval(w.Body, wEnv)
+		}
+	}
+
+	// 2. Update dependent derived variables (reaktif)
+	for _, dep := range dependents {
+		if dep.ReactiveExpr != nil && dep.ReactiveEnv != nil {
+			depOld := dep.CurrentVal
+			dep.ReactiveEnv.SetActiveTracker(dep)
+			depNew := Eval(dep.ReactiveExpr, dep.ReactiveEnv)
+			dep.ReactiveEnv.SetActiveTracker(nil)
+			dep.PreviousVal = depOld
+			dep.CurrentVal = depNew
+			if len(dep.History) < dep.HistoryCap {
+				dep.History = append(dep.History, depNew)
+			}
+			e.triggerReactivity(dep, depNew, depOld, visited)
+		}
+	}
 }

@@ -1669,5 +1669,267 @@ func TestBug_AuditFixes(t *testing.T) {
 	}
 }
 
+func TestFeature_SatuanBudayaDanTerbilang(t *testing.T) {
+	input := `
+	buat harga = 50.ribu
+	buat gaji = 2.5.juta
+	buat hutang = 1.miliar
+	buat ram = 16.gb
+
+	buat h_rp = harga.rupiah
+	buat h_tb = harga.terbilang
+	buat g_tb = gaji.terbilang
+	buat seribu_tb = 1000.terbilang
+	buat angka_kata = 105.kata
+	buat fn_tb = terbilang(15)
+	buat fn_rp = format_rupiah(1250000)
+
+	[harga, gaji, hutang, ram, h_rp, h_tb, g_tb, seribu_tb, angka_kata, fn_tb, fn_rp]
+	`
+	res := testEvalSource(t, input)
+	if res.Type() == evaluator.ERROR_OBJ {
+		t.Fatalf("res error: %s", res.Inspect())
+	}
+	arr, ok := res.(*evaluator.Array)
+	if !ok || len(arr.Elements) != 11 {
+		t.Fatalf("expected 11 elements, got %s", res.Inspect())
+	}
+
+	if arr.Elements[0].(*evaluator.Integer).Value != 50000 {
+		t.Errorf("50.ribu expected 50000, got %v", arr.Elements[0])
+	}
+	if arr.Elements[1].(*evaluator.Integer).Value != 2500000 {
+		t.Errorf("2.5.juta expected 2500000, got %v", arr.Elements[1])
+	}
+	if arr.Elements[2].(*evaluator.Integer).Value != 1000000000 {
+		t.Errorf("1.miliar expected 1000000000, got %v", arr.Elements[2])
+	}
+	if arr.Elements[3].(*evaluator.Integer).Value != 16*1024*1024*1024 {
+		t.Errorf("16.gb expected %d, got %v", int64(16*1024*1024*1024), arr.Elements[3])
+	}
+	if arr.Elements[4].(*evaluator.String).Value != "Rp 50.000" {
+		t.Errorf("harga.rupiah expected 'Rp 50.000', got %v", arr.Elements[4])
+	}
+	if arr.Elements[5].(*evaluator.String).Value != "lima puluh ribu rupiah" {
+		t.Errorf("harga.terbilang expected 'lima puluh ribu rupiah', got %v", arr.Elements[5])
+	}
+	if arr.Elements[6].(*evaluator.String).Value != "dua juta lima ratus ribu rupiah" {
+		t.Errorf("gaji.terbilang expected 'dua juta lima ratus ribu rupiah', got %v", arr.Elements[6])
+	}
+	if arr.Elements[7].(*evaluator.String).Value != "seribu rupiah" {
+		t.Errorf("1000.terbilang expected 'seribu rupiah', got %v", arr.Elements[7])
+	}
+	if arr.Elements[8].(*evaluator.String).Value != "seratus lima" {
+		t.Errorf("105.kata expected 'seratus lima', got %v", arr.Elements[8])
+	}
+	if arr.Elements[9].(*evaluator.String).Value != "lima belas rupiah" {
+		t.Errorf("terbilang(15) expected 'lima belas rupiah', got %v", arr.Elements[9])
+	}
+	if arr.Elements[10].(*evaluator.String).Value != "Rp 1.250.000" {
+		t.Errorf("format_rupiah(1250000) expected 'Rp 1.250.000', got %v", arr.Elements[10])
+	}
+}
+
+func TestFeature_TransaksiDanRollback(t *testing.T) {
+	// 1. Sukses commit transaksi biasa
+	codeCommit := `
+	buat saldo = 100
+	transaksi {
+		saldo = 80
+	}
+	saldo
+	`
+	resCommit := testEvalSource(t, codeCommit)
+	if intVal, ok := resCommit.(*evaluator.Integer); !ok || intVal.Value != 80 {
+		t.Fatalf("expected saldo 80 after commit, got: %v", resCommit)
+	}
+
+	// 2. Rollback via 'batalkan' eksplisit dan tangkap di pulihkan (err)
+	codeRollback := `
+	buat saldo = 100
+	buat status = "aman"
+	transaksi {
+		saldo = 50
+		saldo = 20
+		batalkan "dana tidak mencukupi"
+		saldo = 0
+	} pulihkan (alasan) {
+		status = alasan
+	}
+	[saldo, status]
+	`
+	resRollback := testEvalSource(t, codeRollback)
+	arrRollback, ok := resRollback.(*evaluator.Array)
+	if !ok || len(arrRollback.Elements) != 2 {
+		t.Fatalf("expected array [saldo, status], got: %v", resRollback)
+	}
+	if arrRollback.Elements[0].(*evaluator.Integer).Value != 100 {
+		t.Errorf("expected saldo reverted to 100, got: %v", arrRollback.Elements[0])
+	}
+	if arrRollback.Elements[1].(*evaluator.String).Value != "dana tidak mencukupi" {
+		t.Errorf("expected status 'dana tidak mencukupi', got: %v", arrRollback.Elements[1])
+	}
+
+	// 3. Rollback otomatis akibat runtime error / lempar
+	codeError := `
+	buat saldo = 500
+	buat err_msg = ""
+	transaksi {
+		saldo = 200
+		lempar "koneksi bank terputus"
+	} pulihkan (err) {
+		err_msg = err
+	}
+	[saldo, err_msg]
+	`
+	resError := testEvalSource(t, codeError)
+	arrError, ok := resError.(*evaluator.Array)
+	if !ok || len(arrError.Elements) != 2 {
+		t.Fatalf("expected array [saldo, err_msg], got: %v", resError)
+	}
+	if arrError.Elements[0].(*evaluator.Integer).Value != 500 {
+		t.Errorf("expected saldo 500 after error rollback, got: %v", arrError.Elements[0])
+	}
+	if arrError.Elements[1].(*evaluator.String).Value != "koneksi bank terputus" {
+		t.Errorf("expected err_msg 'koneksi bank terputus', got: %v", arrError.Elements[1])
+	}
+
+	// 4. Nested Transactions: inner rolls back, outer succeeds
+	codeNestedInner := `
+	buat x = 10
+	buat y = 20
+	transaksi {
+		x = 100
+		transaksi {
+			y = 200
+			batalkan "batal dalam"
+		}
+	}
+	[x, y]
+	`
+	resNestedInner := testEvalSource(t, codeNestedInner)
+	arrNestedInner, ok := resNestedInner.(*evaluator.Array)
+	if !ok || len(arrNestedInner.Elements) != 2 {
+		t.Fatalf("expected array [x, y], got: %v", resNestedInner)
+	}
+	if arrNestedInner.Elements[0].(*evaluator.Integer).Value != 100 {
+		t.Errorf("expected x 100, got: %v", arrNestedInner.Elements[0])
+	}
+	if arrNestedInner.Elements[1].(*evaluator.Integer).Value != 20 {
+		t.Errorf("expected y 20 (rolled back), got: %v", arrNestedInner.Elements[1])
+	}
+
+	// 5. Nested Transactions: outer rolls back all
+	codeNestedOuter := `
+	buat x = 10
+	buat y = 20
+	transaksi {
+		x = 100
+		transaksi {
+			y = 200
+		}
+		batalkan "batal luar"
+	}
+	[x, y]
+	`
+	resNestedOuter := testEvalSource(t, codeNestedOuter)
+	arrNestedOuter, ok := resNestedOuter.(*evaluator.Array)
+	if !ok || len(arrNestedOuter.Elements) != 2 {
+		t.Fatalf("expected array [x, y], got: %v", resNestedOuter)
+	}
+	if arrNestedOuter.Elements[0].(*evaluator.Integer).Value != 10 {
+		t.Errorf("expected x 10, got: %v", arrNestedOuter.Elements[0])
+	}
+	if arrNestedOuter.Elements[1].(*evaluator.Integer).Value != 20 {
+		t.Errorf("expected y 20, got: %v", arrNestedOuter.Elements[1])
+	}
+}
+
+func TestFeature_ReaktifDanPengamat(t *testing.T) {
+	// 1. Variabel Reaktif (auto-update derived dependencies)
+	codeReactive := `
+	buat harga = 50.ribu
+	buat jumlah = 2
+	reaktif total = harga * jumlah
+	buat t1 = total
+	harga = 75.ribu
+	buat t2 = total
+	jumlah = 3
+	buat t3 = total
+	[t1, t2, t3]
+	`
+	resReactive := testEvalSource(t, codeReactive)
+	arrReactive, ok := resReactive.(*evaluator.Array)
+	if !ok || len(arrReactive.Elements) != 3 {
+		t.Fatalf("expected array [t1, t2, t3], got: %v", resReactive)
+	}
+	if arrReactive.Elements[0].(*evaluator.Integer).Value != 100000 {
+		t.Errorf("expected t1 100000, got: %v", arrReactive.Elements[0])
+	}
+	if arrReactive.Elements[1].(*evaluator.Integer).Value != 150000 {
+		t.Errorf("expected t2 150000, got: %v", arrReactive.Elements[1])
+	}
+	if arrReactive.Elements[2].(*evaluator.Integer).Value != 225000 {
+		t.Errorf("expected t3 225000, got: %v", arrReactive.Elements[2])
+	}
+
+	// 2. Pengamat (pantau)
+	codeWatch := `
+	buat saldo = 100
+	buat logs = []
+	pantau saldo (baru, lama) {
+		logs = logs + ["ubah: " + lama + " -> " + baru]
+	}
+	saldo = 150
+	saldo = 200
+	logs
+	`
+	resWatch := testEvalSource(t, codeWatch)
+	arrWatch, ok := resWatch.(*evaluator.Array)
+	if !ok || len(arrWatch.Elements) != 2 {
+		t.Fatalf("expected 2 log entries, got: %v", resWatch)
+	}
+	if arrWatch.Elements[0].(*evaluator.String).Value != "ubah: 100 -> 150" {
+		t.Errorf("expected log 0 'ubah: 100 -> 150', got: %v", arrWatch.Elements[0])
+	}
+	if arrWatch.Elements[1].(*evaluator.String).Value != "ubah: 150 -> 200" {
+		t.Errorf("expected log 1 'ubah: 150 -> 200', got: %v", arrWatch.Elements[1])
+	}
+
+	// 3. Sinergi: Pantau variabel reaktif saat transaksi di-rollback
+	codeSynergy := `
+	buat saldo = 100
+	reaktif bonus = saldo * 2
+	buat catatan = []
+	pantau bonus (baru, lama) {
+		catatan = catatan + [baru]
+	}
+	transaksi {
+		saldo = 500
+		batalkan "tes batal"
+	}
+	[saldo, bonus, catatan]
+	`
+	resSynergy := testEvalSource(t, codeSynergy)
+	arrSynergy, ok := resSynergy.(*evaluator.Array)
+	if !ok || len(arrSynergy.Elements) != 3 {
+		t.Fatalf("expected synergy array [saldo, bonus, catatan], got: %v", resSynergy)
+	}
+	if arrSynergy.Elements[0].(*evaluator.Integer).Value != 100 {
+		t.Errorf("expected saldo reverted to 100, got: %v", arrSynergy.Elements[0])
+	}
+	if arrSynergy.Elements[1].(*evaluator.Integer).Value != 200 {
+		t.Errorf("expected bonus reverted to 200, got: %v", arrSynergy.Elements[1])
+	}
+	catatanArr := arrSynergy.Elements[2].(*evaluator.Array)
+	// catatan was modified inside transaction, so it was rolled back to [] before receiving the reverted 200 event
+	if len(catatanArr.Elements) != 1 {
+		t.Fatalf("expected 1 note in catatan (rolled back then reverted), got: %v", catatanArr)
+	}
+	if catatanArr.Elements[0].(*evaluator.Integer).Value != 200 {
+		t.Errorf("expected note 200 (reverted), got: %v", catatanArr.Elements[0])
+	}
+}
+
 
 

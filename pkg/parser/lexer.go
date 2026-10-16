@@ -128,6 +128,21 @@ var keywords = map[string]TokenType{
 	"harus":     HARUS,
 	"sembarang": SEMBARANG,
 	"saluran":   SALURAN,
+
+	// Exclusive Killer Features: Transactions & Reactivity
+	"transaksi":   TRANSACTION,
+	"transaction": TRANSACTION,
+	"batalkan":    ROLLBACK,
+	"rollback":    ROLLBACK,
+	"batalkeun":   ROLLBACK,
+	"pulihkan":    RECOVER,
+	"recover":     RECOVER,
+	"pulihkeun":   RECOVER,
+	"reaktif":     REACTIVE_DECL,
+	"reactive":    REACTIVE_DECL,
+	"pantau":      WATCH,
+	"watch":       WATCH,
+	"awaskeun":    WATCH,
 }
 
 type Lexer struct {

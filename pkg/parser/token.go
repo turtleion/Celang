@@ -115,6 +115,13 @@ const (
 	HARUS     TokenType = "HARUS"     // harus
 	SEMBARANG TokenType = "SEMBARANG" // sembarang
 	SALURAN   TokenType = "SALURAN"   // saluran
+
+	// Exclusive Killer Features: Transactions, Rollback, Reactivity & Watchers
+	TRANSACTION   TokenType = "TRANSACTION"   // transaksi, transaction
+	ROLLBACK      TokenType = "ROLLBACK"      // batalkan, rollback
+	RECOVER       TokenType = "RECOVER"       // pulihkan, recover
+	REACTIVE_DECL TokenType = "REACTIVE_DECL" // reaktif, reactive
+	WATCH         TokenType = "WATCH"         // pantau, watch
 )
 
 type Token struct {

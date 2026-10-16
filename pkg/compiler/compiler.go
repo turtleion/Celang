@@ -463,7 +463,8 @@ func (c *Compiler) compileStatement(stmt uast.Statement) error {
 
 	case *uast.ImportDeclaration, *uast.StructDeclaration, *uast.ConcurrencyStatement,
 		*uast.DestructureDeclaration, *uast.DestructureAssignment, *uast.TryCatchStatement, *uast.ThrowStatement,
-		*uast.ReferenceDeclaration, *uast.TypeAliasDeclaration, *uast.DeferStatement, *uast.SwitchStatement:
+		*uast.ReferenceDeclaration, *uast.TypeAliasDeclaration, *uast.DeferStatement, *uast.SwitchStatement,
+		*uast.TransactionStatement, *uast.RollbackStatement, *uast.ReactiveDeclaration, *uast.WatchStatement:
 		wrapper := &evaluator.ASTNodeWrapper{Node: s}
 		constIdx := c.chunk.AddConstant(wrapper)
 		c.emitOp(bytecode.OpEvalAST, line)
@@ -664,6 +665,26 @@ func (c *Compiler) compileExpression(expr uast.Expression) error {
 					c.chunk.WriteUint16(nameIdx, line)
 					c.chunk.WriteUint16(propIdx, line)
 					return nil
+				}
+			}
+			if lit, ok := e.Object.(*uast.Literal); ok {
+				var numObj evaluator.Object
+				if lit.Kind == uast.LiteralKindInt {
+					if iVal, ok := lit.Value.(int64); ok {
+						numObj = &evaluator.Integer{Value: iVal}
+					}
+				} else if lit.Kind == uast.LiteralKindFloat {
+					if fVal, ok := lit.Value.(float64); ok {
+						numObj = &evaluator.Float{Value: fVal}
+					}
+				}
+				if numObj != nil {
+					if folded, ok := evaluator.EvalNumericMember(numObj, e.Property); ok {
+						constIdx := c.chunk.AddConstant(folded)
+						c.emitOp(bytecode.OpConstant, line)
+						c.chunk.WriteUint16(constIdx, line)
+						return nil
+					}
 				}
 			}
 		}

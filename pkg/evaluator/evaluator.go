@@ -475,7 +475,7 @@ func Eval(node uast.Node, env *Environment) Object {
 				break
 			}
 			result = Eval(n.Body, env)
-			if result != nil && (result.Type() == RETURN_VALUE_OBJ || result.Type() == ERROR_OBJ) {
+			if result != nil && (result.Type() == RETURN_VALUE_OBJ || result.Type() == ERROR_OBJ || result.Type() == ROLLBACK_SIGNAL_OBJ) {
 				return result
 			}
 		}
@@ -501,7 +501,7 @@ func Eval(node uast.Node, env *Environment) Object {
 				}
 			}
 			result = Eval(n.Body, forEnv)
-			if result != nil && (result.Type() == RETURN_VALUE_OBJ || result.Type() == ERROR_OBJ) {
+			if result != nil && (result.Type() == RETURN_VALUE_OBJ || result.Type() == ERROR_OBJ || result.Type() == ROLLBACK_SIGNAL_OBJ) {
 				return result
 			}
 			if n.Update != nil {
@@ -541,7 +541,7 @@ func Eval(node uast.Node, env *Environment) Object {
 			for el := range ch.Ch {
 				forEnv.Define(n.Item, el, true, "")
 				result = Eval(n.Body, forEnv)
-				if result != nil && (result.Type() == RETURN_VALUE_OBJ || result.Type() == ERROR_OBJ) {
+				if result != nil && (result.Type() == RETURN_VALUE_OBJ || result.Type() == ERROR_OBJ || result.Type() == ROLLBACK_SIGNAL_OBJ) {
 					return result
 				}
 			}
@@ -555,7 +555,7 @@ func Eval(node uast.Node, env *Environment) Object {
 		for _, el := range elements {
 			forEnv.Define(n.Item, el, true, "")
 			result = Eval(n.Body, forEnv)
-			if result != nil && (result.Type() == RETURN_VALUE_OBJ || result.Type() == ERROR_OBJ) {
+			if result != nil && (result.Type() == RETURN_VALUE_OBJ || result.Type() == ERROR_OBJ || result.Type() == ROLLBACK_SIGNAL_OBJ) {
 				return result
 			}
 		}
@@ -687,7 +687,7 @@ func Eval(node uast.Node, env *Environment) Object {
 		if n.Body != nil {
 			for _, stmt := range n.Body.Statements {
 				result = Eval(stmt, env)
-				if result != nil && (result.Type() == RETURN_VALUE_OBJ || result.Type() == ERROR_OBJ) {
+				if result != nil && (result.Type() == RETURN_VALUE_OBJ || result.Type() == ERROR_OBJ || result.Type() == ROLLBACK_SIGNAL_OBJ) {
 					return result
 				}
 			}
@@ -731,6 +731,85 @@ func Eval(node uast.Node, env *Environment) Object {
 			return NULL
 		}
 		return newError(n.GetMetadata(), fmt.Sprintf("Mode konkurensi tidak dikenal: '%s'", n.Mode), "Gunakan mode 'sambil' atau 'bersamaan'.")
+
+	case *uast.TransactionStatement:
+		env.BeginTransaction()
+		bodyRes := Eval(n.Body, env)
+
+		if bodyRes != nil && bodyRes.Type() == ROLLBACK_SIGNAL_OBJ {
+			env.RollbackTransaction()
+			sig := bodyRes.(*RollbackSignal)
+			if n.Recover != nil {
+				recEnv := NewEnclosedEnvironment(env)
+				if n.RecoverVar != "" {
+					recVal := sig.Reason
+					if recVal == nil || recVal.Type() == NULL_OBJ {
+						recVal = &String{Value: "transaksi dibatalkan"}
+					}
+					recEnv.Define(n.RecoverVar, recVal, false, "")
+				}
+				return Eval(n.Recover, recEnv)
+			}
+			return NULL
+		} else if isError(bodyRes) {
+			env.RollbackTransaction()
+			if n.Recover != nil {
+				recEnv := NewEnclosedEnvironment(env)
+				if n.RecoverVar != "" {
+					recVal := bodyRes
+					if errObj, ok := bodyRes.(*Error); ok {
+						recVal = &String{Value: errObj.Message}
+					}
+					recEnv.Define(n.RecoverVar, recVal, false, "")
+				}
+				return Eval(n.Recover, recEnv)
+			}
+			return bodyRes
+		}
+
+		env.CommitTransaction()
+		return bodyRes
+
+	case *uast.RollbackStatement:
+		var reason Object = NULL
+		if n.Argument != nil {
+			reason = Eval(n.Argument, env)
+			if isError(reason) {
+				return reason
+			}
+		}
+		return &RollbackSignal{Reason: reason}
+
+	case *uast.ReactiveDeclaration:
+		entry, err := env.DefineReactive(n.Name, n.Value, env)
+		if err != nil {
+			return newError(n.GetMetadata(), err.Error(), "")
+		}
+		return entry.Current()
+
+	case *uast.WatchStatement:
+		targetEntry, ok := env.GetEntry(n.Target)
+		if !ok || targetEntry == nil {
+			return newError(n.GetMetadata(), fmt.Sprintf("Variabel '%s' tidak ditemukan untuk dipantau", n.Target), "Pastikan variabel target sudah dideklarasikan sebelum dipantau.")
+		}
+		newVar := n.NewValVar
+		if newVar == "" {
+			newVar = "baru"
+		}
+		oldVar := n.OldValVar
+		if oldVar == "" {
+			oldVar = "lama"
+		}
+		watcher := &ReactiveWatcher{
+			TargetName: n.Target,
+			NewValVar:  newVar,
+			OldValVar:  oldVar,
+			Body:       n.Body,
+			Env:        env,
+		}
+		root := targetEntry.Resolve()
+		root.Watchers = append(root.Watchers, watcher)
+		return NULL
 
 	// Expressions
 	case *uast.Literal:
@@ -974,26 +1053,9 @@ func Eval(node uast.Node, env *Environment) Object {
 			}
 		}
 
-		// 3d. Duration helpers on numeric types: e.g. 3.detik, 500.milidetik
-		if num, ok := obj.(*Integer); ok {
-			switch n.Property {
-			case "detik":
-				return &Integer{Value: num.Value * 1000}
-			case "milidetik":
-				return &Integer{Value: num.Value}
-			case "menit":
-				return &Integer{Value: num.Value * 60 * 1000}
-			}
-		}
-		if flt, ok := obj.(*Float); ok {
-			switch n.Property {
-			case "detik":
-				return &Float{Value: flt.Value * 1000}
-			case "milidetik":
-				return &Float{Value: flt.Value}
-			case "menit":
-				return &Float{Value: flt.Value * 60 * 1000}
-			}
+		// 3d. Numeric cultural, nominal, terbilang, data size & duration helpers (e.g. 50.ribu, 3.detik, 10.mb, 15000.rupiah, 50000.terbilang)
+		if res, ok := EvalNumericMember(obj, n.Property); ok {
+			return res
 		}
 
 		// 4. Time-Travel Variable access fallback (e.g. x.sebelumnya, x.awal, x.histori)
@@ -1266,6 +1328,9 @@ func evalProgram(stmts []uast.Statement, env *Environment) Object {
 			if result.Type() == ERROR_OBJ {
 				return result
 			}
+			if result.Type() == ROLLBACK_SIGNAL_OBJ {
+				return newError(nil, "perintah 'batalkan' hanya dapat digunakan di dalam blok transaksi", "Bungkus operasi dengan 'transaksi { ... }' terlebih dahulu.")
+			}
 		}
 	}
 	return result
@@ -1276,7 +1341,7 @@ func evalBlockStatement(stmts []uast.Statement, env *Environment) Object {
 	for _, stmt := range stmts {
 		result = Eval(stmt, env)
 		if result != nil {
-			if result.Type() == RETURN_VALUE_OBJ || result.Type() == ERROR_OBJ {
+			if result.Type() == RETURN_VALUE_OBJ || result.Type() == ERROR_OBJ || result.Type() == ROLLBACK_SIGNAL_OBJ {
 				return result
 			}
 		}
@@ -1317,6 +1382,20 @@ func evalBinaryOp(op string, left, right Object, meta *uast.NodeMetadata) Object
 				}
 			}
 			return &String{Value: left.Inspect() + rightStr.Value}
+		}
+
+		// Array concatenation / append
+		if leftArr, ok := left.(*Array); ok {
+			if rightArr, ok := right.(*Array); ok {
+				newElems := make([]Object, len(leftArr.Elements)+len(rightArr.Elements))
+				copy(newElems, leftArr.Elements)
+				copy(newElems[len(leftArr.Elements):], rightArr.Elements)
+				return &Array{Elements: newElems}
+			}
+			newElems := make([]Object, len(leftArr.Elements)+1)
+			copy(newElems, leftArr.Elements)
+			newElems[len(leftArr.Elements)] = right
+			return &Array{Elements: newElems}
 		}
 	}
 

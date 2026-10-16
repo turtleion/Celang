@@ -566,4 +566,81 @@ func TestVM_AuditFixes(t *testing.T) {
 	}
 }
 
+func TestVM_SatuanBudayaDanTerbilang(t *testing.T) {
+	input := `
+	buat harga = 50.ribu
+	buat gaji = 2.5.juta
+	buat hutang = 1.miliar
+	[harga, gaji, hutang, harga.rupiah, gaji.terbilang]
+	`
+	res, _, _ := runVM(t, input)
+	arr, ok := res.(*evaluator.Array)
+	if !ok || len(arr.Elements) != 5 {
+		t.Fatalf("expected 5 elements, got %s", res.Inspect())
+	}
+	if arr.Elements[0].(*evaluator.Integer).Value != 50000 {
+		t.Errorf("expected 50000, got %v", arr.Elements[0])
+	}
+	if arr.Elements[1].(*evaluator.Integer).Value != 2500000 {
+		t.Errorf("expected 2500000, got %v", arr.Elements[1])
+	}
+	if arr.Elements[2].(*evaluator.Integer).Value != 1000000000 {
+		t.Errorf("expected 1000000000, got %v", arr.Elements[2])
+	}
+	if arr.Elements[3].(*evaluator.String).Value != "Rp 50.000" {
+		t.Errorf("expected 'Rp 50.000', got %v", arr.Elements[3])
+	}
+	if arr.Elements[4].(*evaluator.String).Value != "dua juta lima ratus ribu rupiah" {
+		t.Errorf("expected 'dua juta lima ratus ribu rupiah', got %v", arr.Elements[4])
+	}
+}
+
+func TestVM_TransaksiDanRollback(t *testing.T) {
+	input := `
+	buat saldo = 100
+	buat status = "aman"
+	transaksi {
+		saldo = 40
+		batalkan "saldo kurang"
+	} pulihkan (err) {
+		status = err
+	}
+	[saldo, status]
+	`
+	res, _, _ := runVM(t, input)
+	arr, ok := res.(*evaluator.Array)
+	if !ok || len(arr.Elements) != 2 {
+		t.Fatalf("expected 2 elements, got %s", res.Inspect())
+	}
+	if arr.Elements[0].(*evaluator.Integer).Value != 100 {
+		t.Errorf("expected saldo 100, got %v", arr.Elements[0])
+	}
+	if arr.Elements[1].(*evaluator.String).Value != "saldo kurang" {
+		t.Errorf("expected status 'saldo kurang', got %v", arr.Elements[1])
+	}
+}
+
+func TestVM_ReaktifDanPengamat(t *testing.T) {
+	input := `
+	buat harga = 50.ribu
+	buat jumlah = 2
+	reaktif total = harga * jumlah
+	buat t1 = total
+	harga = 100.ribu
+	buat t2 = total
+	[t1, t2]
+	`
+	res, _, _ := runVM(t, input)
+	arr, ok := res.(*evaluator.Array)
+	if !ok || len(arr.Elements) != 2 {
+		t.Fatalf("expected 2 elements, got %s", res.Inspect())
+	}
+	if arr.Elements[0].(*evaluator.Integer).Value != 100000 {
+		t.Errorf("expected t1 100000, got %v", arr.Elements[0])
+	}
+	if arr.Elements[1].(*evaluator.Integer).Value != 200000 {
+		t.Errorf("expected t2 200000, got %v", arr.Elements[1])
+	}
+}
+
 

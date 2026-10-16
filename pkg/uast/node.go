@@ -33,6 +33,10 @@ const (
 	NodeTypeReferenceDeclaration   NodeType = "ReferenceDeclaration"
 	NodeTypeTypeAliasDeclaration   NodeType = "TypeAliasDeclaration"
 	NodeTypeDeferStatement         NodeType = "DeferStatement"
+	NodeTypeTransactionStatement   NodeType = "TransactionStatement"
+	NodeTypeRollbackStatement      NodeType = "RollbackStatement"
+	NodeTypeReactiveDeclaration    NodeType = "ReactiveDeclaration"
+	NodeTypeWatchStatement         NodeType = "WatchStatement"
 
 	// Expressions
 	NodeTypeLiteral          NodeType = "Literal"

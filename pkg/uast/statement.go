@@ -868,4 +868,140 @@ func (d *DeferStatement) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// TransactionStatement represents a transactional state block with optional rollback recovery:
+// transaksi { ... } pulihkan (err) { ... }
+type TransactionStatement struct {
+	NodeType   NodeType        `json:"type"`
+	Metadata   *NodeMetadata   `json:"metadata,omitempty"`
+	Body       *BlockStatement `json:"body"`
+	RecoverVar string          `json:"recover_var,omitempty"`
+	Recover    *BlockStatement `json:"recover,omitempty"`
+}
+
+func (t *TransactionStatement) Type() NodeType          { return NodeTypeTransactionStatement }
+func (t *TransactionStatement) GetMetadata() *NodeMetadata { return t.Metadata }
+func (t *TransactionStatement) statementNode()          {}
+
+func (t *TransactionStatement) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		NodeType   NodeType        `json:"type"`
+		Metadata   *NodeMetadata   `json:"metadata,omitempty"`
+		Body       *BlockStatement `json:"body"`
+		RecoverVar string          `json:"recover_var,omitempty"`
+		Recover    *BlockStatement `json:"recover,omitempty"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	t.NodeType = NodeTypeTransactionStatement
+	t.Metadata = raw.Metadata
+	t.Body = raw.Body
+	t.RecoverVar = raw.RecoverVar
+	t.Recover = raw.Recover
+	return nil
+}
+
+// RollbackStatement explicitly cancels the current transaction: batalkan [alasan]
+type RollbackStatement struct {
+	NodeType NodeType      `json:"type"`
+	Metadata *NodeMetadata `json:"metadata,omitempty"`
+	Argument Expression    `json:"argument,omitempty"`
+}
+
+func (r *RollbackStatement) Type() NodeType          { return NodeTypeRollbackStatement }
+func (r *RollbackStatement) GetMetadata() *NodeMetadata { return r.Metadata }
+func (r *RollbackStatement) statementNode()          {}
+
+func (r *RollbackStatement) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		NodeType NodeType        `json:"type"`
+		Metadata *NodeMetadata   `json:"metadata,omitempty"`
+		Argument json.RawMessage `json:"argument,omitempty"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	r.NodeType = NodeTypeRollbackStatement
+	r.Metadata = raw.Metadata
+	if len(raw.Argument) > 0 && string(raw.Argument) != "null" {
+		argExpr, err := UnmarshalExpressionJSON(raw.Argument)
+		if err != nil {
+			return fmt.Errorf("RollbackStatement.argument unmarshal error: %w", err)
+		}
+		r.Argument = argExpr
+	}
+	return nil
+}
+
+// ReactiveDeclaration represents a reactive derived variable: reaktif <name> = <expr>
+type ReactiveDeclaration struct {
+	NodeType NodeType      `json:"type"`
+	Metadata *NodeMetadata `json:"metadata,omitempty"`
+	Name     string        `json:"name"`
+	Value    Expression    `json:"value"`
+}
+
+func (r *ReactiveDeclaration) Type() NodeType          { return NodeTypeReactiveDeclaration }
+func (r *ReactiveDeclaration) GetMetadata() *NodeMetadata { return r.Metadata }
+func (r *ReactiveDeclaration) statementNode()          {}
+
+func (r *ReactiveDeclaration) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		NodeType NodeType        `json:"type"`
+		Metadata *NodeMetadata   `json:"metadata,omitempty"`
+		Name     string          `json:"name"`
+		Value    json.RawMessage `json:"value"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	r.NodeType = NodeTypeReactiveDeclaration
+	r.Metadata = raw.Metadata
+	r.Name = raw.Name
+	if len(raw.Value) > 0 && string(raw.Value) != "null" {
+		valExpr, err := UnmarshalExpressionJSON(raw.Value)
+		if err != nil {
+			return fmt.Errorf("ReactiveDeclaration.value unmarshal error: %w", err)
+		}
+		r.Value = valExpr
+	}
+	return nil
+}
+
+// WatchStatement observes changes to a variable: pantau <target> (baru, lama) { ... }
+type WatchStatement struct {
+	NodeType  NodeType        `json:"type"`
+	Metadata  *NodeMetadata   `json:"metadata,omitempty"`
+	Target    string          `json:"target"`
+	NewValVar string          `json:"new_val_var,omitempty"`
+	OldValVar string          `json:"old_val_var,omitempty"`
+	Body      *BlockStatement `json:"body"`
+}
+
+func (w *WatchStatement) Type() NodeType          { return NodeTypeWatchStatement }
+func (w *WatchStatement) GetMetadata() *NodeMetadata { return w.Metadata }
+func (w *WatchStatement) statementNode()          {}
+
+func (w *WatchStatement) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		NodeType  NodeType        `json:"type"`
+		Metadata  *NodeMetadata   `json:"metadata,omitempty"`
+		Target    string          `json:"target"`
+		NewValVar string          `json:"new_val_var,omitempty"`
+		OldValVar string          `json:"old_val_var,omitempty"`
+		Body      *BlockStatement `json:"body"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	w.NodeType = NodeTypeWatchStatement
+	w.Metadata = raw.Metadata
+	w.Target = raw.Target
+	w.NewValVar = raw.NewValVar
+	w.OldValVar = raw.OldValVar
+	w.Body = raw.Body
+	return nil
+}
+
+
 

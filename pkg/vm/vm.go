@@ -754,6 +754,16 @@ func (vm *VM) evalIndex(targetObj, indexObj evaluator.Object) (evaluator.Object,
 		}
 		return &evaluator.Null{}, nil
 
+	case *evaluator.Integer, *evaluator.Float:
+		prop := indexObj.Inspect()
+		if s, ok := indexObj.(*evaluator.String); ok {
+			prop = s.Value
+		}
+		if res, ok := evaluator.EvalNumericMember(targetObj, prop); ok {
+			return res, nil
+		}
+		return &evaluator.Null{}, nil
+
 	default:
 		return nil, fmt.Errorf("tipe %s tidak mendukung operasi indeks", targetObj.Type())
 	}
@@ -818,6 +828,19 @@ func (vm *VM) evalAdd(a, b evaluator.Object) (evaluator.Object, error) {
 	}
 	if bStr, ok := b.(*evaluator.String); ok {
 		return &evaluator.String{Value: a.Inspect() + bStr.Value}, nil
+	}
+
+	if aArr, ok := a.(*evaluator.Array); ok {
+		if bArr, ok := b.(*evaluator.Array); ok {
+			newElems := make([]evaluator.Object, len(aArr.Elements)+len(bArr.Elements))
+			copy(newElems, aArr.Elements)
+			copy(newElems[len(aArr.Elements):], bArr.Elements)
+			return &evaluator.Array{Elements: newElems}, nil
+		}
+		newElems := make([]evaluator.Object, len(aArr.Elements)+1)
+		copy(newElems, aArr.Elements)
+		newElems[len(aArr.Elements)] = b
+		return &evaluator.Array{Elements: newElems}, nil
 	}
 
 	aInt, aFloat, aIsInt, aOk := evaluator.CoerceToNumeric(a)

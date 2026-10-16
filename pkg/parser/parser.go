@@ -253,6 +253,14 @@ func (p *Parser) parseStatement() uast.Statement {
 		return p.parseReferenceDeclaration()
 	case DEFER:
 		return p.parseDeferStatement()
+	case TRANSACTION:
+		return p.parseTransactionStatement()
+	case ROLLBACK:
+		return p.parseRollbackStatement()
+	case REACTIVE_DECL:
+		return p.parseReactiveDeclaration()
+	case WATCH:
+		return p.parseWatchStatement()
 	default:
 		return p.parseExpressionStatement()
 	}
@@ -629,6 +637,133 @@ func (p *Parser) parseThrowStatement() *uast.ThrowStatement {
 		NodeType: uast.NodeTypeThrowStatement,
 		Metadata: meta,
 		Argument: arg,
+	}
+}
+
+func (p *Parser) parseTransactionStatement() *uast.TransactionStatement {
+	meta := p.currentMetadata()
+	p.nextToken() // eat 'transaksi' / 'transaction'
+
+	if !p.curTokenIs(LBRACE) {
+		p.addError(fmt.Sprintf("Diharapkan '{' setelah keyword 'transaksi', menerima '%s'", p.curToken.Literal))
+		return nil
+	}
+	body := p.parseBlockStatement()
+
+	stmt := &uast.TransactionStatement{
+		NodeType: uast.NodeTypeTransactionStatement,
+		Metadata: meta,
+		Body:     body,
+	}
+
+	if p.peekTokenIs(RECOVER) {
+		p.nextToken() // move to 'pulihkan' / 'recover'
+
+		recoverVar := "err"
+		if p.peekTokenIs(LPAREN) {
+			p.nextToken() // move to '('
+			if p.peekTokenIs(IDENT) {
+				p.nextToken()
+				recoverVar = p.curToken.Literal
+			}
+			if !p.expectPeek(RPAREN) {
+				return nil
+			}
+		}
+
+		if !p.expectPeek(LBRACE) {
+			return nil
+		}
+		stmt.RecoverVar = recoverVar
+		stmt.Recover = p.parseBlockStatement()
+	}
+
+	return stmt
+}
+
+func (p *Parser) parseRollbackStatement() *uast.RollbackStatement {
+	meta := p.currentMetadata()
+	p.nextToken() // eat 'batalkan' / 'rollback'
+
+	var arg uast.Expression
+	if !p.curTokenIs(SEMICOLON) && !p.curTokenIs(RBRACE) && !p.curTokenIs(EOF) {
+		arg = p.parseExpression(LOWEST)
+	}
+
+	return &uast.RollbackStatement{
+		NodeType: uast.NodeTypeRollbackStatement,
+		Metadata: meta,
+		Argument: arg,
+	}
+}
+
+func (p *Parser) parseReactiveDeclaration() *uast.ReactiveDeclaration {
+	meta := p.currentMetadata()
+	p.nextToken() // eat 'reaktif' / 'reactive'
+
+	if !p.curTokenIs(IDENT) {
+		p.addError(fmt.Sprintf("Diharapkan nama variabel setelah 'reaktif', menerima '%s'", p.curToken.Literal))
+		return nil
+	}
+	name := p.curToken.Literal
+
+	if !p.expectPeek(ASSIGN) {
+		return nil
+	}
+	p.nextToken() // move past '='
+
+	val := p.parseExpression(LOWEST)
+
+	return &uast.ReactiveDeclaration{
+		NodeType: uast.NodeTypeReactiveDeclaration,
+		Metadata: meta,
+		Name:     name,
+		Value:    val,
+	}
+}
+
+func (p *Parser) parseWatchStatement() *uast.WatchStatement {
+	meta := p.currentMetadata()
+	p.nextToken() // eat 'pantau' / 'watch'
+
+	if !p.curTokenIs(IDENT) {
+		p.addError(fmt.Sprintf("Diharapkan nama target variabel setelah 'pantau', menerima '%s'", p.curToken.Literal))
+		return nil
+	}
+	target := p.curToken.Literal
+
+	newVar := "baru"
+	oldVar := "lama"
+
+	if p.peekTokenIs(LPAREN) {
+		p.nextToken() // move to '('
+		if p.peekTokenIs(IDENT) {
+			p.nextToken()
+			newVar = p.curToken.Literal
+			if p.peekTokenIs(COMMA) {
+				p.nextToken() // eat ','
+				if p.expectPeek(IDENT) {
+					oldVar = p.curToken.Literal
+				}
+			}
+		}
+		if !p.expectPeek(RPAREN) {
+			return nil
+		}
+	}
+
+	if !p.expectPeek(LBRACE) {
+		return nil
+	}
+	body := p.parseBlockStatement()
+
+	return &uast.WatchStatement{
+		NodeType:   uast.NodeTypeWatchStatement,
+		Metadata:   meta,
+		Target:     target,
+		NewValVar:  newVar,
+		OldValVar:  oldVar,
+		Body:       body,
 	}
 }
 
@@ -2051,9 +2186,35 @@ func (p *Parser) parseIndexExpression(left uast.Expression) uast.Expression {
 	}
 }
 
+func (p *Parser) isPropertyIdentifierToken(t TokenType) bool {
+	if t == IDENT {
+		return true
+	}
+	switch t {
+	case VAR_DECL, CONST_DECL, TYPE_ASSIGN, IF, ELSE_IF, ELSE, SWITCH, CASE, DEFAULT,
+		WHILE, FOR, IN, FUNC, RETURN, ASYNC, PARALLEL, TRUE, FALSE, NULL, AND, OR, NOT,
+		RETURN_TYPE, MAKA, SELESAI, VIS_PUBLIC, VIS_MODULE, VIS_PRIVATE, VIS_ALLOWLIST,
+		IMPORT, FROM, AS, TRY, CATCH, FINALLY, THROW, STYLE_BLOCK, STRUCT_DECL, PRIVATE,
+		REF_DECL, TYPE_DECL, NULL_COALESCE, MAYBE, DEFER, TITIP, JEMPUT, HARUS, SEMBARANG,
+		SALURAN, TRANSACTION, ROLLBACK, RECOVER, REACTIVE_DECL, WATCH:
+		return true
+	default:
+		return false
+	}
+}
+
+func (p *Parser) expectPeekProperty() bool {
+	if p.isPropertyIdentifierToken(p.peekToken.Type) {
+		p.nextToken()
+		return true
+	}
+	p.peekError(IDENT)
+	return false
+}
+
 func (p *Parser) parseMemberExpression(left uast.Expression) uast.Expression {
 	meta := p.currentMetadata()
-	if !p.expectPeek(IDENT) {
+	if !p.expectPeekProperty() {
 		return nil
 	}
 	prop := p.curToken.Literal
@@ -2240,7 +2401,7 @@ func (p *Parser) parseOptionalMemberExpression(left uast.Expression) uast.Expres
 		}
 	}
 
-	if !p.expectPeek(IDENT) {
+	if !p.expectPeekProperty() {
 		return nil
 	}
 	prop := p.curToken.Literal

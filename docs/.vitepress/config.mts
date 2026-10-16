@@ -34,11 +34,11 @@ export default defineConfig({
           },
           {
             name: 'keyword.control.celang',
-            match: '\\b(jika|selain jika|selain|maka|cocok|kasus|lainnya|switch|case|default|selama|untuk|dalam|kembalikan|mengembalikan|berhenti|lanjut|sambil|bersamaan|mundur ke|coba|tangkap|akhirnya|lempar|try|catch|finally|throw|gaya|mungkin|saat_selesai|kalau|bila|defer|titip|jemput|harus|if|else|while|for|return|break|continue|async|parallel|lamun|salami|pikeun|balikkeun)\\b'
+            match: '\\b(jika|selain jika|selain|maka|cocok|kasus|lainnya|switch|case|default|selama|untuk|dalam|kembalikan|mengembalikan|berhenti|lanjut|sambil|bersamaan|mundur ke|coba|tangkap|akhirnya|lempar|try|catch|finally|throw|gaya|mungkin|saat_selesai|kalau|bila|defer|titip|jemput|harus|transaksi|batalkan|pulihkan|pantau|if|else|while|for|return|break|continue|async|parallel|lamun|salami|pikeun|balikkeun)\\b'
           },
           {
             name: 'keyword.declaration.celang',
-            match: '\\b(buat|konstanta|fungsi|bentuk|itu|rujuk|sebagai|tipe|privat|sembarang|saluran|let|const|var|function|def|jieun|tetep|struct|ref|as)\\b'
+            match: '\\b(buat|konstanta|fungsi|bentuk|itu|rujuk|sebagai|tipe|privat|sembarang|saluran|reaktif|reactive|let|const|var|function|def|jieun|tetep|struct|ref|as)\\b'
           },
           {
             name: 'constant.language.celang',
@@ -46,7 +46,7 @@ export default defineConfig({
           },
           {
             name: 'support.function.celang',
-            match: '\\b(cetak|masukan|panjang|tipe|rentang|saring|petakan|potong_spasi|kapitalisasi|salin|clone|Saluran|jemput_semua|jemput_pertama|Angka|Pecahan|Teks|Logika|print|input|len|type|range|filter|map|trim)\\b'
+            match: '\\b(cetak|masukan|panjang|tipe|rentang|saring|petakan|potong_spasi|kapitalisasi|salin|clone|Saluran|jemput_semua|jemput_pertama|terbilang|rupiah|format_rupiah|Angka|Pecahan|Teks|Logika|print|input|len|type|range|filter|map|trim)\\b'
           },
           {
             name: 'constant.numeric.celang',
@@ -138,7 +138,10 @@ export default defineConfig({
         text: '⏳ Fitur Eksklusif',
         collapsed: false,
         items: [
-          { text: 'Time-Travel Debugging (Riwayat Variabel)', link: '/fitur-khas/time-travel' }
+          { text: 'Time-Travel Debugging (Riwayat Variabel)', link: '/fitur-khas/time-travel' },
+          { text: 'Transaksi & Rollback Otomatis', link: '/fitur-khas/transaksi' },
+          { text: 'Variabel Reaktif & Pengamat', link: '/fitur-khas/reaktif' },
+          { text: 'Satuan Budaya & Terbilang Bawaan', link: '/fitur-khas/satuan-budaya' }
         ]
       },
       {

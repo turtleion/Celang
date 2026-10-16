@@ -254,6 +254,28 @@ func RegisterBuiltinsWithIO(env *Environment, in io.Reader, out io.Writer) {
 	env.Define("Logika", logikaFn, false, "function")
 	env.Define("logika", logikaFn, false, "function")
 
+	// Indonesian Culture Builtins: terbilang(angka), rupiah(angka) / format_rupiah(angka)
+	terbilangFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 {
+				return &Error{Message: fmt.Sprintf("terbilang mengharapkan 1 argumen, menerima %d", len(args))}
+			}
+			return &String{Value: Terbilang(args[0])}
+		},
+	}
+	env.Define("terbilang", terbilangFn, false, "function")
+
+	rupiahFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 {
+				return &Error{Message: fmt.Sprintf("format_rupiah mengharapkan 1 argumen, menerima %d", len(args))}
+			}
+			return &String{Value: FormatRupiah(args[0])}
+		},
+	}
+	env.Define("rupiah", rupiahFn, false, "function")
+	env.Define("format_rupiah", rupiahFn, false, "function")
+
 	// Deep Memory Clone Builtin: salin(obj) / clone(obj)
 	salinFn := &Builtin{
 		Fn: func(args ...Object) Object {

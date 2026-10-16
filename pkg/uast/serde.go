@@ -355,6 +355,38 @@ func UnmarshalStatementJSON(data []byte) (Statement, error) {
 		def.NodeType = NodeTypeDeferStatement
 		return &def, nil
 
+	case NodeTypeTransactionStatement:
+		var txn TransactionStatement
+		if err := json.Unmarshal(data, &txn); err != nil {
+			return nil, err
+		}
+		txn.NodeType = NodeTypeTransactionStatement
+		return &txn, nil
+
+	case NodeTypeRollbackStatement:
+		var rb RollbackStatement
+		if err := json.Unmarshal(data, &rb); err != nil {
+			return nil, err
+		}
+		rb.NodeType = NodeTypeRollbackStatement
+		return &rb, nil
+
+	case NodeTypeReactiveDeclaration:
+		var rx ReactiveDeclaration
+		if err := json.Unmarshal(data, &rx); err != nil {
+			return nil, err
+		}
+		rx.NodeType = NodeTypeReactiveDeclaration
+		return &rx, nil
+
+	case NodeTypeWatchStatement:
+		var ws WatchStatement
+		if err := json.Unmarshal(data, &ws); err != nil {
+			return nil, err
+		}
+		ws.NodeType = NodeTypeWatchStatement
+		return &ws, nil
+
 	default:
 		return nil, fmt.Errorf("unrecognized statement type: '%s'", detector.Type)
 	}
