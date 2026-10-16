@@ -8,10 +8,11 @@ import (
 // Program is the root node of a Celang U-AST compilation unit.
 // This is the structure that is stored as data (.ast / .json) in version control.
 type Program struct {
-	NodeType NodeType      `json:"type"`
-	Version  string        `json:"version"`
-	Metadata *NodeMetadata `json:"metadata,omitempty"`
-	Body     []Statement   `json:"body"`
+	NodeType    NodeType      `json:"type"`
+	Version     string        `json:"version"`
+	Metadata    *NodeMetadata `json:"metadata,omitempty"`
+	Body        []Statement   `json:"body"`
+	IsUniversal bool          `json:"is_universal,omitempty"`
 }
 
 func (p *Program) Type() NodeType          { return NodeTypeProgram }
@@ -19,10 +20,11 @@ func (p *Program) GetMetadata() *NodeMetadata { return p.Metadata }
 
 func (p *Program) UnmarshalJSON(data []byte) error {
 	var raw struct {
-		NodeType NodeType          `json:"type"`
-		Version  string            `json:"version"`
-		Metadata *NodeMetadata     `json:"metadata,omitempty"`
-		Body     []json.RawMessage `json:"body"`
+		NodeType    NodeType          `json:"type"`
+		Version     string            `json:"version"`
+		Metadata    *NodeMetadata     `json:"metadata,omitempty"`
+		Body        []json.RawMessage `json:"body"`
+		IsUniversal bool              `json:"is_universal,omitempty"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
@@ -39,5 +41,6 @@ func (p *Program) UnmarshalJSON(data []byte) error {
 	p.Version = raw.Version
 	p.Metadata = raw.Metadata
 	p.Body = stmts
+	p.IsUniversal = raw.IsUniversal
 	return nil
 }

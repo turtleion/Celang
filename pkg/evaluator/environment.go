@@ -107,16 +107,17 @@ func NewModuleRegistry() *ModuleRegistry {
 // Environment manages variable bindings across lexical scopes with thread-safety for goroutines.
 type Environment struct {
 	mu             sync.RWMutex
-	store          map[string]*VariableEntry
-	typeAliases    map[string]string
-	outer          *Environment
-	FilePath       string
-	ModuleRoot     string
-	ModuleRegistry *ModuleRegistry
+	store           map[string]*VariableEntry
+	typeAliases     map[string]string
+	outer           *Environment
+	FilePath        string
+	ModuleRoot      string
+	ModuleRegistry  *ModuleRegistry
 	defers          []uast.Statement
 	savepoints      []*transactionFrame
 	reactivityDepth int
 	activeTracker   *VariableEntry
+	IsUniversal     bool
 }
 
 func NewEnvironment() *Environment {
@@ -135,6 +136,7 @@ func NewEnclosedEnvironment(outer *Environment) *Environment {
 		env.FilePath = outer.FilePath
 		env.ModuleRoot = outer.ModuleRoot
 		env.ModuleRegistry = outer.ModuleRegistry
+		env.IsUniversal = outer.IsUniversal
 	}
 	return env
 }

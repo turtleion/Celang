@@ -153,13 +153,15 @@ type Lexer struct {
 	ch           byte // current character
 	line         int
 	column       int
+	IsUniversal  bool
 }
 
 func NewLexer(input string) *Lexer {
 	l := &Lexer{
-		input:  input,
-		line:   1,
-		column: 0,
+		input:       input,
+		line:        1,
+		column:      0,
+		IsUniversal: DetectUniversalDirective(input),
 	}
 	l.readChar()
 	return l

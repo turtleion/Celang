@@ -759,7 +759,10 @@ func (vm *VM) evalIndex(targetObj, indexObj evaluator.Object) (evaluator.Object,
 		if s, ok := indexObj.(*evaluator.String); ok {
 			prop = s.Value
 		}
-		if res, ok := evaluator.EvalNumericMember(targetObj, prop); ok {
+		if res, ok := evaluator.EvalNumericMemberWithEnv(targetObj, prop, vm.env); ok {
+			if isErr, ok := res.(*evaluator.Error); ok {
+				return nil, fmt.Errorf("%s", isErr.Message)
+			}
 			return res, nil
 		}
 		return &evaluator.Null{}, nil

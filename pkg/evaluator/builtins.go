@@ -83,6 +83,7 @@ func RegisterBuiltinsWithIO(env *Environment, in io.Reader, out io.Writer) {
 	}
 	env.Define("panjang", panjangFn, false, "function")
 	env.Define("len", panjangFn, false, "function")
+	env.Define("length", panjangFn, false, "function")
 
 	// 'tipe' returns the type name of an object
 	tipeFn := &Builtin{
@@ -231,6 +232,8 @@ func RegisterBuiltinsWithIO(env *Environment, in io.Reader, out io.Writer) {
 	}
 	env.Define("Angka", angkaFn, false, "function")
 	env.Define("angka", angkaFn, false, "function")
+	env.Define("Number", angkaFn, false, "function")
+	env.Define("number", angkaFn, false, "function")
 
 	teksFn := &Builtin{
 		Fn: func(args ...Object) Object {
@@ -242,6 +245,8 @@ func RegisterBuiltinsWithIO(env *Environment, in io.Reader, out io.Writer) {
 	}
 	env.Define("Teks", teksFn, false, "function")
 	env.Define("teks", teksFn, false, "function")
+	env.Define("String", teksFn, false, "function")
+	env.Define("string", teksFn, false, "function")
 
 	logikaFn := &Builtin{
 		Fn: func(args ...Object) Object {
@@ -253,6 +258,8 @@ func RegisterBuiltinsWithIO(env *Environment, in io.Reader, out io.Writer) {
 	}
 	env.Define("Logika", logikaFn, false, "function")
 	env.Define("logika", logikaFn, false, "function")
+	env.Define("Boolean", logikaFn, false, "function")
+	env.Define("boolean", logikaFn, false, "function")
 
 	// Indonesian Culture Builtins: terbilang(angka), rupiah(angka) / format_rupiah(angka)
 	terbilangFn := &Builtin{
@@ -275,6 +282,39 @@ func RegisterBuiltinsWithIO(env *Environment, in io.Reader, out io.Writer) {
 	}
 	env.Define("rupiah", rupiahFn, false, "function")
 	env.Define("format_rupiah", rupiahFn, false, "function")
+
+	// International Currency & Word Builtins: format_usd(n), in_words(n), dollars_in_words(n)
+	usdFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 {
+				return &Error{Message: fmt.Sprintf("format_usd expects 1 argument, received %d", len(args))}
+			}
+			return &String{Value: FormatUSD(args[0])}
+		},
+	}
+	env.Define("format_usd", usdFn, false, "function")
+	env.Define("format_currency", usdFn, false, "function")
+
+	inWordsFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 {
+				return &Error{Message: fmt.Sprintf("in_words expects 1 argument, received %d", len(args))}
+			}
+			return &String{Value: WordsEnglishCoerced(args[0])}
+		},
+	}
+	env.Define("in_words", inWordsFn, false, "function")
+	env.Define("spelled_out", inWordsFn, false, "function")
+
+	dollarsInWordsFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 {
+				return &Error{Message: fmt.Sprintf("dollars_in_words expects 1 argument, received %d", len(args))}
+			}
+			return &String{Value: DollarsInWords(args[0])}
+		},
+	}
+	env.Define("dollars_in_words", dollarsInWordsFn, false, "function")
 
 	// Deep Memory Clone Builtin: salin(obj) / clone(obj)
 	salinFn := &Builtin{
@@ -302,6 +342,8 @@ func RegisterBuiltinsWithIO(env *Environment, in io.Reader, out io.Writer) {
 	}
 	env.Define("Saluran", saluranFn, false, "function")
 	env.Define("saluran", saluranFn, false, "function")
+	env.Define("Channel", saluranFn, false, "function")
+	env.Define("channel", saluranFn, false, "function")
 
 	jemputFn := &Builtin{
 		Fn: func(args ...Object) Object {
@@ -320,6 +362,7 @@ func RegisterBuiltinsWithIO(env *Environment, in io.Reader, out io.Writer) {
 		},
 	}
 	env.Define("jemput", jemputFn, false, "function")
+	env.Define("await", jemputFn, false, "function")
 
 	jemputSemuaFn := &Builtin{
 		Fn: func(args ...Object) Object {
@@ -363,6 +406,7 @@ func RegisterBuiltinsWithIO(env *Environment, in io.Reader, out io.Writer) {
 		},
 	}
 	env.Define("jemput_semua", jemputSemuaFn, false, "function")
+	env.Define("await_all", jemputSemuaFn, false, "function")
 
 	jemputPertamaFn := &Builtin{
 		Fn: func(args ...Object) Object {
@@ -388,6 +432,8 @@ func RegisterBuiltinsWithIO(env *Environment, in io.Reader, out io.Writer) {
 		},
 	}
 	env.Define("jemput_pertama", jemputPertamaFn, false, "function")
+	env.Define("await_race", jemputPertamaFn, false, "function")
+	env.Define("await_first", jemputPertamaFn, false, "function")
 
 	// Register Standard Library global objects (berkas, fs, matematika, math, teks, strings, waktu, time, json)
 	RegisterStdlibGlobals(env)

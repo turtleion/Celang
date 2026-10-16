@@ -1,0 +1,55 @@
+"use universal"
+
+// ==========================================
+// 🌍 Celang Universal Mode Demo ("use universal")
+// ==========================================
+
+print("=== 1. Variables & Global Multipliers ===")
+let salary = 85.k
+let bonus = 15.thousand
+let totalCompensation = salary + bonus
+print("Base Salary:", salary)
+print("Total Compensation:", totalCompensation)
+
+print("\n=== 2. International Currency & Spelled-Out Numbers ===")
+let itemPrice = 1250.usd
+let smallPrice = 25.50.usd
+print("Item Price (USD):", itemPrice)
+print("Small Price (USD):", smallPrice)
+print("Spelled Out:", 42.words)
+print("Price in Words:", 25.50.dollars_in_words)
+
+print("\n=== 3. Time Travel Tracking ===")
+let balance = 100
+balance = 250
+balance = 500
+print("Current balance:", balance)
+print("Previous balance:", balance.previous)
+print("Initial balance:", balance.initial)
+print("Balance history:", balance.history)
+
+print("\n=== 4. Reactive State ===")
+let price = 50
+reactive tax = price * 0.1
+reactive grandTotal = price + tax
+print("Price:", price, "Tax:", tax, "Grand Total:", grandTotal)
+
+price = 100
+print("After price update to 100 -> Grand Total is automatically:", grandTotal)
+
+print("\n=== 5. Transactions & Rollback ===")
+let senderBalance = 200
+let receiverBalance = 50
+
+transaction {
+    senderBalance = senderBalance - 500
+    receiverBalance = receiverBalance + 500
+    if senderBalance < 0 {
+        rollback "Insufficient balance for transfer!"
+    }
+} recover (reason) {
+    print("⚠️ Transfer failed safely:", reason)
+}
+
+print("Sender balance safely preserved:", senderBalance)
+print("Receiver balance safely preserved:", receiverBalance)

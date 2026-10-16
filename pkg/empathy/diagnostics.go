@@ -20,6 +20,7 @@ type Diagnostic struct {
 	FriendlyHint     string
 	SourceCode       string
 	OtherErrorsCount int
+	IsUniversal      bool
 }
 
 // NewRuntimeDiagnostic constructs a friendly diagnostic from an evaluator error.
@@ -31,18 +32,30 @@ func NewRuntimeDiagnostic(err *evaluator.Error, sourceCode string) *Diagnostic {
 		col = err.Pos.Column
 	}
 
+	isUniversal := parser.DetectUniversalDirective(sourceCode)
+
 	hint := err.FriendlyHint
 	if hint == "" {
-		hint = suggestHint(err.Message)
+		if isUniversal {
+			hint = suggestEnglishHint(err.Message)
+		} else {
+			hint = suggestHint(err.Message)
+		}
+	}
+
+	title := "⚠️ Kesalahan Saat Program Berjalan (Runtime)"
+	if isUniversal {
+		title = "⚠️ Runtime Error"
 	}
 
 	return &Diagnostic{
-		Title:        "⚠️ Kesalahan Saat Program Berjalan (Runtime)",
+		Title:        title,
 		Message:      err.Message,
 		Line:         line,
 		Column:       col,
 		FriendlyHint: hint,
 		SourceCode:   sourceCode,
+		IsUniversal:  isUniversal,
 	}
 }
 
@@ -97,16 +110,23 @@ func NewSyntaxDiagnostic(rawErr string, line, col int, sourceCode string) *Diagn
 		otherCount = count
 	}
 
+	isUniversal := parser.DetectUniversalDirective(sourceCode)
 	hint := suggestSyntaxHint(cleanMsg, actualLine, actualCol, sourceCode)
 
+	title := "🛑 Kesalahan Penulisan Kode (Syntax Error)"
+	if isUniversal {
+		title = "🛑 Syntax Error"
+	}
+
 	return &Diagnostic{
-		Title:            "🛑 Kesalahan Penulisan Kode (Syntax Error)",
+		Title:            title,
 		Message:          cleanMsg,
 		Line:             actualLine,
 		Column:           actualCol,
 		FriendlyHint:     hint,
 		SourceCode:       sourceCode,
 		OtherErrorsCount: otherCount,
+		IsUniversal:      isUniversal,
 	}
 }
 
@@ -116,17 +136,24 @@ func NewSyntaxDiagnosticFromError(err error, sourceCode string) *Diagnostic {
 		return nil
 	}
 
+	isUniversal := parser.DetectUniversalDirective(sourceCode)
+	title := "🛑 Kesalahan Penulisan Kode (Syntax Error)"
+	if isUniversal {
+		title = "🛑 Syntax Error"
+	}
+
 	if pel, ok := err.(parser.ParseErrorList); ok && len(pel) > 0 {
 		first := pel[0]
 		hint := suggestSyntaxHint(first.Message, first.Line, first.Column, sourceCode)
 		return &Diagnostic{
-			Title:            "🛑 Kesalahan Penulisan Kode (Syntax Error)",
+			Title:            title,
 			Message:          first.Message,
 			Line:             first.Line,
 			Column:           first.Column,
 			FriendlyHint:     hint,
 			SourceCode:       sourceCode,
 			OtherErrorsCount: len(pel) - 1,
+			IsUniversal:      isUniversal,
 		}
 	}
 
@@ -139,10 +166,18 @@ func (d *Diagnostic) Render() string {
 
 	border := strings.Repeat("─", 50)
 	sb.WriteString(fmt.Sprintf("\n╭─ %s %s\n", d.Title, border[:max(0, 50-len(d.Title))]))
-	sb.WriteString(fmt.Sprintf("│ 📍 Lokasi: Baris %d, Kolom %d\n", d.Line, d.Column))
-	sb.WriteString(fmt.Sprintf("│ 💬 Penjelasan: %s\n", d.Message))
-	if d.OtherErrorsCount > 0 {
-		sb.WriteString(fmt.Sprintf("│    (Ditemukan juga %d kemungkinan kesalahan turunan lainnya)\n", d.OtherErrorsCount))
+	if d.IsUniversal {
+		sb.WriteString(fmt.Sprintf("│ 📍 Location: Line %d, Column %d\n", d.Line, d.Column))
+		sb.WriteString(fmt.Sprintf("│ 💬 Explanation: %s\n", d.Message))
+		if d.OtherErrorsCount > 0 {
+			sb.WriteString(fmt.Sprintf("│    (Found %d additional secondary error(s))\n", d.OtherErrorsCount))
+		}
+	} else {
+		sb.WriteString(fmt.Sprintf("│ 📍 Lokasi: Baris %d, Kolom %d\n", d.Line, d.Column))
+		sb.WriteString(fmt.Sprintf("│ 💬 Penjelasan: %s\n", d.Message))
+		if d.OtherErrorsCount > 0 {
+			sb.WriteString(fmt.Sprintf("│    (Ditemukan juga %d kemungkinan kesalahan turunan lainnya)\n", d.OtherErrorsCount))
+		}
 	}
 	sb.WriteString("│\n")
 
@@ -164,7 +199,11 @@ func (d *Diagnostic) Render() string {
 				if i == d.Line {
 					indentLen := len(gutter) - 2
 					pointerPad := strings.Repeat(" ", max(0, d.Column-1))
-					sb.WriteString(fmt.Sprintf("│%s^ di sini\n", strings.Repeat(" ", indentLen)+pointerPad))
+					pointerText := "^ di sini"
+					if d.IsUniversal {
+						pointerText = "^ here"
+					}
+					sb.WriteString(fmt.Sprintf("│%s%s\n", strings.Repeat(" ", indentLen)+pointerPad, pointerText))
 				}
 			}
 		}
@@ -172,7 +211,11 @@ func (d *Diagnostic) Render() string {
 
 	if d.FriendlyHint != "" {
 		sb.WriteString("│\n")
-		sb.WriteString(fmt.Sprintf("│ 💡 Saran Solusi:\n│    %s\n", d.FriendlyHint))
+		header := "💡 Saran Solusi:"
+		if d.IsUniversal {
+			header = "💡 Suggested Solution:"
+		}
+		sb.WriteString(fmt.Sprintf("│ %s\n│    %s\n", header, d.FriendlyHint))
 	}
 
 	sb.WriteString("╰" + strings.Repeat("─", 60) + "\n")
@@ -196,8 +239,38 @@ func suggestHint(msg string) string {
 	return "Periksa kembali logika dan tipe data variabel yang terlibat dalam operasi ini."
 }
 
+func suggestEnglishHint(msg string) string {
+	lower := strings.ToLower(msg)
+	if strings.Contains(lower, "not defined") || strings.Contains(lower, "not found") {
+		return "Ensure this variable is declared with 'let name = ...' or 'const name = ...' beforehand."
+	}
+	if strings.Contains(lower, "immutable") || strings.Contains(lower, "constant") {
+		return "This variable was declared with 'const'. Change it to 'let' if you need to reassign it."
+	}
+	if strings.Contains(lower, "division") || strings.Contains(lower, "zero") {
+		return "Division by zero is undefined in mathematics. Make sure the denominator is not zero."
+	}
+	return "Check your variable types and logic involved in this operation."
+}
+
 func suggestSyntaxHint(msg string, line, col int, sourceCode string) string {
 	lowerMsg := strings.ToLower(msg)
+
+	if parser.DetectUniversalDirective(sourceCode) {
+		if strings.Contains(lowerMsg, "is not allowed in universal mode") {
+			return "Universal Mode requires standard English syntax and keywords."
+		}
+		if strings.Contains(lowerMsg, "'}'") || strings.Contains(lowerMsg, "'{'") || strings.Contains(lowerMsg, "brace") {
+			return "There is an unclosed '{' or an extra '}'. Ensure every opening brace has a matching closing brace."
+		}
+		if strings.Contains(lowerMsg, "token ')'") || strings.Contains(lowerMsg, "token '('") {
+			return "Ensure every opening parenthesis '(' has a matching closing parenthesis ')'."
+		}
+		if strings.Contains(lowerMsg, "token ']'") || strings.Contains(lowerMsg, "token '['") {
+			return "Ensure every opening bracket '[' has a matching closing bracket ']'."
+		}
+		return "Check syntax, keyword spelling, and punctuation on this line."
+	}
 
 	var currentLine, prevLine string
 	if sourceCode != "" && line > 0 {

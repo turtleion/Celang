@@ -212,6 +212,9 @@ func runFile(filePath string, scriptArgs []string, useAST bool) {
 	}
 
 	env := evaluator.NewEnvironment()
+	if prog.IsUniversal {
+		env.IsUniversal = true
+	}
 	absPath, _ := filepath.Abs(filePath)
 	env.FilePath = absPath
 	evaluator.RegisterBuiltins(env, os.Stdout)
@@ -237,16 +240,18 @@ func runFile(filePath string, scriptArgs []string, useAST bool) {
 	}
 
 	// Default: Run via Bytecode Compiler & Virtual Machine (VM)
-	comp := compiler.NewCompiler()
+	comp := compiler.NewCompilerWithEnv(env)
 	chunk, err := comp.Compile(prog)
 	if err != nil {
-		fmt.Printf("❌ Kesalahan kompilasi Bytecode: %v\n", err)
+		diag := empathy.NewSyntaxDiagnostic(err.Error(), 1, 1, sourceStr)
+		fmt.Print(diag.Render())
 		os.Exit(1)
 	}
 	virtualMachine := vm.NewWithEnv(chunk, env)
 	result, err := virtualMachine.Run()
 	if err != nil {
-		fmt.Printf("❌ Kesalahan Runtime VM: %v\n", err)
+		diag := empathy.NewRuntimeDiagnostic(&evaluator.Error{Message: err.Error()}, sourceStr)
+		fmt.Print(diag.Render())
 		os.Exit(1)
 	}
 	_ = result

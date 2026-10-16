@@ -96,7 +96,8 @@ type Parser struct {
 	prefixParseFns map[TokenType]prefixParseFn
 	infixParseFns  map[TokenType]infixParseFn
 
-	parenDepth int
+	parenDepth  int
+	IsUniversal bool
 }
 
 func NewParser(l *Lexer) *Parser {
@@ -104,6 +105,7 @@ func NewParser(l *Lexer) *Parser {
 		l:           l,
 		errors:      []string{},
 		parseErrors: []ParseError{},
+		IsUniversal: l.IsUniversal,
 	}
 
 	p.prefixParseFns = make(map[TokenType]prefixParseFn)
@@ -242,6 +244,7 @@ func (p *Parser) peekPrecedence() int {
 // ParseProgram parses the full source code into a U-AST Program.
 func (p *Parser) ParseProgram() (*uast.Program, error) {
 	program := uast.NewProgram()
+	program.IsUniversal = p.IsUniversal
 
 	for !p.curTokenIs(EOF) {
 		// Skip semicolons if present
@@ -265,6 +268,12 @@ func (p *Parser) ParseProgram() (*uast.Program, error) {
 }
 
 func (p *Parser) parseStatement() uast.Statement {
+	if p.IsUniversal {
+		if repl, ok := IsIndonesianKeyword(p.curToken.Literal); ok {
+			p.addError(fmt.Sprintf("Indonesian keyword '%s' is not allowed in Universal Mode. Use '%s' instead.", p.curToken.Literal, repl))
+		}
+	}
+
 	switch p.curToken.Type {
 	case VAR_DECL:
 		return p.parseVariableDeclaration(true)
@@ -711,6 +720,11 @@ func (p *Parser) parseTransactionStatement() *uast.TransactionStatement {
 
 	if p.peekTokenIs(RECOVER) {
 		p.nextToken() // move to 'pulihkan' / 'recover'
+		if p.IsUniversal {
+			if repl, ok := IsIndonesianKeyword(p.curToken.Literal); ok {
+				p.addError(fmt.Sprintf("Indonesian keyword '%s' is not allowed in Universal Mode. Use '%s' instead.", p.curToken.Literal, repl))
+			}
+		}
 
 		recoverVar := "err"
 		if p.peekTokenIs(LPAREN) {
@@ -787,6 +801,10 @@ func (p *Parser) parseWatchStatement() *uast.WatchStatement {
 
 	newVar := "baru"
 	oldVar := "lama"
+	if p.IsUniversal {
+		newVar = "newVal"
+		oldVar = "oldVal"
+	}
 
 	if p.peekTokenIs(LPAREN) {
 		p.nextToken() // move to '('
@@ -1340,12 +1358,25 @@ func (p *Parser) parseIfStatement() *uast.IfStatement {
 	var alternate uast.Statement
 	if p.peekTokenIs(ELSE_IF) {
 		p.nextToken() // move to ELSE_IF ("selain jika" / "elif")
+		if p.IsUniversal {
+			if repl, ok := IsIndonesianKeyword(p.curToken.Literal); ok {
+				p.addError(fmt.Sprintf("Indonesian keyword '%s' is not allowed in Universal Mode. Use '%s' instead.", p.curToken.Literal, repl))
+			}
+		}
 		alternate = p.parseIfStatement()
 	} else if p.peekTokenIs(ELSE) {
 		p.nextToken() // move to ELSE ("selain")
+		if p.IsUniversal {
+			if repl, ok := IsIndonesianKeyword(p.curToken.Literal); ok {
+				p.addError(fmt.Sprintf("Indonesian keyword '%s' is not allowed in Universal Mode. Use '%s' instead.", p.curToken.Literal, repl))
+			}
+		}
 		if p.peekTokenIs(IF) {
 			// In case written as two tokens "selain" "jika"
 			p.nextToken()
+			if p.IsUniversal {
+				p.addError("Indonesian keyword 'jika' is not allowed in Universal Mode. Use 'if' instead.")
+			}
 			alternate = p.parseIfStatement()
 		} else {
 			if p.peekTokenIs(COLON) {
@@ -1938,6 +1969,13 @@ func (p *Parser) parseInterpolationOrLiteral(rawStr string, meta *uast.NodeMetad
 }
 
 func (p *Parser) parseBooleanLiteral() uast.Expression {
+	if p.IsUniversal {
+		if p.curToken.Literal == "benar" {
+			p.addError("Indonesian literal 'benar' is not allowed in Universal Mode. Use 'true' instead.")
+		} else if p.curToken.Literal == "salah" {
+			p.addError("Indonesian literal 'salah' is not allowed in Universal Mode. Use 'false' instead.")
+		}
+	}
 	val := p.curToken.Type == TRUE || p.curToken.Literal == "benar" || p.curToken.Literal == "true" || p.curToken.Literal == "True"
 	return &uast.Literal{
 		NodeType: uast.NodeTypeLiteral,
@@ -1949,6 +1987,11 @@ func (p *Parser) parseBooleanLiteral() uast.Expression {
 }
 
 func (p *Parser) parseNullLiteral() uast.Expression {
+	if p.IsUniversal {
+		if p.curToken.Literal == "kosong" || p.curToken.Literal == "nihil" {
+			p.addError(fmt.Sprintf("Indonesian literal '%s' is not allowed in Universal Mode. Use 'null' instead.", p.curToken.Literal))
+		}
+	}
 	return &uast.Literal{
 		NodeType: uast.NodeTypeLiteral,
 		Metadata: p.currentMetadata(),
@@ -1961,6 +2004,11 @@ func (p *Parser) parseNullLiteral() uast.Expression {
 func (p *Parser) parsePrefixExpression() uast.Expression {
 	meta := p.currentMetadata()
 	operator := p.curToken.Literal
+	if p.IsUniversal {
+		if operator == "bukan" || operator == "tidak" {
+			p.addError("Indonesian operator 'bukan' is not allowed in Universal Mode. Use 'not' or '!' instead.")
+		}
+	}
 	p.nextToken()
 	arg := p.parseExpression(PREFIX)
 
@@ -1976,6 +2024,13 @@ func (p *Parser) parsePrefixExpression() uast.Expression {
 func (p *Parser) parseInfixExpression(left uast.Expression) uast.Expression {
 	meta := p.currentMetadata()
 	operator := p.curToken.Literal
+	if p.IsUniversal {
+		if operator == "dan" {
+			p.addError("Indonesian operator 'dan' is not allowed in Universal Mode. Use 'and' or '&&' instead.")
+		} else if operator == "atau" {
+			p.addError("Indonesian operator 'atau' is not allowed in Universal Mode. Use 'or' or '||' instead.")
+		}
+	}
 	precedence := p.curPrecedence()
 	p.nextToken()
 	right := p.parseExpression(precedence)

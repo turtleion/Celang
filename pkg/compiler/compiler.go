@@ -59,6 +59,12 @@ func newFunctionCompiler(parent *Compiler, name string, numParams int) *Compiler
 
 // Compile processes a U-AST Program and returns the compiled bytecode chunk.
 func (c *Compiler) Compile(program *uast.Program) (*bytecode.Chunk, error) {
+	if program.IsUniversal {
+		if c.env == nil {
+			c.env = evaluator.NewEnvironment()
+		}
+		c.env.IsUniversal = true
+	}
 	for i, stmt := range program.Body {
 		isLast := (i == len(program.Body)-1)
 		if isLast {
@@ -679,7 +685,10 @@ func (c *Compiler) compileExpression(expr uast.Expression) error {
 					}
 				}
 				if numObj != nil {
-					if folded, ok := evaluator.EvalNumericMember(numObj, e.Property); ok {
+					if folded, ok := evaluator.EvalNumericMemberWithEnv(numObj, e.Property, c.env); ok {
+						if isErr, ok := folded.(*evaluator.Error); ok {
+							return fmt.Errorf("%s", isErr.Message)
+						}
 						constIdx := c.chunk.AddConstant(folded)
 						c.emitOp(bytecode.OpConstant, line)
 						c.chunk.WriteUint16(constIdx, line)

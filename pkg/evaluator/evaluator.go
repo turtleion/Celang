@@ -27,6 +27,9 @@ func Eval(node uast.Node, env *Environment) Object {
 	switch n := node.(type) {
 	// Root / Structural
 	case *uast.Program:
+		if n.IsUniversal {
+			env.IsUniversal = true
+		}
 		return evalProgram(n.Body, env)
 
 	case *uast.BlockStatement:
@@ -584,9 +587,28 @@ func Eval(node uast.Node, env *Environment) Object {
 		return NULL
 
 	case *uast.ImportDeclaration:
+		if env.IsUniversal {
+			switch strings.ToLower(strings.TrimSpace(n.Source)) {
+			case "berkas":
+				return newError(n.GetMetadata(), "Indonesian module 'berkas' is not allowed in Universal Mode.", "Import 'fs' instead.")
+			case "matematika":
+				return newError(n.GetMetadata(), "Indonesian module 'matematika' is not allowed in Universal Mode.", "Import 'math' instead.")
+			case "teks":
+				return newError(n.GetMetadata(), "Indonesian module 'teks' is not allowed in Universal Mode.", "Import 'strings' instead.")
+			case "waktu":
+				return newError(n.GetMetadata(), "Indonesian module 'waktu' is not allowed in Universal Mode.", "Import 'time' instead.")
+			case "sistem":
+				return newError(n.GetMetadata(), "Indonesian module 'sistem' is not allowed in Universal Mode.", "Import 'os' instead.")
+			}
+		}
 		targetAbsPath, err := resolveModulePath(env.FilePath, n.Source)
 		if err != nil {
-			return newError(n.GetMetadata(), err.Error(), "Pastikan path modul benar dan file tersebut ada.")
+			msg := err.Error()
+			hint := "Pastikan path modul benar dan file tersebut ada."
+			if env.IsUniversal {
+				hint = "Ensure module path is correct and the file exists."
+			}
+			return newError(n.GetMetadata(), msg, hint)
 		}
 		targetEnv, err := loadModule(targetAbsPath, env)
 		if err != nil {
@@ -793,15 +815,29 @@ func Eval(node uast.Node, env *Environment) Object {
 	case *uast.WatchStatement:
 		targetEntry, ok := env.GetEntry(n.Target)
 		if !ok || targetEntry == nil {
-			return newError(n.GetMetadata(), fmt.Sprintf("Variabel '%s' tidak ditemukan untuk dipantau", n.Target), "Pastikan variabel target sudah dideklarasikan sebelum dipantau.")
+			msg := fmt.Sprintf("Variabel '%s' tidak ditemukan untuk dipantau", n.Target)
+			hint := "Pastikan variabel target sudah dideklarasikan sebelum dipantau."
+			if env.IsUniversal {
+				msg = fmt.Sprintf("Target variable '%s' not found to watch", n.Target)
+				hint = "Ensure target variable is declared before watching."
+			}
+			return newError(n.GetMetadata(), msg, hint)
 		}
 		newVar := n.NewValVar
 		if newVar == "" {
-			newVar = "baru"
+			if env.IsUniversal {
+				newVar = "newVal"
+			} else {
+				newVar = "baru"
+			}
 		}
 		oldVar := n.OldValVar
 		if oldVar == "" {
-			oldVar = "lama"
+			if env.IsUniversal {
+				oldVar = "oldVal"
+			} else {
+				oldVar = "lama"
+			}
 		}
 		watcher := &ReactiveWatcher{
 			TargetName: n.Target,
@@ -860,8 +896,61 @@ func Eval(node uast.Node, env *Environment) Object {
 		return &String{Value: sb.String()}
 
 	case *uast.Identifier:
+		if env.IsUniversal {
+			switch n.Name {
+			case "cetak":
+				return newError(n.GetMetadata(), "Indonesian built-in 'cetak' is not allowed in Universal Mode.", "Use 'print' instead.")
+			case "masukan":
+				return newError(n.GetMetadata(), "Indonesian built-in 'masukan' is not allowed in Universal Mode.", "Use 'input' instead.")
+			case "panjang":
+				return newError(n.GetMetadata(), "Indonesian built-in 'panjang' is not allowed in Universal Mode.", "Use 'len' or 'length' instead.")
+			case "rentang":
+				return newError(n.GetMetadata(), "Indonesian built-in 'rentang' is not allowed in Universal Mode.", "Use 'range' instead.")
+			case "tipe":
+				return newError(n.GetMetadata(), "Indonesian built-in 'tipe' is not allowed in Universal Mode.", "Use 'type' instead.")
+			case "saring":
+				return newError(n.GetMetadata(), "Indonesian built-in 'saring' is not allowed in Universal Mode.", "Use 'filter' instead.")
+			case "petakan":
+				return newError(n.GetMetadata(), "Indonesian built-in 'petakan' is not allowed in Universal Mode.", "Use 'map' instead.")
+			case "potong_spasi":
+				return newError(n.GetMetadata(), "Indonesian built-in 'potong_spasi' is not allowed in Universal Mode.", "Use 'trim' instead.")
+			case "kapitalisasi":
+				return newError(n.GetMetadata(), "Indonesian built-in 'kapitalisasi' is not allowed in Universal Mode.", "Use 'capitalize' or 'uppercase' instead.")
+			case "Angka", "angka":
+				return newError(n.GetMetadata(), fmt.Sprintf("Indonesian type '%s' is not allowed in Universal Mode.", n.Name), "Use 'Number' instead.")
+			case "Teks", "teks":
+				return newError(n.GetMetadata(), fmt.Sprintf("Indonesian type '%s' is not allowed in Universal Mode.", n.Name), "Use 'String' instead.")
+			case "Logika", "logika":
+				return newError(n.GetMetadata(), fmt.Sprintf("Indonesian type '%s' is not allowed in Universal Mode.", n.Name), "Use 'Boolean' instead.")
+			case "terbilang":
+				return newError(n.GetMetadata(), "Indonesian function 'terbilang' is not allowed in Universal Mode.", "Use 'in_words' or '.words' instead.")
+			case "rupiah", "format_rupiah":
+				return newError(n.GetMetadata(), fmt.Sprintf("Indonesian function '%s' is not allowed in Universal Mode.", n.Name), "Use 'format_usd' or '.usd' instead.")
+			case "salin":
+				return newError(n.GetMetadata(), "Indonesian function 'salin' is not allowed in Universal Mode.", "Use 'clone' instead.")
+			case "Saluran", "saluran":
+				return newError(n.GetMetadata(), fmt.Sprintf("Indonesian type '%s' is not allowed in Universal Mode.", n.Name), "Use 'Channel' or 'channel' instead.")
+			case "jemput":
+				return newError(n.GetMetadata(), "Indonesian function 'jemput' is not allowed in Universal Mode.", "Use 'await' instead.")
+			case "jemput_semua":
+				return newError(n.GetMetadata(), "Indonesian function 'jemput_semua' is not allowed in Universal Mode.", "Use 'await_all' instead.")
+			case "jemput_pertama":
+				return newError(n.GetMetadata(), "Indonesian function 'jemput_pertama' is not allowed in Universal Mode.", "Use 'await_race' or 'await_first' instead.")
+			case "berkas":
+				return newError(n.GetMetadata(), "Indonesian module 'berkas' is not allowed in Universal Mode.", "Use 'fs' instead.")
+			case "matematika":
+				return newError(n.GetMetadata(), "Indonesian module 'matematika' is not allowed in Universal Mode.", "Use 'math' instead.")
+			case "waktu":
+				return newError(n.GetMetadata(), "Indonesian module 'waktu' is not allowed in Universal Mode.", "Use 'time' instead.")
+			case "sistem":
+				return newError(n.GetMetadata(), "Indonesian module 'sistem' is not allowed in Universal Mode.", "Use 'os' instead.")
+			}
+		}
 		val, ok := env.Get(n.Name)
 		if !ok {
+			if env.IsUniversal {
+				return newError(n.GetMetadata(), fmt.Sprintf("Variable '%s' is not defined", n.Name), "Check spelling or ensure it is declared before use.")
+			}
 			return newError(n.GetMetadata(), fmt.Sprintf("Variabel '%s' tidak ditemukan", n.Name), "Periksa ejaan nama variabel atau pastikan sudah dideklarasikan sebelumnya.")
 		}
 		return val
@@ -877,6 +966,9 @@ func Eval(node uast.Node, env *Environment) Object {
 
 		// 1. Array index access, slicing, or built-in methods (arr.tambah, arr.push)
 		if arr, ok := obj.(*Array); ok {
+			if env.IsUniversal && n.Property == "tambah" {
+				return newError(n.GetMetadata(), "Indonesian method 'tambah' is not allowed in Universal Mode.", "Use '.push(...)' instead.")
+			}
 			if n.Property == "tambah" || n.Property == "push" {
 				return &Builtin{
 					Fn: func(args ...Object) Object {
@@ -1002,17 +1094,37 @@ func Eval(node uast.Node, env *Environment) Object {
 
 		// 3b. Channel member access
 		if ch, ok := obj.(*Channel); ok {
+			if env.IsUniversal {
+				switch n.Property {
+				case "kirim":
+					return newError(n.GetMetadata(), "Indonesian method 'kirim' is not allowed in Universal Mode.", "Use '.send(data)' instead.")
+				case "terima":
+					return newError(n.GetMetadata(), "Indonesian method 'terima' is not allowed in Universal Mode.", "Use '.receive()' or '.recv()' instead.")
+				case "tutup":
+					return newError(n.GetMetadata(), "Indonesian method 'tutup' is not allowed in Universal Mode.", "Use '.close()' instead.")
+				case "panjang":
+					return newError(n.GetMetadata(), "Indonesian property 'panjang' is not allowed in Universal Mode.", "Use '.length' or '.len' instead.")
+				case "kapasitas":
+					return newError(n.GetMetadata(), "Indonesian property 'kapasitas' is not allowed in Universal Mode.", "Use '.capacity' or '.cap' instead.")
+				}
+			}
 			switch n.Property {
-			case "kirim":
+			case "kirim", "send":
 				return &Builtin{
 					Fn: func(args ...Object) Object {
 						if len(args) == 0 {
-							return newError(n.GetMetadata(), "Metode kirim() membutuhkan 1 argumen data", "Contoh: saluran.kirim(data)")
+							msg := "Metode kirim() membutuhkan 1 argumen data"
+							hint := "Contoh: saluran.kirim(data)"
+							if env.IsUniversal {
+								msg = "Method send() requires 1 data argument"
+								hint = "Example: channel.send(data)"
+							}
+							return newError(n.GetMetadata(), msg, hint)
 						}
 						return ch.Send(args[0], n.GetMetadata())
 					},
 				}
-			case "terima":
+			case "terima", "receive", "recv":
 				return &Builtin{
 					Fn: func(args ...Object) Object {
 						var to time.Duration = 0
@@ -1022,28 +1134,38 @@ func Eval(node uast.Node, env *Environment) Object {
 						return ch.Receive(to)
 					},
 				}
-			case "tutup":
+			case "tutup", "close":
 				return &Builtin{
 					Fn: func(args ...Object) Object {
 						return ch.Close()
 					},
 				}
-			case "panjang":
+			case "panjang", "length", "len":
 				return &Integer{Value: int64(len(ch.Ch))}
-			case "kapasitas":
+			case "kapasitas", "capacity", "cap":
 				return &Integer{Value: int64(ch.Capacity)}
 			}
 		}
 
 		// 3c. Ticket member access
 		if t, ok := obj.(*Ticket); ok {
+			if env.IsUniversal {
+				switch n.Property {
+				case "selesai":
+					return newError(n.GetMetadata(), "Indonesian property 'selesai' is not allowed in Universal Mode.", "Use '.done' instead.")
+				case "hasil":
+					return newError(n.GetMetadata(), "Indonesian property 'hasil' is not allowed in Universal Mode.", "Use '.result' instead.")
+				case "jemput":
+					return newError(n.GetMetadata(), "Indonesian method 'jemput' is not allowed in Universal Mode.", "Use '.await()' instead.")
+				}
+			}
 			switch n.Property {
-			case "selesai":
+			case "selesai", "done":
 				t.mu.Lock()
 				done := t.isDone
 				t.mu.Unlock()
 				return nativeBool(done)
-			case "hasil", "jemput":
+			case "hasil", "result", "jemput", "await":
 				return &Builtin{
 					Fn: func(args ...Object) Object {
 						var to time.Duration = 0
@@ -1056,7 +1178,7 @@ func Eval(node uast.Node, env *Environment) Object {
 			}
 		}
 
-		// 3d. Numeric cultural, nominal, terbilang, data size & duration helpers (e.g. 50.ribu, 3.detik, 10.mb, 15000.rupiah, 50000.terbilang)
+		// 3d. Numeric cultural, nominal, terbilang, data size & duration helpers (e.g. 50.ribu, 3.detik, 10.mb, 15000.rupiah, 50000.terbilang, 50.k, 25.usd)
 		numProp := n.Property
 		if n.Computed && n.PropertyExpr != nil {
 			pObj := Eval(n.PropertyExpr, env)
@@ -1068,14 +1190,24 @@ func Eval(node uast.Node, env *Environment) Object {
 				}
 			}
 		}
-		if res, ok := EvalNumericMember(obj, numProp); ok {
+		if res, ok := EvalNumericMemberWithEnv(obj, numProp, env); ok {
 			return res
 		}
 
-		// 4. Time-Travel Variable access fallback (e.g. x.sebelumnya, x.awal, x.histori)
+		// 4. Time-Travel Variable access fallback (e.g. x.sebelumnya, x.awal, x.histori, x.previous, x.initial, x.history)
 		if id, ok := n.Object.(*uast.Identifier); ok {
 			entry, exists := env.GetEntry(id.Name)
 			if exists {
+				if env.IsUniversal {
+					switch n.Property {
+					case "sebelumnya":
+						return newError(n.GetMetadata(), "Indonesian property '.sebelumnya' is not allowed in Universal Mode.", "Use '.previous' or '.prev' instead.")
+					case "awal":
+						return newError(n.GetMetadata(), "Indonesian property '.awal' is not allowed in Universal Mode.", "Use '.initial' instead.")
+					case "histori":
+						return newError(n.GetMetadata(), "Indonesian property '.histori' is not allowed in Universal Mode.", "Use '.history' instead.")
+					}
+				}
 				switch n.Property {
 				case "sebelumnya", "prev", "previous":
 					prev, hasPrev := entry.Previous()
@@ -1100,10 +1232,22 @@ func Eval(node uast.Node, env *Environment) Object {
 
 		// 6. Missing property on Struct reports friendly error
 		if inst, ok := obj.(*StructInstance); ok {
-			return newError(n.GetMetadata(), fmt.Sprintf("Properti atau fungsi '%s' tidak ditemukan pada bentuk '%s'", n.Property, inst.Def.Name), "Pastikan nama field atau fungsi dieja dengan benar.")
+			msg := fmt.Sprintf("Properti atau fungsi '%s' tidak ditemukan pada bentuk '%s'", n.Property, inst.Def.Name)
+			hint := "Pastikan nama field atau fungsi dieja dengan benar."
+			if env.IsUniversal {
+				msg = fmt.Sprintf("Property or method '%s' not found on struct '%s'", n.Property, inst.Def.Name)
+				hint = "Ensure the field or method name is spelled correctly."
+			}
+			return newError(n.GetMetadata(), msg, hint)
 		}
 
-		return newError(n.GetMetadata(), fmt.Sprintf("Properti '%s' tidak ditemukan pada objek", n.Property), "Pastikan properti yang diakses valid.")
+		msg := fmt.Sprintf("Properti '%s' tidak ditemukan pada objek", n.Property)
+		hint := "Pastikan properti yang diakses valid."
+		if env.IsUniversal {
+			msg = fmt.Sprintf("Property '%s' not found on object", n.Property)
+			hint = "Ensure the accessed property exists and is valid."
+		}
+		return newError(n.GetMetadata(), msg, hint)
 
 	case *uast.BinaryExpression:
 		if n.Operator == "|>" {
