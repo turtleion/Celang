@@ -331,12 +331,18 @@ func NewIterator(obj Object) (*IteratorObject, error) {
 		}, nil
 	case *Map:
 		idx := 0
+		keys := o.Order
+		if len(keys) == 0 && len(o.Pairs) > 0 {
+			for k := range o.Pairs {
+				keys = append(keys, k)
+			}
+		}
 		return &IteratorObject{
 			NextFunc: func() (Object, bool) {
-				if idx >= len(o.Order) {
+				if idx >= len(keys) {
 					return nil, false
 				}
-				val := &String{Value: o.Order[idx]}
+				val := &String{Value: keys[idx]}
 				idx++
 				return val, true
 			},

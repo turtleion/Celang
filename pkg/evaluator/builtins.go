@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 )
 
 func RegisterBuiltins(env *Environment, out io.Writer) {
@@ -68,7 +69,7 @@ func RegisterBuiltinsWithIO(env *Environment, in io.Reader, out io.Writer) {
 			}
 			switch arg := args[0].(type) {
 			case *String:
-				return &Integer{Value: int64(len(arg.Value))}
+				return &Integer{Value: int64(utf8.RuneCountInString(arg.Value))}
 			case *Array:
 				return &Integer{Value: int64(len(arg.Elements))}
 			case *Map:
@@ -396,7 +397,12 @@ func deepClone(obj Object) Object {
 		for k, v := range o.Pairs {
 			newPairs[k] = deepClone(v)
 		}
-		return &Map{Pairs: newPairs}
+		var newOrder []string
+		if o.Order != nil {
+			newOrder = make([]string, len(o.Order))
+			copy(newOrder, o.Order)
+		}
+		return &Map{Pairs: newPairs, Order: newOrder}
 	case *StructInstance:
 		newFields := make(map[string]Object, len(o.Fields))
 		for k, v := range o.Fields {

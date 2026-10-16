@@ -1561,4 +1561,113 @@ func TestEvaluator_Generics(t *testing.T) {
 	}
 }
 
+func TestBug_ComputedAssignment(t *testing.T) {
+	// 1. Map with variable key assignment: data[k] = 123 and data[k] += 10
+	inputMap := `
+	buat data = {}
+	buat k = "kunci_rahasia"
+	data[k] = 123
+	data[k] += 10
+	[data[k], data["kunci_rahasia"]]
+	`
+	resMap := testEvalSource(t, inputMap)
+	if resMap.Type() == evaluator.ERROR_OBJ {
+		t.Fatalf("resMap error: %s", resMap.Inspect())
+	}
+	arrMap, ok := resMap.(*evaluator.Array)
+	if !ok || len(arrMap.Elements) != 2 || arrMap.Elements[0].(*evaluator.Integer).Value != 133 || arrMap.Elements[1].(*evaluator.Integer).Value != 133 {
+		t.Fatalf("expected [133, 133], got %s", resMap.Inspect())
+	}
+
+	// 2. Array with computed index expression: arr[1 + 1] = 99 and arr[i + 1] += 1
+	inputArr := `
+	buat arr = [10, 20, 30]
+	buat i = 1
+	arr[i + 1] = 99
+	arr[i + 1] += 1
+	[arr[2], arr[i + 1]]
+	`
+	resArr := testEvalSource(t, inputArr)
+	if resArr.Type() == evaluator.ERROR_OBJ {
+		t.Fatalf("resArr error: %s", resArr.Inspect())
+	}
+	arrRes, ok := resArr.(*evaluator.Array)
+	if !ok || len(arrRes.Elements) != 2 || arrRes.Elements[0].(*evaluator.Integer).Value != 100 || arrRes.Elements[1].(*evaluator.Integer).Value != 100 {
+		t.Fatalf("expected [100, 100], got %s", resArr.Inspect())
+	}
+}
+
+func TestBug_AuditFixes(t *testing.T) {
+	// 1. Float modulo
+	resMod := testEvalSource(t, `5.5 % 2`)
+	if flt, ok := resMod.(*evaluator.Float); !ok || flt.Value != 1.5 {
+		t.Fatalf("expected 5.5 %% 2 = 1.5, got %s", resMod.Inspect())
+	}
+
+	// 2. Short-circuiting for && and ||
+	inputShortCircuit := `
+	buat x = null
+	buat hasil_and = 0
+	jika x != null dan x.properti_pasti_error > 0 {
+		hasil_and = 1
+	} selain {
+		hasil_and = 2
+	}
+
+	buat hasil_or = 0
+	jika 1 == 1 atau x.properti_pasti_error > 0 {
+		hasil_or = 10
+	}
+
+	[hasil_and, hasil_or]
+	`
+	resSC := testEvalSource(t, inputShortCircuit)
+	if resSC.Type() == evaluator.ERROR_OBJ {
+		t.Fatalf("resSC error: %s", resSC.Inspect())
+	}
+	arrSC := resSC.(*evaluator.Array)
+	if arrSC.Elements[0].(*evaluator.Integer).Value != 2 || arrSC.Elements[1].(*evaluator.Integer).Value != 10 {
+		t.Fatalf("expected [2, 10], got %s", resSC.Inspect())
+	}
+
+	// 3. Safe navigation with computed key: data?.[k]
+	inputSafeNav := `
+	buat data = {"pesan": "halo dunia"}
+	buat k = "pesan"
+	data?.[k]
+	`
+	resSafe := testEvalSource(t, inputSafeNav)
+	if s, ok := resSafe.(*evaluator.String); !ok || s.Value != "halo dunia" {
+		t.Fatalf("expected 'halo dunia', got %s", resSafe.Inspect())
+	}
+
+	// 4. Unicode panjang()
+	resPanjang := testEvalSource(t, `panjang("halo 👋")`)
+	if i, ok := resPanjang.(*evaluator.Integer); !ok || i.Value != 6 {
+		t.Fatalf("expected panjang('halo 👋') = 6, got %s", resPanjang.Inspect())
+	}
+
+	// 5. deepClone preserving Map Order and iteration
+	inputClone := `
+	buat m = {"z": 1, "a": 2, "m": 3}
+	buat c = salin(m)
+	buat kunci = []
+	untuk k dalam c {
+		kunci.tambah(k)
+	}
+	kunci
+	`
+	resClone := testEvalSource(t, inputClone)
+	if resClone.Type() == evaluator.ERROR_OBJ {
+		t.Fatalf("resClone error: %s", resClone.Inspect())
+	}
+	arrClone := resClone.(*evaluator.Array)
+	if len(arrClone.Elements) != 3 || arrClone.Elements[0].(*evaluator.String).Value != "z" ||
+		arrClone.Elements[1].(*evaluator.String).Value != "a" ||
+		arrClone.Elements[2].(*evaluator.String).Value != "m" {
+		t.Fatalf("expected ['z', 'a', 'm'], got %s", resClone.Inspect())
+	}
+}
+
+
 

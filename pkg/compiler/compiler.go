@@ -654,15 +654,17 @@ func (c *Compiler) compileExpression(expr uast.Expression) error {
 			return nil
 		}
 
-		if id, ok := e.Object.(*uast.Identifier); ok {
-			switch e.Property {
-			case "sebelumnya", "prev", "previous", "awal", "initial", "first", "histori", "history":
-				nameIdx := c.chunk.AddConstant(&evaluator.String{Value: id.Name})
-				propIdx := c.chunk.AddConstant(&evaluator.String{Value: e.Property})
-				c.emitOp(bytecode.OpTimeTravel, line)
-				c.chunk.WriteUint16(nameIdx, line)
-				c.chunk.WriteUint16(propIdx, line)
-				return nil
+		if !e.Computed {
+			if id, ok := e.Object.(*uast.Identifier); ok {
+				switch e.Property {
+				case "sebelumnya", "prev", "previous", "awal", "initial", "first", "histori", "history":
+					nameIdx := c.chunk.AddConstant(&evaluator.String{Value: id.Name})
+					propIdx := c.chunk.AddConstant(&evaluator.String{Value: e.Property})
+					c.emitOp(bytecode.OpTimeTravel, line)
+					c.chunk.WriteUint16(nameIdx, line)
+					c.chunk.WriteUint16(propIdx, line)
+					return nil
+				}
 			}
 		}
 

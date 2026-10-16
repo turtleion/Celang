@@ -2,9 +2,9 @@ package vm
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"strconv"
-	"strings"
 	"sync"
 
 	"celang/pkg/bytecode"
@@ -469,6 +469,18 @@ func (vm *VM) Run() (evaluator.Object, error) {
 			if !exists {
 				return nil, fmt.Errorf("variabel '%s' tidak ditemukan dalam pencarian histori", name)
 			}
+			curr := entry.Current()
+			if mp, ok := curr.(*evaluator.Map); ok {
+				if val, found := mp.Pairs[prop]; found {
+					vm.push(val)
+					break
+				}
+			} else if inst, ok := curr.(*evaluator.StructInstance); ok {
+				if val, found := inst.Fields[prop]; found {
+					vm.push(val)
+					break
+				}
+			}
 			switch prop {
 			case "sebelumnya", "prev", "previous":
 				prev, hasPrev := entry.Previous()
@@ -867,15 +879,21 @@ func (vm *VM) evalDiv(a, b evaluator.Object) (evaluator.Object, error) {
 }
 
 func (vm *VM) evalMod(a, b evaluator.Object) (evaluator.Object, error) {
-	aInt, _, aIsInt, aOk := evaluator.CoerceToNumeric(a)
-	bInt, _, bIsInt, bOk := evaluator.CoerceToNumeric(b)
-	if !aOk || !bOk || !aIsInt || !bIsInt {
-		return nil, fmt.Errorf("operasi modulo '%%' hanya valid untuk integer")
+	aInt, aFloat, aIsInt, aOk := evaluator.CoerceToNumeric(a)
+	bInt, bFloat, bIsInt, bOk := evaluator.CoerceToNumeric(b)
+	if !aOk || !bOk {
+		return nil, fmt.Errorf("operasi modulo '%%' tidak dapat mengekstrak angka")
 	}
-	if bInt == 0 {
+	if aIsInt && bIsInt {
+		if bInt == 0 {
+			return nil, fmt.Errorf("operasi modulo dengan nol")
+		}
+		return &evaluator.Integer{Value: aInt % bInt}, nil
+	}
+	if bFloat == 0.0 {
 		return nil, fmt.Errorf("operasi modulo dengan nol")
 	}
-	return &evaluator.Integer{Value: aInt % bInt}, nil
+	return &evaluator.Float{Value: math.Mod(aFloat, bFloat)}, nil
 }
 
 func (vm *VM) evalNeg(a evaluator.Object) (evaluator.Object, error) {
@@ -934,18 +952,5 @@ func (vm *VM) evalCompare(a, b evaluator.Object, op string) (evaluator.Object, e
 }
 
 func isTruthy(obj evaluator.Object) bool {
-	switch val := obj.(type) {
-	case *evaluator.Boolean:
-		return val.Value
-	case *evaluator.Null:
-		return false
-	case *evaluator.Integer:
-		return val.Value != 0
-	case *evaluator.Float:
-		return val.Value != 0.0
-	case *evaluator.String:
-		return strings.TrimSpace(val.Value) != ""
-	default:
-		return true
-	}
+	return evaluator.CoerceToBoolean(obj)
 }

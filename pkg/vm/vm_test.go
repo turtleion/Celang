@@ -530,4 +530,40 @@ func TestVM_ConstImmutability(t *testing.T) {
 	}
 }
 
+func TestVM_AuditFixes(t *testing.T) {
+	// 1. Float modulo in VM
+	resMod, _, _ := runVM(t, "5.5 % 2")
+	if flt, ok := resMod.(*evaluator.Float); !ok || flt.Value != 1.5 {
+		t.Fatalf("expected 5.5 %% 2 = 1.5, got %s", resMod.Inspect())
+	}
+
+	// 2. Map with property named 'awal' (should not trigger time travel)
+	inputAwal := `
+	buat data = {"awal": "nilai_awal_map"}
+	[data.awal, data["awal"]]
+	`
+	resAwal, _, _ := runVM(t, inputAwal)
+	arrAwal, ok := resAwal.(*evaluator.Array)
+	if !ok || len(arrAwal.Elements) != 2 ||
+		arrAwal.Elements[0].(*evaluator.String).Value != "nilai_awal_map" ||
+		arrAwal.Elements[1].(*evaluator.String).Value != "nilai_awal_map" {
+		t.Fatalf("expected ['nilai_awal_map', 'nilai_awal_map'], got %s", resAwal.Inspect())
+	}
+
+	// 3. Truthiness parity with Evaluator: empty array is falsy
+	inputTruthy := `
+	buat res = 0
+	jika [] {
+		res = 1
+	} selain {
+		res = 2
+	}
+	res
+	`
+	resTruthy, _, _ := runVM(t, inputTruthy)
+	if i, ok := resTruthy.(*evaluator.Integer); !ok || i.Value != 2 {
+		t.Fatalf("expected empty array to be falsy (res = 2), got %s", resTruthy.Inspect())
+	}
+}
+
 

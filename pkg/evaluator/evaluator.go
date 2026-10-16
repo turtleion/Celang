@@ -2,6 +2,7 @@ package evaluator
 
 import (
 	"fmt"
+	"math"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -322,6 +323,19 @@ func Eval(node uast.Node, env *Environment) Object {
 				return obj
 			}
 			prop := target.Property
+			var computedIndexObj Object
+			if target.Computed && target.PropertyExpr != nil {
+				computedIndexObj = Eval(target.PropertyExpr, env)
+				if isError(computedIndexObj) {
+					return computedIndexObj
+				}
+				if s, ok := computedIndexObj.(*String); ok {
+					prop = s.Value
+				} else {
+					prop = computedIndexObj.Inspect()
+				}
+			}
+
 			if inst, ok := obj.(*StructInstance); ok {
 				if inst.Def.PrivateFields[prop] && !isInternalAccess(inst, env) {
 					return newError(n.GetMetadata(),
@@ -370,10 +384,15 @@ func Eval(node uast.Node, env *Environment) Object {
 			if arr, ok := obj.(*Array); ok {
 				var intIdx int64
 				var hasInt bool
-				if parsed, err := strconv.ParseInt(prop, 10, 64); err == nil {
+				if computedIndexObj != nil {
+					if iVal, _, isInt, ok := CoerceToNumeric(computedIndexObj); ok && isInt {
+						intIdx = iVal
+						hasInt = true
+					}
+				} else if parsed, err := strconv.ParseInt(prop, 10, 64); err == nil {
 					intIdx = parsed
 					hasInt = true
-				} else {
+				} else if prop != "" {
 					idxObj := Eval(uast.NewIdentifier(prop), env)
 					if iVal, _, isInt, ok := CoerceToNumeric(idxObj); ok && isInt {
 						intIdx = iVal
@@ -507,8 +526,14 @@ func Eval(node uast.Node, env *Environment) Object {
 				elements = append(elements, &String{Value: string(r)})
 			}
 		} else if mp, ok := iterVal.(*Map); ok {
-			for _, k := range mp.Order {
-				elements = append(elements, &String{Value: k})
+			if len(mp.Order) > 0 {
+				for _, k := range mp.Order {
+					elements = append(elements, &String{Value: k})
+				}
+			} else {
+				for k := range mp.Pairs {
+					elements = append(elements, &String{Value: k})
+				}
 			}
 		} else if ch, ok := iterVal.(*Channel); ok {
 			forEnv := NewEnclosedEnvironment(env)
@@ -836,6 +861,17 @@ func Eval(node uast.Node, env *Environment) Object {
 		// 2. Struct instance field or method access
 		if inst, ok := obj.(*StructInstance); ok {
 			prop := n.Property
+			if n.Computed && n.PropertyExpr != nil {
+				keyObj := Eval(n.PropertyExpr, env)
+				if isError(keyObj) {
+					return keyObj
+				}
+				if s, ok := keyObj.(*String); ok {
+					prop = s.Value
+				} else {
+					prop = keyObj.Inspect()
+				}
+			}
 			if val, exists := inst.Fields[prop]; exists {
 				if inst.Def.PrivateFields[prop] && !isInternalAccess(inst, env) {
 					return newError(n.GetMetadata(),
@@ -866,6 +902,17 @@ func Eval(node uast.Node, env *Environment) Object {
 		// 3. Map property access
 		if mp, ok := obj.(*Map); ok {
 			key := n.Property
+			if n.Computed && n.PropertyExpr != nil {
+				keyObj := Eval(n.PropertyExpr, env)
+				if isError(keyObj) {
+					return keyObj
+				}
+				if s, ok := keyObj.(*String); ok {
+					key = s.Value
+				} else {
+					key = keyObj.Inspect()
+				}
+			}
 			if val, exists := mp.Pairs[key]; exists {
 				return val
 			}
@@ -1009,6 +1056,34 @@ func Eval(node uast.Node, env *Environment) Object {
 				return callee
 			}
 			return applyFunction(callee, []Object{leftVal}, n.GetMetadata())
+		}
+		if n.Operator == "&&" || n.Operator == "dan" || n.Operator == "and" {
+			left := Eval(n.Left, env)
+			if isError(left) {
+				return left
+			}
+			if !CoerceToBoolean(left) {
+				return FALSE
+			}
+			right := Eval(n.Right, env)
+			if isError(right) {
+				return right
+			}
+			return nativeBool(CoerceToBoolean(right))
+		}
+		if n.Operator == "||" || n.Operator == "atau" || n.Operator == "or" {
+			left := Eval(n.Left, env)
+			if isError(left) {
+				return left
+			}
+			if CoerceToBoolean(left) {
+				return TRUE
+			}
+			right := Eval(n.Right, env)
+			if isError(right) {
+				return right
+			}
+			return nativeBool(CoerceToBoolean(right))
 		}
 		left := Eval(n.Left, env)
 		if isError(left) {
@@ -1289,6 +1364,11 @@ func evalBinaryOp(op string, left, right Object, meta *uast.NodeMetadata) Object
 				return newError(meta, "Pembagian dengan nol (zero division)", "Pastikan penyebut bernilai selain 0.")
 			}
 			return &Float{Value: leftFloat / rightFloat}
+		case "%":
+			if rightFloat == 0.0 {
+				return newError(meta, "Operasi modulo dengan nol", "Pastikan penyebut bernilai selain 0.")
+			}
+			return &Float{Value: math.Mod(leftFloat, rightFloat)}
 		}
 
 	case "==", "!=":
@@ -1769,6 +1849,17 @@ func evalSafeNavigation(expr uast.Expression, env *Environment) Object {
 
 		if inst, ok := obj.(*StructInstance); ok {
 			prop := e.Property
+			if e.Computed && e.PropertyExpr != nil {
+				keyObj := Eval(e.PropertyExpr, env)
+				if isError(keyObj) {
+					return NULL
+				}
+				if s, ok := keyObj.(*String); ok {
+					prop = s.Value
+				} else {
+					prop = keyObj.Inspect()
+				}
+			}
 			if val, exists := inst.Fields[prop]; exists {
 				return val
 			}
@@ -1788,7 +1879,19 @@ func evalSafeNavigation(expr uast.Expression, env *Environment) Object {
 		}
 
 		if mp, ok := obj.(*Map); ok {
-			if val, exists := mp.Pairs[e.Property]; exists {
+			key := e.Property
+			if e.Computed && e.PropertyExpr != nil {
+				keyObj := Eval(e.PropertyExpr, env)
+				if isError(keyObj) {
+					return NULL
+				}
+				if s, ok := keyObj.(*String); ok {
+					key = s.Value
+				} else {
+					key = keyObj.Inspect()
+				}
+			}
+			if val, exists := mp.Pairs[key]; exists {
 				return val
 			}
 			return NULL

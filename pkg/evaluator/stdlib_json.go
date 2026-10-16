@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -757,11 +758,14 @@ func convertGoJSONToCelang(val any) Object {
 		}
 		return &Array{Elements: elements}
 	case map[string]any:
-		pairs := make(map[string]Object)
+		pairs := make(map[string]Object, len(v))
 		order := make([]string, 0, len(v))
-		for k, item := range v {
-			pairs[k] = convertGoJSONToCelang(item)
+		for k := range v {
 			order = append(order, k)
+		}
+		sort.Strings(order)
+		for _, k := range order {
+			pairs[k] = convertGoJSONToCelang(v[k])
 		}
 		return &Map{Pairs: pairs, Order: order}
 	default:

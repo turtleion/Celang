@@ -2212,6 +2212,34 @@ func (p *Parser) parseInfixRangeExpression(left uast.Expression) uast.Expression
 
 func (p *Parser) parseOptionalMemberExpression(left uast.Expression) uast.Expression {
 	meta := p.currentMetadata()
+	if p.peekTokenIs(LBRACKET) {
+		p.nextToken() // move to '['
+		p.nextToken() // move to index expression
+		index := p.parseExpression(LOWEST)
+		if !p.expectPeek(RBRACKET) {
+			return nil
+		}
+		propStr := ""
+		if lit, ok := index.(*uast.Literal); ok {
+			if s, ok := lit.Value.(string); ok {
+				propStr = s
+			} else {
+				propStr = lit.Raw
+			}
+		} else if id, ok := index.(*uast.Identifier); ok {
+			propStr = id.Name
+		}
+		return &uast.MemberExpression{
+			NodeType:     uast.NodeTypeMemberExpression,
+			Metadata:     meta,
+			Object:       left,
+			Property:     propStr,
+			PropertyExpr: index,
+			Computed:     true,
+			Safe:         true,
+		}
+	}
+
 	if !p.expectPeek(IDENT) {
 		return nil
 	}
