@@ -56,9 +56,39 @@ type (
 	infixParseFn  func(uast.Expression) uast.Expression
 )
 
+// ParseError represents a structured syntax error with precise source location.
+type ParseError struct {
+	Line    int
+	Column  int
+	Message string
+}
+
+func (e ParseError) Error() string {
+	return fmt.Sprintf("[Baris %d, Kolom %d] %s", e.Line, e.Column, e.Message)
+}
+
+// ParseErrorList is a slice of ParseError implementing error.
+type ParseErrorList []ParseError
+
+func (el ParseErrorList) Error() string {
+	if len(el) == 0 {
+		return ""
+	}
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("parsing gagal dengan %d kesalahan:\n", len(el)))
+	for i, e := range el {
+		if i > 0 {
+			sb.WriteString("\n")
+		}
+		sb.WriteString(e.Error())
+	}
+	return sb.String()
+}
+
 type Parser struct {
-	l      *Lexer
-	errors []string
+	l           *Lexer
+	errors      []string
+	parseErrors []ParseError
 
 	curToken  Token
 	peekToken Token
@@ -71,8 +101,9 @@ type Parser struct {
 
 func NewParser(l *Lexer) *Parser {
 	p := &Parser{
-		l:      l,
-		errors: []string{},
+		l:           l,
+		errors:      []string{},
+		parseErrors: []ParseError{},
 	}
 
 	p.prefixParseFns = make(map[TokenType]prefixParseFn)
@@ -145,14 +176,36 @@ func (p *Parser) Errors() []string {
 	return p.errors
 }
 
+func (p *Parser) ParseErrors() []ParseError {
+	return p.parseErrors
+}
+
+func (p *Parser) FirstError() *ParseError {
+	if len(p.parseErrors) > 0 {
+		return &p.parseErrors[0]
+	}
+	return nil
+}
+
 func (p *Parser) addError(msg string) {
-	errStr := fmt.Sprintf("[Baris %d, Kolom %d] %s", p.curToken.Line, p.curToken.Column, msg)
-	p.errors = append(p.errors, errStr)
+	pe := ParseError{
+		Line:    p.curToken.Line,
+		Column:  p.curToken.Column,
+		Message: msg,
+	}
+	p.parseErrors = append(p.parseErrors, pe)
+	p.errors = append(p.errors, pe.Error())
 }
 
 func (p *Parser) peekError(t TokenType) {
 	msg := fmt.Sprintf("Diharapkan token '%s', tetapi menemukan '%s' (%s)", t, p.peekToken.Type, p.peekToken.Literal)
-	p.addError(msg)
+	pe := ParseError{
+		Line:    p.peekToken.Line,
+		Column:  p.peekToken.Column,
+		Message: msg,
+	}
+	p.parseErrors = append(p.parseErrors, pe)
+	p.errors = append(p.errors, pe.Error())
 }
 
 func (p *Parser) curTokenIs(t TokenType) bool {
@@ -204,8 +257,8 @@ func (p *Parser) ParseProgram() (*uast.Program, error) {
 		p.nextToken()
 	}
 
-	if len(p.errors) > 0 {
-		return nil, fmt.Errorf("parsing gagal dengan %d kesalahan:\n%s", len(p.errors), strings.Join(p.errors, "\n"))
+	if len(p.parseErrors) > 0 {
+		return nil, ParseErrorList(p.parseErrors)
 	}
 
 	return program, nil

@@ -199,12 +199,16 @@ func loadProgram(filePath string) (*uast.Program, string, error) {
 	return prog, sourceStr, nil
 }
 
+func handleSyntaxError(err error, sourceStr string) {
+	diag := empathy.NewSyntaxDiagnosticFromError(err, sourceStr)
+	fmt.Print(diag.Render())
+	os.Exit(1)
+}
+
 func runFile(filePath string, scriptArgs []string, useAST bool) {
 	prog, sourceStr, err := loadProgram(filePath)
 	if err != nil {
-		diag := empathy.NewSyntaxDiagnostic(err.Error(), 1, 1, sourceStr)
-		fmt.Print(diag.Render())
-		os.Exit(1)
+		handleSyntaxError(err, sourceStr)
 	}
 
 	env := evaluator.NewEnvironment()
@@ -251,9 +255,7 @@ func runFile(filePath string, scriptArgs []string, useAST bool) {
 func disasmFile(filePath string) {
 	prog, sourceStr, err := loadProgram(filePath)
 	if err != nil {
-		diag := empathy.NewSyntaxDiagnostic(err.Error(), 1, 1, sourceStr)
-		fmt.Print(diag.Render())
-		os.Exit(1)
+		handleSyntaxError(err, sourceStr)
 	}
 
 	comp := compiler.NewCompiler()
@@ -269,9 +271,7 @@ func disasmFile(filePath string) {
 func compileFile(inputFile, outputFile string) {
 	prog, sourceStr, err := loadProgram(inputFile)
 	if err != nil {
-		diag := empathy.NewSyntaxDiagnostic(err.Error(), 1, 1, sourceStr)
-		fmt.Print(diag.Render())
-		os.Exit(1)
+		handleSyntaxError(err, sourceStr)
 	}
 
 	jsonData, err := uast.ToJSON(prog, true)
@@ -291,9 +291,7 @@ func compileFile(inputFile, outputFile string) {
 func formatFile(filePath, styleName string, isWrite bool) {
 	prog, sourceStr, err := loadProgram(filePath)
 	if err != nil {
-		diag := empathy.NewSyntaxDiagnostic(err.Error(), 1, 1, sourceStr)
-		fmt.Print(diag.Render())
-		os.Exit(1)
+		handleSyntaxError(err, sourceStr)
 	}
 
 	if styleName == "indonesian" {
@@ -370,9 +368,7 @@ Aplikasi berbasis bahasa pemrograman [Celang](https://github.com/celang).
 func dumpAST(filePath string) {
 	prog, sourceStr, err := loadProgram(filePath)
 	if err != nil {
-		diag := empathy.NewSyntaxDiagnostic(err.Error(), 1, 1, sourceStr)
-		fmt.Print(diag.Render())
-		os.Exit(1)
+		handleSyntaxError(err, sourceStr)
 	}
 
 	jsonData, err := uast.ToJSON(prog, true)
