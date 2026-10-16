@@ -2074,5 +2074,31 @@ func TestFeature_BugFixesAudit(t *testing.T) {
 	}
 }
 
+func TestEvaluator_LainBranching(t *testing.T) {
+	code := `
+	fungsi cek(x) {
+		jika x == 1 {
+			"satu"
+		} lain jika x == 2 {
+			"dua"
+		} lain {
+			"banyak"
+		}
+	}
+	[cek(1), cek(2), cek(3)]
+	`
+	res := testEvalSource(t, code)
+	arr, ok := res.(*evaluator.Array)
+	if !ok || len(arr.Elements) != 3 {
+		t.Fatalf("expected 3 elements, got: %v", res)
+	}
+	if arr.Elements[0].(*evaluator.String).Value != "satu" ||
+		arr.Elements[1].(*evaluator.String).Value != "dua" ||
+		arr.Elements[2].(*evaluator.String).Value != "banyak" {
+		t.Errorf("unexpected evaluation: %v", res)
+	}
+}
+
+
 
 

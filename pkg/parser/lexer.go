@@ -16,6 +16,7 @@ var keywords = map[string]TokenType{
 	"if":           IF,
 	"elif":         ELSE_IF,
 	"selain":       ELSE,
+	"lain":         ELSE,
 	"else":         ELSE,
 	"cocok":        SWITCH,
 	"switch":       SWITCH,
@@ -317,8 +318,8 @@ func (l *Lexer) NextToken() Token {
 			tok.Literal = l.readIdentifier()
 			tok.Type = lookupIdent(tok.Literal)
 
-			// Handle compound keywords: "selain jika", "else if", "atawa lamun"
-			if ((tok.Literal == "selain" || tok.Literal == "else") && l.peekNextWord() == "jika") ||
+			// Handle compound keywords: "selain jika", "lain jika", "else if", "atawa lamun"
+			if ((tok.Literal == "selain" || tok.Literal == "lain" || tok.Literal == "else") && l.peekNextWord() == "jika") ||
 				(tok.Literal == "else" && l.peekNextWord() == "if") ||
 				(tok.Literal == "atawa" && l.peekNextWord() == "lamun") {
 				l.skipWhitespaceAndComments()
