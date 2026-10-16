@@ -184,6 +184,92 @@ func TestParser_VisibilityAndImports(t *testing.T) {
 	}
 }
 
+func TestParser_CleanPackageAndModuleImports(t *testing.T) {
+	input := `
+	ambil { akar, PI } dari matematika
+	impor matematika sebagai math
+	impor matematika
+	ambil akar, PI dari matematika
+	ambil akar sebagai sqrt dari matematika
+	dari matematika ambil { akar, PI }
+	dari matematika ambil akar, PI as pi
+	dari matematika ambil *
+	from json import uraikan
+	ambil { helper } dari "./helper.ce"
+	`
+
+	l := parser.NewLexer(input)
+	p := parser.NewParser(l)
+	prog, err := p.ParseProgram()
+	if err != nil {
+		t.Fatalf("Parser error: %v", err)
+	}
+
+	if len(prog.Body) != 10 {
+		t.Fatalf("Expected 10 statements, got %d", len(prog.Body))
+	}
+
+	// 0: ambil { akar, PI } dari matematika
+	imp0, ok := prog.Body[0].(*uast.ImportDeclaration)
+	if !ok || imp0.Source != "matematika" || len(imp0.Specifiers) != 2 {
+		t.Fatalf("Statement 0 unexpected: %+v", prog.Body[0])
+	}
+
+	// 1: impor matematika sebagai math
+	imp1, ok := prog.Body[1].(*uast.ImportDeclaration)
+	if !ok || imp1.Source != "matematika" || len(imp1.Specifiers) != 1 || imp1.Specifiers[0].Local != "math" || !imp1.Specifiers[0].IsAll {
+		t.Fatalf("Statement 1 unexpected: %+v", prog.Body[1])
+	}
+
+	// 2: impor matematika
+	imp2, ok := prog.Body[2].(*uast.ImportDeclaration)
+	if !ok || imp2.Source != "matematika" || len(imp2.Specifiers) != 1 || imp2.Specifiers[0].Local != "matematika" || !imp2.Specifiers[0].IsAll {
+		t.Fatalf("Statement 2 unexpected: %+v", prog.Body[2])
+	}
+
+	// 3: ambil akar, PI dari matematika
+	imp3, ok := prog.Body[3].(*uast.ImportDeclaration)
+	if !ok || imp3.Source != "matematika" || len(imp3.Specifiers) != 2 {
+		t.Fatalf("Statement 3 unexpected: %+v", prog.Body[3])
+	}
+
+	// 4: ambil akar sebagai sqrt dari matematika
+	imp4, ok := prog.Body[4].(*uast.ImportDeclaration)
+	if !ok || imp4.Source != "matematika" || imp4.Specifiers[0].Imported != "akar" || imp4.Specifiers[0].Local != "sqrt" {
+		t.Fatalf("Statement 4 unexpected: %+v", prog.Body[4])
+	}
+
+	// 5: dari matematika ambil { akar, PI }
+	imp5, ok := prog.Body[5].(*uast.ImportDeclaration)
+	if !ok || imp5.Source != "matematika" || len(imp5.Specifiers) != 2 {
+		t.Fatalf("Statement 5 unexpected: %+v", prog.Body[5])
+	}
+
+	// 6: dari matematika ambil akar, PI as pi
+	imp6, ok := prog.Body[6].(*uast.ImportDeclaration)
+	if !ok || imp6.Source != "matematika" || imp6.Specifiers[1].Local != "pi" {
+		t.Fatalf("Statement 6 unexpected: %+v", prog.Body[6])
+	}
+
+	// 7: dari matematika ambil *
+	imp7, ok := prog.Body[7].(*uast.ImportDeclaration)
+	if !ok || imp7.Source != "matematika" || !imp7.Specifiers[0].IsAll || imp7.Specifiers[0].Local != "*" {
+		t.Fatalf("Statement 7 unexpected: %+v", prog.Body[7])
+	}
+
+	// 8: from json import uraikan
+	imp8, ok := prog.Body[8].(*uast.ImportDeclaration)
+	if !ok || imp8.Source != "json" || imp8.Specifiers[0].Imported != "uraikan" {
+		t.Fatalf("Statement 8 unexpected: %+v", prog.Body[8])
+	}
+
+	// 9: ambil { helper } dari "./helper.ce"
+	imp9, ok := prog.Body[9].(*uast.ImportDeclaration)
+	if !ok || imp9.Source != "./helper.ce" || imp9.Specifiers[0].Imported != "helper" {
+		t.Fatalf("Statement 9 unexpected: %+v", prog.Body[9])
+	}
+}
+
 func TestParser_TryCatchAndThrow(t *testing.T) {
 	input := `
 	coba {

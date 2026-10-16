@@ -26,8 +26,8 @@ cetak(data.nama) // "Celang"
 buat teksJSON = json.rapi(data)
 cetak(teksJSON)
 
-// 3. Menggunakan sintaks impor terstruktur:
-impor { dapatkan, setel, gabung, samarkan } dari "json"
+// 3. Atau impor fungsi tertentu (tanpa tanda kutip):
+ambil { dapatkan, setel, gabung, samarkan } dari json
 ```
 
 ---

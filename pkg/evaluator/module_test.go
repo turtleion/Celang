@@ -253,3 +253,87 @@ func TestModule_StandaloneExportAndAliases(t *testing.T) {
 		t.Fatalf("Expected hasil_kali=12, got %+v", kaliVal)
 	}
 }
+
+func TestModule_CleanPackageAndStdlibImports(t *testing.T) {
+	tempDir := t.TempDir()
+
+	// 1. Unquoted stdlib imports
+	script := `
+	ambil { akar, PI } dari matematika
+	impor matematika sebagai math
+	dari json ambil uraikan
+	dari matematika ambil *
+
+	buat a = akar(16)
+	buat b = math.akar(25)
+	buat c = uraikan("{\"kunci\": 42}")
+	buat d = floor(3.9)
+	`
+	l := parser.NewLexer(script)
+	p := parser.NewParser(l)
+	prog, err := p.ParseProgram()
+	if err != nil {
+		t.Fatalf("Parse error: %v", err)
+	}
+
+	env := evaluator.NewEnvironment()
+	env.FilePath = filepath.Join(tempDir, "main.ce")
+	res := evaluator.Eval(prog, env)
+	if res != nil && res.Type() == evaluator.ERROR_OBJ {
+		t.Fatalf("Eval error: %s", res.Inspect())
+	}
+
+	aVal, ok := env.Get("a")
+	if !ok || aVal.Inspect() != "4" {
+		t.Fatalf("Expected a=4, got %+v", aVal)
+	}
+
+	bVal, ok := env.Get("b")
+	if !ok || bVal.Inspect() != "5" {
+		t.Fatalf("Expected b=5, got %+v", bVal)
+	}
+
+	dVal, ok := env.Get("d")
+	if !ok || dVal.Inspect() != "3" {
+		t.Fatalf("Expected d=3, got %+v", dVal)
+	}
+
+	// 2. Unquoted package from celang_modules/<pkg>/utama.ce
+	pkgDir := filepath.Join(tempDir, "celang_modules", "kalkulator")
+	if err := os.MkdirAll(pkgDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	pkgMain := filepath.Join(pkgDir, "utama.ce")
+	pkgCode := `
+	publik! fungsi kali2(x) {
+		kembalikan x * 2
+	}
+	`
+	if err := os.WriteFile(pkgMain, []byte(pkgCode), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	pkgScript := `
+	ambil { kali2 } dari kalkulator
+	buat hasil = kali2(21)
+	`
+	l2 := parser.NewLexer(pkgScript)
+	p2 := parser.NewParser(l2)
+	prog2, err := p2.ParseProgram()
+	if err != nil {
+		t.Fatalf("Parse error: %v", err)
+	}
+
+	env2 := evaluator.NewEnvironment()
+	env2.FilePath = filepath.Join(tempDir, "app.ce")
+	res2 := evaluator.Eval(prog2, env2)
+	if res2 != nil && res2.Type() == evaluator.ERROR_OBJ {
+		t.Fatalf("Eval error for package: %s", res2.Inspect())
+	}
+
+	hasilVal, ok := env2.Get("hasil")
+	if !ok || hasilVal.(*evaluator.Integer).Value != 42 {
+		t.Fatalf("Expected hasil=42, got %+v", hasilVal)
+	}
+}
+

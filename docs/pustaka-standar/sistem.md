@@ -14,6 +14,24 @@ Modul ini sangat berguna saat Anda membangun:
 
 ---
 
+## Cara Memanggil
+
+Modul ini langsung aktif secara global maupun dapat diimpor secara spesifik:
+
+```celang
+// 1. Langsung panggil via objek global:
+buat info = sistem.jalankan("git status")
+buat home = os.homedir()
+
+// 2. Atau impor fungsi tertentu (tanpa tanda kutip):
+ambil { jalankan, dapatkan_env, direktori_kerja } dari sistem
+
+// 3. Atau impor modul dengan alias:
+impor sistem sebagai os
+```
+
+---
+
 ## Ringkasan Fungsi & Padanan Istilah
 
 | Fungsi Bahasa Indonesia | Alias Bahasa Inggris | Keterangan |

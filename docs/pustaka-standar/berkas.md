@@ -25,8 +25,8 @@ Modul ini langsung aktif secara global maupun dapat diimpor secara spesifik:
 berkas.tulis("./laporan.txt", "Isi catatan...")
 buat data = fs.read("./laporan.txt")
 
-// 2. Atau impor fungsi tertentu:
-impor { muat, simpan, alir, cari, pantau } dari "berkas"
+// 2. Atau impor fungsi tertentu (tanpa tanda kutip):
+ambil { muat, simpan, alir, cari, pantau } dari berkas
 ```
 
 ---

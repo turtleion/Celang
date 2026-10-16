@@ -28,8 +28,8 @@ cetak(teksIndo) // "Rabu, 15 Oktober 2026, 17:30 WIB"
 buat ms = time.now()
 time.sleep(100) // istirahat 100 milidetik
 
-// 3. Menggunakan sintaks impor terstruktur:
-impor { lalu, format_indonesia, ukur, tambah, selisih } dari "waktu"
+// 3. Atau impor fungsi tertentu (tanpa tanda kutip):
+ambil { lalu, format_indonesia, ukur, tambah, selisih } dari waktu
 ```
 
 ---

@@ -40,6 +40,34 @@ func findModuleRoot(filePath string) string {
 	return dir
 }
 
+// resolvePackagePath searches for a package in celang_modules directories ascending from baseDir.
+func resolvePackagePath(baseDir, packageName string) (string, error) {
+	current := baseDir
+	for {
+		pkgDir := filepath.Join(current, "celang_modules", packageName)
+		candidates := []string{
+			filepath.Join(pkgDir, "utama.ce"),
+			filepath.Join(pkgDir, "main.ce"),
+			filepath.Join(pkgDir, "modul.ce"),
+			filepath.Join(pkgDir, packageName+".ce"),
+			filepath.Join(pkgDir, "index.ce"),
+			filepath.Join(current, "celang_modules", packageName+".ce"),
+		}
+		for _, c := range candidates {
+			if info, err := os.Stat(c); err == nil && !info.IsDir() {
+				return filepath.Abs(c)
+			}
+		}
+
+		parent := filepath.Dir(current)
+		if parent == current || parent == "." || parent == "/" {
+			break
+		}
+		current = parent
+	}
+	return "", fmt.Errorf("paket '%s' tidak ditemukan di 'celang_modules'", packageName)
+}
+
 // resolveModulePath resolves an import path relative to the caller's file.
 func resolveModulePath(callerFilePath, importSource string) (string, error) {
 	if isStdlibModule(importSource) {
@@ -51,6 +79,15 @@ func resolveModulePath(callerFilePath, importSource string) (string, error) {
 		baseDir = filepath.Dir(callerFilePath)
 	} else {
 		baseDir, _ = os.Getwd()
+	}
+
+	// If importSource is a package name (not a relative/absolute path and not ending in .ce/.ast),
+	// search celang_modules first
+	if !strings.HasPrefix(importSource, ".") && !filepath.IsAbs(importSource) &&
+		!strings.HasSuffix(importSource, ".ce") && !strings.HasSuffix(importSource, ".ast") {
+		if pkgPath, err := resolvePackagePath(baseDir, importSource); err == nil {
+			return pkgPath, nil
+		}
 	}
 
 	candidate := importSource

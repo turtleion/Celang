@@ -581,9 +581,23 @@ func Eval(node uast.Node, env *Environment) Object {
 						mapOrder = append(mapOrder, name)
 					}
 				}
-				obj := &Map{Pairs: mapPairs, Order: mapOrder}
-				if _, err := env.Define(spec.Local, obj, true, "Map"); err != nil {
-					return newError(n.GetMetadata(), err.Error(), "")
+				if spec.Local == "*" {
+					for _, name := range mapOrder {
+						val := mapPairs[name]
+						entry, _ := targetEnv.GetEntry(name)
+						hint := ""
+						if entry != nil {
+							hint = entry.TypeHint
+						}
+						if _, err := env.Define(name, val, true, hint); err != nil {
+							return newError(n.GetMetadata(), err.Error(), "")
+						}
+					}
+				} else {
+					obj := &Map{Pairs: mapPairs, Order: mapOrder}
+					if _, err := env.Define(spec.Local, obj, true, "Map"); err != nil {
+						return newError(n.GetMetadata(), err.Error(), "")
+					}
 				}
 			} else {
 				entry, ok := targetEnv.GetEntry(spec.Imported)
