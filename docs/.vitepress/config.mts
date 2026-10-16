@@ -93,6 +93,7 @@ export default defineConfig({
           { text: 'Operator & Ekspresi', link: '/dasar/operator' },
           { text: 'Kontrol Alur & Percabangan', link: '/dasar/kontrol-alur' },
           { text: 'Fungsi & Ruang Lingkup', link: '/dasar/fungsi' },
+          { text: 'Sistem Modul & Impor', link: '/dasar/modul' },
           { text: 'Fungsi Bawaan Global', link: '/dasar/fungsi-bawaan' }
         ]
       },

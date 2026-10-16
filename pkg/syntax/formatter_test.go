@@ -131,4 +131,48 @@ func TestFormatter_StyleBlockStatement(t *testing.T) {
 	}
 }
 
+func TestFormatter_ImportsFormatting(t *testing.T) {
+	input := `
+	ambil { akar } dari matematika
+	ambil { helper } dari "./helper.ce"
+	ambil * sebagai math dari matematika
+	dari matematika ambil *
+	`
+	l := parser.NewLexer(input)
+	p := parser.NewParser(l)
+	prog, err := p.ParseProgram()
+	if err != nil {
+		t.Fatalf("Parse error: %v", err)
+	}
+
+	// 1. Indonesian Profile
+	indoFormatter := syntax.NewFormatter(syntax.IndonesianProfile())
+	indoText := indoFormatter.Format(prog)
+
+	if !strings.Contains(indoText, "ambil { akar } dari matematika") {
+		t.Errorf("Expected unquoted matematika in Indonesian profile, got:\n%s", indoText)
+	}
+	if !strings.Contains(indoText, "ambil { helper } dari \"./helper.ce\"") {
+		t.Errorf("Expected quoted ./helper.ce in Indonesian profile, got:\n%s", indoText)
+	}
+	if !strings.Contains(indoText, "ambil * sebagai math dari matematika") {
+		t.Errorf("Expected unquoted math namespace in Indonesian profile, got:\n%s", indoText)
+	}
+
+	// 2. Pythonic Profile
+	pyFormatter := syntax.NewFormatter(syntax.PythonicProfile())
+	pyText := pyFormatter.Format(prog)
+
+	if !strings.Contains(pyText, "from matematika import akar") {
+		t.Errorf("Expected unquoted matematika in Pythonic profile, got:\n%s", pyText)
+	}
+	if !strings.Contains(pyText, "from \"./helper.ce\" import helper") {
+		t.Errorf("Expected quoted ./helper.ce in Pythonic profile, got:\n%s", pyText)
+	}
+	if !strings.Contains(pyText, "from matematika import *") {
+		t.Errorf("Expected wildcard import in Pythonic profile, got:\n%s", pyText)
+	}
+}
+
+
 

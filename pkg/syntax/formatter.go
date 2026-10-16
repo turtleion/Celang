@@ -2,6 +2,7 @@ package syntax
 
 import (
 	"fmt"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -337,10 +338,11 @@ func (f *Formatter) formatStatement(stmt uast.Statement, indent int) string {
 	case *uast.ImportDeclaration:
 		var sb strings.Builder
 		sb.WriteString(prefix)
+		sourceStr := formatImportSource(s.Source, f.profile.Name)
 		switch f.profile.Name {
 		case "javascript":
 			if len(s.Specifiers) == 1 && s.Specifiers[0].IsAll {
-				sb.WriteString(fmt.Sprintf("import * as %s from \"%s\"", s.Specifiers[0].Local, s.Source))
+				sb.WriteString(fmt.Sprintf("import * as %s from %s", s.Specifiers[0].Local, sourceStr))
 			} else {
 				specs := []string{}
 				for _, spec := range s.Specifiers {
@@ -350,11 +352,15 @@ func (f *Formatter) formatStatement(stmt uast.Statement, indent int) string {
 						specs = append(specs, spec.Imported)
 					}
 				}
-				sb.WriteString(fmt.Sprintf("import { %s } from \"%s\"", strings.Join(specs, ", "), s.Source))
+				sb.WriteString(fmt.Sprintf("import { %s } from %s", strings.Join(specs, ", "), sourceStr))
 			}
 		case "pythonic":
 			if len(s.Specifiers) == 1 && s.Specifiers[0].IsAll {
-				sb.WriteString(fmt.Sprintf("import \"%s\" as %s", s.Source, s.Specifiers[0].Local))
+				if s.Specifiers[0].Local == "*" {
+					sb.WriteString(fmt.Sprintf("from %s import *", sourceStr))
+				} else {
+					sb.WriteString(fmt.Sprintf("import %s as %s", sourceStr, s.Specifiers[0].Local))
+				}
 			} else {
 				specs := []string{}
 				for _, spec := range s.Specifiers {
@@ -364,14 +370,14 @@ func (f *Formatter) formatStatement(stmt uast.Statement, indent int) string {
 						specs = append(specs, spec.Imported)
 					}
 				}
-				sb.WriteString(fmt.Sprintf("from \"%s\" import %s", s.Source, strings.Join(specs, ", ")))
+				sb.WriteString(fmt.Sprintf("from %s import %s", sourceStr, strings.Join(specs, ", ")))
 			}
 		default:
 			impWord := "ambil"
 			fromWord := "dari"
 			asWord := "sebagai"
 			if len(s.Specifiers) == 1 && s.Specifiers[0].IsAll {
-				sb.WriteString(fmt.Sprintf("%s * %s %s %s \"%s\"", impWord, asWord, s.Specifiers[0].Local, fromWord, s.Source))
+				sb.WriteString(fmt.Sprintf("%s * %s %s %s %s", impWord, asWord, s.Specifiers[0].Local, fromWord, sourceStr))
 			} else {
 				specs := []string{}
 				for _, spec := range s.Specifiers {
@@ -381,7 +387,7 @@ func (f *Formatter) formatStatement(stmt uast.Statement, indent int) string {
 						specs = append(specs, spec.Imported)
 					}
 				}
-				sb.WriteString(fmt.Sprintf("%s { %s } %s \"%s\"", impWord, strings.Join(specs, ", "), fromWord, s.Source))
+				sb.WriteString(fmt.Sprintf("%s { %s } %s %s", impWord, strings.Join(specs, ", "), fromWord, sourceStr))
 			}
 		}
 		return sb.String()
@@ -906,3 +912,25 @@ func (f *Formatter) formatVisibility(vis *uast.Visibility) string {
 		}
 	}
 }
+
+func formatImportSource(source string, profileName string) string {
+	if profileName == "javascript" {
+		return fmt.Sprintf("\"%s\"", source)
+	}
+	if isPathImport(source) {
+		return fmt.Sprintf("\"%s\"", source)
+	}
+	return source
+}
+
+func isPathImport(source string) bool {
+	if strings.HasPrefix(source, ".") || strings.HasPrefix(source, "/") || strings.HasPrefix(source, "\\") {
+		return true
+	}
+	ext := filepath.Ext(source)
+	if ext == ".ce" || ext == ".ast" {
+		return true
+	}
+	return false
+}
+

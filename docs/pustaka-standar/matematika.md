@@ -22,8 +22,11 @@ Modul ini langsung aktif secara global maupun dapat diimpor secara modular:
 buat bayar = matematika.rupiah(1500000)
 buat eja = math.terbilang(125000)
 
-// 2. Atau menggunakan sintaks impor terstruktur:
-impor { terbilang, rupiah, persen, rata_rata } dari "matematika"
+// 2. Atau impor fungsi tertentu (tanpa tanda kutip untuk modul bawaan/paket):
+ambil { terbilang, rupiah, persen, rata_rata } dari matematika
+
+// 3. Atau impor modul dengan alias:
+impor matematika sebagai math
 ```
 
 ---

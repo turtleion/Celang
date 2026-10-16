@@ -403,9 +403,9 @@ func (p *Parser) parseImportStatement() *uast.ImportDeclaration {
 		}
 		p.nextToken() // move to 'dari' / 'from'
 	} else if p.curTokenIs(STRING) {
-		// Case 3: Python style: import "./mod.ce" as math
+		// Case 3: Quoted path import: import "./mod.ce" as math
 		source := p.curToken.Literal
-		if p.peekTokenIs(AS) {
+		if p.peekTokenIs(AS) && p.peekToken.Line == p.curToken.Line {
 			p.nextToken() // eat 'as'
 			p.nextToken() // move to alias
 			local := p.curToken.Literal
@@ -417,6 +417,49 @@ func (p *Parser) parseImportStatement() *uast.ImportDeclaration {
 			Source:     source,
 			Specifiers: specifiers,
 		}
+	} else if p.curTokenIs(IDENT) {
+		firstIdent := p.curToken.Literal
+		firstLocal := firstIdent
+		if p.peekTokenIs(AS) && p.peekToken.Line == p.curToken.Line {
+			p.nextToken() // eat 'as' / 'sebagai'
+			p.nextToken() // move to alias
+			if p.curTokenIs(IDENT) {
+				firstLocal = p.curToken.Literal
+			}
+		}
+
+		if (!p.peekTokenIs(FROM) && !p.peekTokenIs(COMMA)) || p.peekToken.Line > p.curToken.Line {
+			// Direct module import: impor matematika [sebagai math]
+			specifiers = append(specifiers, uast.ImportSpecifier{Imported: "*", Local: firstLocal, IsAll: true})
+			return &uast.ImportDeclaration{
+				NodeType:   uast.NodeTypeImportDeclaration,
+				Metadata:   meta,
+				Source:     firstIdent,
+				Specifiers: specifiers,
+			}
+		}
+
+		// Otherwise: ambil foo [sebagai bar], baz dari ...
+		specifiers = append(specifiers, uast.ImportSpecifier{Imported: firstIdent, Local: firstLocal})
+		for p.peekTokenIs(COMMA) && p.peekToken.Line == p.curToken.Line {
+			p.nextToken() // eat ','
+			p.nextToken() // move to next ident
+			if !p.curTokenIs(IDENT) {
+				p.addError("Diharapkan nama simbol setelah koma dalam impor")
+				return nil
+			}
+			imp := p.curToken.Literal
+			loc := imp
+			if p.peekTokenIs(AS) && p.peekToken.Line == p.curToken.Line {
+				p.nextToken() // eat 'as' / 'sebagai'
+				p.nextToken() // move to alias
+				if p.curTokenIs(IDENT) {
+					loc = p.curToken.Literal
+				}
+			}
+			specifiers = append(specifiers, uast.ImportSpecifier{Imported: imp, Local: loc})
+		}
+		p.nextToken() // move to 'dari' / 'from'
 	} else {
 		p.addError(fmt.Sprintf("Sintaks impor tidak valid pada token '%s'", p.curToken.Literal))
 		return nil
@@ -426,10 +469,10 @@ func (p *Parser) parseImportStatement() *uast.ImportDeclaration {
 		p.addError("Diharapkan keyword 'dari' atau 'from' setelah daftar impor")
 		return nil
 	}
-	p.nextToken() // move to source path
+	p.nextToken() // move to source path or module identifier
 
-	if !p.curTokenIs(STRING) {
-		p.addError("Diharapkan path modul berupa string (contoh: \"./modul.ce\")")
+	if !p.curTokenIs(STRING) && !p.curTokenIs(IDENT) {
+		p.addError("Diharapkan nama modul (contoh: matematika) atau path berkas (contoh: \"./modul.ce\")")
 		return nil
 	}
 	source := p.curToken.Literal
@@ -446,8 +489,8 @@ func (p *Parser) parsePythonicImportStatement() *uast.ImportDeclaration {
 	meta := p.currentMetadata()
 	p.nextToken() // eat 'dari' / 'from'
 
-	if !p.curTokenIs(STRING) {
-		p.addError("Diharapkan path modul berupa string setelah 'from' / 'dari'")
+	if !p.curTokenIs(STRING) && !p.curTokenIs(IDENT) {
+		p.addError("Diharapkan nama modul (contoh: matematika) atau path berkas setelah 'from' / 'dari'")
 		return nil
 	}
 	source := p.curToken.Literal
@@ -463,13 +506,15 @@ func (p *Parser) parsePythonicImportStatement() *uast.ImportDeclaration {
 
 	if p.curTokenIs(ASTERISK) {
 		specifiers = append(specifiers, uast.ImportSpecifier{Imported: "*", Local: "*", IsAll: true})
-	} else {
-		for !p.curTokenIs(SEMICOLON) && !p.curTokenIs(EOF) {
+	} else if p.curTokenIs(LBRACE) {
+		// Case: dari matematika ambil { akar, PI as pi }
+		p.nextToken() // enter '{'
+		for !p.curTokenIs(RBRACE) && !p.curTokenIs(EOF) {
 			if p.curTokenIs(IDENT) {
 				imported := p.curToken.Literal
 				local := imported
 				if p.peekTokenIs(AS) {
-					p.nextToken() // eat 'as'
+					p.nextToken() // eat 'as' / 'sebagai'
 					p.nextToken() // move to alias
 					if p.curTokenIs(IDENT) {
 						local = p.curToken.Literal
@@ -478,6 +523,25 @@ func (p *Parser) parsePythonicImportStatement() *uast.ImportDeclaration {
 				specifiers = append(specifiers, uast.ImportSpecifier{Imported: imported, Local: local})
 			}
 			if p.peekTokenIs(COMMA) {
+				p.nextToken()
+			}
+			p.nextToken()
+		}
+	} else {
+		for !p.curTokenIs(SEMICOLON) && !p.curTokenIs(EOF) {
+			if p.curTokenIs(IDENT) {
+				imported := p.curToken.Literal
+				local := imported
+				if p.peekTokenIs(AS) && p.peekToken.Line == p.curToken.Line {
+					p.nextToken() // eat 'as'
+					p.nextToken() // move to alias
+					if p.curTokenIs(IDENT) {
+						local = p.curToken.Literal
+					}
+				}
+				specifiers = append(specifiers, uast.ImportSpecifier{Imported: imported, Local: local})
+			}
+			if p.peekTokenIs(COMMA) && p.peekToken.Line == p.curToken.Line {
 				p.nextToken()
 				p.nextToken()
 			} else {

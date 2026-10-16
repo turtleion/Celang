@@ -26,8 +26,8 @@ cetak(judulWeb) // "belajar-celang-2-0-cepat-dan-mudah"
 buat hasil = strings.trim_left("===DATA===", "=")
 cetak(hasil) // "DATA==="
 
-// 3. Atau menggunakan sintaks impor terstruktur:
-impor { slug, samarkan, kemiripan, terdekat } dari "teks"
+// 3. Atau impor fungsi tertentu (tanpa tanda kutip):
+ambil { slug, samarkan, kemiripan, terdekat } dari teks
 ```
 
 ---
