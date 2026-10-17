@@ -8,19 +8,25 @@ import (
 	"celang/pkg/uast"
 )
 
-// objectsEqual checks if two Celang objects are considered equal.
-func objectsEqual(a, b Object) bool {
+// ObjectsEqual checks if two Celang objects are considered equal.
+func ObjectsEqual(a, b Object) bool {
 	if a == nil || b == nil {
 		return a == b
 	}
+	if a.Type() == NULL_OBJ && b.Type() == NULL_OBJ {
+		return true
+	}
+	if a.Type() == NULL_OBJ || b.Type() == NULL_OBJ {
+		return false
+	}
 	if a.Type() != b.Type() {
-		aInt, aFloat, aIsInt, aOk := CoerceToNumeric(a)
-		bInt, bFloat, bIsInt, bOk := CoerceToNumeric(b)
-		if aOk && bOk {
-			if aIsInt && bIsInt {
-				return aInt == bInt
+		// Only numeric types (INTEGER and FLOAT) can be equal across different types
+		if (a.Type() == INTEGER_OBJ || a.Type() == FLOAT_OBJ) && (b.Type() == INTEGER_OBJ || b.Type() == FLOAT_OBJ) {
+			_, aFloat, _, aOk := CoerceToNumeric(a)
+			_, bFloat, _, bOk := CoerceToNumeric(b)
+			if aOk && bOk {
+				return aFloat == bFloat
 			}
-			return aFloat == bFloat
 		}
 		return false
 	}
@@ -35,9 +41,48 @@ func objectsEqual(a, b Object) bool {
 		return oA.Value == b.(*Boolean).Value
 	case *Null:
 		return true
+	case *Array:
+		oB := b.(*Array)
+		if len(oA.Elements) != len(oB.Elements) {
+			return false
+		}
+		for i := range oA.Elements {
+			if !ObjectsEqual(oA.Elements[i], oB.Elements[i]) {
+				return false
+			}
+		}
+		return true
+	case *Map:
+		oB := b.(*Map)
+		if len(oA.Pairs) != len(oB.Pairs) {
+			return false
+		}
+		for k, valA := range oA.Pairs {
+			valB, exists := oB.Pairs[k]
+			if !exists || !ObjectsEqual(valA, valB) {
+				return false
+			}
+		}
+		return true
+	case *StructInstance:
+		oB := b.(*StructInstance)
+		if oA.Def.Name != oB.Def.Name || len(oA.Fields) != len(oB.Fields) {
+			return false
+		}
+		for k, valA := range oA.Fields {
+			valB, exists := oB.Fields[k]
+			if !exists || !ObjectsEqual(valA, valB) {
+				return false
+			}
+		}
+		return true
 	default:
 		return a.Inspect() == b.Inspect()
 	}
+}
+
+func objectsEqual(a, b Object) bool {
+	return ObjectsEqual(a, b)
 }
 
 // EvalArrayMethod dispatches member method invocations on an Array.

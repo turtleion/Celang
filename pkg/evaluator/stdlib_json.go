@@ -56,7 +56,11 @@ func initStdlibJSON(env *Environment) {
 				switch ind := args[1].(type) {
 				case *Integer:
 					if ind.Value > 0 {
-						indentStr = strings.Repeat(" ", int(ind.Value))
+						spaces := int(ind.Value)
+						if spaces > 10 {
+							spaces = 10
+						}
+						indentStr = strings.Repeat(" ", spaces)
 					}
 				case *String:
 					indentStr = ind.Value

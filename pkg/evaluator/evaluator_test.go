@@ -2322,4 +2322,52 @@ func TestEvaluator_SliceBounds_Validation(t *testing.T) {
 	}
 }
 
+func TestEvaluator_StructuralEquality(t *testing.T) {
+	code := `
+	buat e1 = (null == "kosong")
+	buat e2 = (true == "benar")
+	buat e3 = (false == "salah")
+	buat e4 = (null == null)
+	buat e5 = (true == true)
+	buat e6 = (1 == 1.0)
+	buat e7 = ([1, 2] == "[1, 2]")
+	buat e8 = ([1, 2] == [1, "2"])
+	buat e9 = ([1, 2] == [1, 2])
+	buat e10 = ({"a": 1, "b": 2} == {"b": 2, "a": 1})
+	buat e11 = ({"a": [1, 2]} == {"a": [1, 2]})
+
+	[e1, e2, e3, e4, e5, e6, e7, e8, e9, e10, e11]
+	`
+	res := testEvalSource(t, code)
+	arr := res.(*evaluator.Array)
+	expectations := []bool{false, false, false, true, true, true, false, false, true, true, true}
+	for i, exp := range expectations {
+		got := arr.Elements[i].(*evaluator.Boolean).Value
+		if got != exp {
+			t.Errorf("e%d expected %v, got %v", i+1, exp, got)
+		}
+	}
+}
+
+func TestEvaluator_RangeSizeGuard(t *testing.T) {
+	res1 := testEvalSource(t, `rentang(1, 10000000)`)
+	if _, ok := res1.(*evaluator.Error); !ok {
+		t.Fatalf("expected error for excessive rentang size, got %s", res1.Inspect())
+	}
+
+	res2 := testEvalSource(t, `1..10000000`)
+	if _, ok := res2.(*evaluator.Error); !ok {
+		t.Fatalf("expected error for excessive range expression size, got %s", res2.Inspect())
+	}
+}
+
+func TestEvaluator_MathOverflow(t *testing.T) {
+	code := `matematika.pangkat(10, 25)`
+	res := testEvalSource(t, code)
+	if flt, ok := res.(*evaluator.Float); !ok || flt.Value < 0 {
+		t.Fatalf("expected positive Float for 10^25 without int64 overflow, got %s", res.Inspect())
+	}
+}
+
+
 

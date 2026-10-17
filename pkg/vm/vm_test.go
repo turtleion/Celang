@@ -735,5 +735,32 @@ func TestVM_MapAndStruct_StringIndexAssignment(t *testing.T) {
 	}
 }
 
+func TestVM_StructuralEquality(t *testing.T) {
+	code := `
+	buat e1 = (null == "kosong")
+	buat e2 = (true == "benar")
+	buat e3 = (false == "salah")
+	buat e4 = (null == null)
+	buat e5 = (true == true)
+	buat e6 = (1 == 1.0)
+	buat e7 = ([1, 2] == "[1, 2]")
+	buat e8 = ([1, 2] == [1, "2"])
+	buat e9 = ([1, 2] == [1, 2])
+	buat e10 = ({"a": 1, "b": 2} == {"b": 2, "a": 1})
+
+	[e1, e2, e3, e4, e5, e6, e7, e8, e9, e10]
+	`
+	res, _, _ := runVM(t, code)
+	arr := res.(*evaluator.Array)
+	expectations := []bool{false, false, false, true, true, true, false, false, true, true}
+	for i, exp := range expectations {
+		got := arr.Elements[i].(*evaluator.Boolean).Value
+		if got != exp {
+			t.Errorf("VM e%d expected %v, got %v", i+1, exp, got)
+		}
+	}
+}
+
+
 
 

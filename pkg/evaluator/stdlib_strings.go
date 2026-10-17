@@ -317,6 +317,9 @@ func initStdlibTeks(env *Environment) {
 			if cnt.Value <= 0 {
 				return &String{Value: ""}
 			}
+			if cnt.Value > 1_000_000 || int64(len(str.Value))*cnt.Value > 50_000_000 {
+				return newError(nil, "hasil pengulangan teks melebihi batas aman (maksimal 50MB)", "")
+			}
 			return &String{Value: strings.Repeat(str.Value, int(cnt.Value))}
 		},
 	}

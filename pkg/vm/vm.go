@@ -224,12 +224,12 @@ func (vm *VM) Run() (evaluator.Object, error) {
 		case bytecode.OpEqual:
 			b := vm.pop()
 			a := vm.pop()
-			vm.push(&evaluator.Boolean{Value: a.Inspect() == b.Inspect()})
+			vm.push(&evaluator.Boolean{Value: evaluator.ObjectsEqual(a, b)})
 
 		case bytecode.OpNotEqual:
 			b := vm.pop()
 			a := vm.pop()
-			vm.push(&evaluator.Boolean{Value: a.Inspect() != b.Inspect()})
+			vm.push(&evaluator.Boolean{Value: !evaluator.ObjectsEqual(a, b)})
 
 		case bytecode.OpGreaterThan:
 			b := vm.pop()

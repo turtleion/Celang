@@ -1390,9 +1390,9 @@ func evalBinaryOp(op string, left, right Object, meta *uast.NodeMetadata) Object
 			return &Float{Value: math.Mod(leftFloat, rightFloat)}
 		}
 
-	case "==", "!=":
-		eq := left.Inspect() == right.Inspect()
-		if op == "==" {
+	case "==", "!=", "===", "!==":
+		eq := ObjectsEqual(left, right)
+		if op == "==" || op == "===" {
 			return nativeBool(eq)
 		}
 		return nativeBool(!eq)
@@ -2204,6 +2204,18 @@ func evalRangeExpression(rng *uast.RangeExpression, env *Environment) Object {
 		} else {
 			return newError(rng.GetMetadata(), "Batas akhir rentang harus berupa bilangan bulat", "")
 		}
+	}
+
+	diff := endVal - startVal
+	if diff < 0 {
+		diff = -diff
+	}
+	if diff > 1_000_000 {
+		msg := "Ukuran rentang terlalu besar (maksimal 1.000.000 elemen)"
+		if env.IsUniversal {
+			msg = "Range size is too large (maximum 1,000,000 elements)"
+		}
+		return newError(rng.GetMetadata(), msg, "Gunakan perulangan dengan kondisi 'selama' (while) untuk iterasi dalam skala besar.")
 	}
 
 	var elements []Object

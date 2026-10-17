@@ -35,7 +35,7 @@ func initStdlibMatematika(env *Environment) {
 				return newError(nil, "nilai untuk matematika.akar tidak boleh negatif", "Gunakan bilangan bernilai >= 0.")
 			}
 			res := math.Sqrt(fVal)
-			if res == math.Trunc(res) {
+			if res == math.Trunc(res) && res <= float64(math.MaxInt64) && res >= float64(math.MinInt64) {
 				return &Integer{Value: int64(res)}
 			}
 			return &Float{Value: res}
@@ -56,7 +56,7 @@ func initStdlibMatematika(env *Environment) {
 				return newError(nil, "argumen matematika.pangkat harus berupa angka", "")
 			}
 			res := math.Pow(aVal, bVal)
-			if aIsInt && bIsInt && bVal >= 0 && res == math.Trunc(res) {
+			if aIsInt && bIsInt && bVal >= 0 && res == math.Trunc(res) && res <= float64(math.MaxInt64) && res >= float64(math.MinInt64) {
 				return &Integer{Value: int64(res)}
 			}
 			return &Float{Value: res}
@@ -829,7 +829,7 @@ func initStdlibMatematika(env *Environment) {
 				return newError(nil, "pembagian dengan nol pada matematika.persen", "")
 			}
 			res := (fPart / fTotal) * 100.0
-			if res == math.Trunc(res) {
+			if res == math.Trunc(res) && res <= float64(math.MaxInt64) && res >= float64(math.MinInt64) {
 				return &Integer{Value: int64(res)}
 			}
 			return &Float{Value: res}
@@ -850,7 +850,7 @@ func initStdlibMatematika(env *Environment) {
 				return newError(nil, "argumen matematika.dari_persen harus berupa angka", "")
 			}
 			res := (fPercent / 100.0) * fTotal
-			if res == math.Trunc(res) {
+			if res == math.Trunc(res) && res <= float64(math.MaxInt64) && res >= float64(math.MinInt64) {
 				return &Integer{Value: int64(res)}
 			}
 			return &Float{Value: res}
@@ -872,7 +872,7 @@ func initStdlibMatematika(env *Environment) {
 				return newError(nil, "seluruh argumen matematika.lerp harus berupa angka", "")
 			}
 			res := aVal + (bVal-aVal)*tVal
-			if isIntA && isIntB && isIntT && res == math.Trunc(res) {
+			if isIntA && isIntB && isIntT && res == math.Trunc(res) && res <= float64(math.MaxInt64) && res >= float64(math.MinInt64) {
 				return &Integer{Value: int64(res)}
 			}
 			return &Float{Value: res}
@@ -898,7 +898,7 @@ func initStdlibMatematika(env *Environment) {
 				return newError(nil, "rentang masukan tidak boleh sama (pembagian dengan nol)", "")
 			}
 			res := outMin + (val-inMin)*(outMax-outMin)/(inMax-inMin)
-			if res == math.Trunc(res) {
+			if res == math.Trunc(res) && res <= float64(math.MaxInt64) && res >= float64(math.MinInt64) {
 				return &Integer{Value: int64(res)}
 			}
 			return &Float{Value: res}

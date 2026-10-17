@@ -120,6 +120,13 @@ func RegisterBuiltinsWithIO(env *Environment, in io.Reader, out io.Writer) {
 				start = s
 				end = e
 			}
+			diff := end - start
+			if diff < 0 {
+				diff = -diff
+			}
+			if diff > 1_000_000 {
+				return &Error{Message: "ukuran rentang terlalu besar (maksimal 1.000.000 elemen)"}
+			}
 			var elems []Object
 			if start <= end {
 				for i := start; i <= end; i++ {
