@@ -1549,6 +1549,12 @@ func evalProgram(stmts []uast.Statement, env *Environment) Object {
 			if result.Type() == ROLLBACK_SIGNAL_OBJ {
 				return newError(nil, "perintah 'batalkan' hanya dapat digunakan di dalam blok transaksi", "Bungkus operasi dengan 'transaksi { ... }' terlebih dahulu.")
 			}
+			if result.Type() == BREAK_SIGNAL_OBJ {
+				return newError(nil, "perintah 'berhenti' (break) hanya dapat digunakan di dalam perulangan", "Hapus perintah tersebut atau bungkus dengan blok perulangan.")
+			}
+			if result.Type() == CONTINUE_SIGNAL_OBJ {
+				return newError(nil, "perintah 'lanjut' (continue) hanya dapat digunakan di dalam perulangan", "Hapus perintah tersebut atau bungkus dengan blok perulangan.")
+			}
 		}
 	}
 	return result
@@ -1811,6 +1817,14 @@ func applyFunctionWithGenerics(callee Object, args []Object, typeArgs []string, 
 		res := Eval(fn.Body, fnEnv)
 		if ret, ok := res.(*ReturnValue); ok {
 			return ret.Value
+		}
+		if res != nil {
+			if res.Type() == BREAK_SIGNAL_OBJ {
+				return newError(meta, "perintah 'berhenti' (break) hanya dapat digunakan di dalam perulangan", "Hapus perintah tersebut atau bungkus dengan blok perulangan.")
+			}
+			if res.Type() == CONTINUE_SIGNAL_OBJ {
+				return newError(meta, "perintah 'lanjut' (continue) hanya dapat digunakan di dalam perulangan", "Hapus perintah tersebut atau bungkus dengan blok perulangan.")
+			}
 		}
 		return res
 	case *StructDefinition:
@@ -2099,6 +2113,14 @@ func applyFunctionWithASTArgs(fn *Function, argNodes []uast.Expression, callerEn
 	if ret, ok := res.(*ReturnValue); ok {
 		return ret.Value
 	}
+	if res != nil {
+		if res.Type() == BREAK_SIGNAL_OBJ {
+			return newError(meta, "perintah 'berhenti' (break) hanya dapat digunakan di dalam perulangan", "Hapus perintah tersebut atau bungkus dengan blok perulangan.")
+		}
+		if res.Type() == CONTINUE_SIGNAL_OBJ {
+			return newError(meta, "perintah 'lanjut' (continue) hanya dapat digunakan di dalam perulangan", "Hapus perintah tersebut atau bungkus dengan blok perulangan.")
+		}
+	}
 	return res
 }
 
@@ -2271,8 +2293,9 @@ func evalRangeExpression(rng *uast.RangeExpression, env *Environment) Object {
 }
 
 func evalArraySlice(arr *Array, rng *uast.RangeExpression, env *Environment, meta *uast.NodeMetadata) Object {
+	n := len(arr.Elements)
 	start := 0
-	end := len(arr.Elements)
+	end := n
 	if rng.Start != nil {
 		sVal := Eval(rng.Start, env)
 		if isError(sVal) {
@@ -2292,16 +2315,25 @@ func evalArraySlice(arr *Array, rng *uast.RangeExpression, env *Environment, met
 		}
 	}
 	if start < 0 {
-		start = 0
+		start = n + start
+		if start < 0 {
+			start = 0
+		}
 	}
-	if start > len(arr.Elements) {
-		start = len(arr.Elements)
+	if start > n {
+		start = n
+	}
+	if end < 0 {
+		end = n + end
+		if end < 0 {
+			end = 0
+		}
 	}
 	if end < start {
 		end = start
 	}
-	if end > len(arr.Elements) {
-		end = len(arr.Elements)
+	if end > n {
+		end = n
 	}
 
 	sliced := make([]Object, end-start)
@@ -2311,8 +2343,9 @@ func evalArraySlice(arr *Array, rng *uast.RangeExpression, env *Environment, met
 
 func evalStringSlice(str *String, rng *uast.RangeExpression, env *Environment, meta *uast.NodeMetadata) Object {
 	runes := []rune(str.Value)
+	n := len(runes)
 	start := 0
-	end := len(runes)
+	end := n
 	if rng.Start != nil {
 		sVal := Eval(rng.Start, env)
 		if isError(sVal) {
@@ -2332,16 +2365,25 @@ func evalStringSlice(str *String, rng *uast.RangeExpression, env *Environment, m
 		}
 	}
 	if start < 0 {
-		start = 0
+		start = n + start
+		if start < 0 {
+			start = 0
+		}
 	}
-	if start > len(runes) {
-		start = len(runes)
+	if start > n {
+		start = n
+	}
+	if end < 0 {
+		end = n + end
+		if end < 0 {
+			end = 0
+		}
 	}
 	if end < start {
 		end = start
 	}
-	if end > len(runes) {
-		end = len(runes)
+	if end > n {
+		end = n
 	}
 
 	return &String{Value: string(runes[start:end])}

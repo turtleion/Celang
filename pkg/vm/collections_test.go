@@ -59,3 +59,61 @@ func TestVM_BreakAndContinue(t *testing.T) {
 		t.Fatalf("expected 13, got %s", res.Inspect())
 	}
 }
+
+func TestVM_ForEach_Locals(t *testing.T) {
+	code := `
+	"use universal"
+	let arr = [1, 2, 3]
+	let res = []
+	for x in arr {
+		let y = x * 10
+		res.push(y)
+	}
+	res.join(",")
+	`
+	res, _, _ := runVM(t, code)
+	if res.Inspect() != "10,20,30" {
+		t.Fatalf("expected 10,20,30, got %s", res.Inspect())
+	}
+}
+
+func TestVM_For_Continue_Update(t *testing.T) {
+	code := `
+	"use universal"
+	let sum = 0
+	for i in 0..4 {
+		if i == 2 {
+			continue
+		}
+		sum = sum + i
+	}
+	sum
+	`
+	res, _, _ := runVM(t, code)
+	if res.Inspect() != "8" {
+		t.Fatalf("expected 8, got %s", res.Inspect())
+	}
+}
+
+func TestVM_ForEach_ContinueAndBreak(t *testing.T) {
+	code := `
+	"use universal"
+	let arr = [1, 2, 3, 4, 5]
+	let res = []
+	for x in arr {
+		let temp = x * 2
+		if x == 2 {
+			continue
+		}
+		if x == 4 {
+			break
+		}
+		res.push(temp)
+	}
+	res.join(",")
+	`
+	res, _, _ := runVM(t, code)
+	if res.Inspect() != "2,6" {
+		t.Fatalf("expected 2,6, got %s", res.Inspect())
+	}
+}

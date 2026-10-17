@@ -17,9 +17,11 @@ type Local struct {
 }
 
 type loopContext struct {
-	startPos   int
-	breakJumps []int
-	scopeDepth int
+	startPos       int
+	breakJumps     []int
+	continueJumps  []int
+	continueTarget int
+	scopeDepth     int
 }
 
 type Compiler struct {
@@ -67,9 +69,11 @@ func newFunctionCompiler(parent *Compiler, name string, numParams int) *Compiler
 
 func (c *Compiler) enterLoop(startPos int) *loopContext {
 	ctx := &loopContext{
-		startPos:   startPos,
-		breakJumps: make([]int, 0),
-		scopeDepth: c.scopeDepth,
+		startPos:       startPos,
+		breakJumps:     make([]int, 0),
+		continueJumps:  make([]int, 0),
+		continueTarget: startPos,
+		scopeDepth:     c.scopeDepth,
 	}
 	c.loopStack = append(c.loopStack, ctx)
 	return ctx
@@ -353,6 +357,7 @@ func (c *Compiler) compileStatement(stmt uast.Statement) error {
 
 		loopStart := len(c.chunk.Instructions)
 		loopCtx := c.enterLoop(loopStart)
+		loopCtx.continueTarget = -1 // Continue jumps forward to Update block
 		var exitJump int = -1
 
 		if s.Condition != nil {
@@ -365,6 +370,11 @@ func (c *Compiler) compileStatement(stmt uast.Statement) error {
 
 		if err := c.compileStatement(s.Body); err != nil {
 			return err
+		}
+
+		// Continue statements inside s.Body jump here, right before s.Update
+		for _, cj := range loopCtx.continueJumps {
+			c.patchJump(cj)
 		}
 
 		if s.Update != nil {
@@ -414,12 +424,10 @@ func (c *Compiler) compileStatement(stmt uast.Statement) error {
 		c.chunk.WriteUint16(uint16(itemSlot), line)
 		c.emitOp(bytecode.OpPop, line)
 
-		// 5. Loop body
+		// 5. Loop body with its own nested scope so iteration locals are properly popped
 		if s.Body != nil {
-			for _, child := range s.Body.Statements {
-				if err := c.compileStatement(child); err != nil {
-					return err
-				}
+			if err := c.compileStatement(s.Body); err != nil {
+				return err
 			}
 		}
 
@@ -457,7 +465,12 @@ func (c *Compiler) compileStatement(stmt uast.Statement) error {
 		for i := len(c.locals) - 1; i >= 0 && c.locals[i].Depth > loopCtx.scopeDepth; i-- {
 			c.emitOp(bytecode.OpPop, line)
 		}
-		c.emitLoop(loopCtx.startPos, line)
+		if loopCtx.continueTarget >= 0 {
+			c.emitLoop(loopCtx.continueTarget, line)
+		} else {
+			cj := c.emitJump(bytecode.OpJump, line)
+			loopCtx.continueJumps = append(loopCtx.continueJumps, cj)
+		}
 		return nil
 
 	case *uast.BlockStatement:

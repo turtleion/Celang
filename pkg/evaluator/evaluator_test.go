@@ -2139,6 +2139,94 @@ func TestEvaluator_BreakAndContinue(t *testing.T) {
 	}
 }
 
+func TestEvaluator_BreakAndContinue_InvalidScopes(t *testing.T) {
+	// 1. Top-level break should error
+	resBreak := testEvalSource(t, `berhenti`)
+	if errObj, ok := resBreak.(*evaluator.Error); !ok || !strings.Contains(errObj.Message, "hanya dapat digunakan di dalam perulangan") {
+		t.Fatalf("expected error for top-level break, got %v", resBreak)
+	}
 
+	// 2. Top-level continue should error
+	resContinue := testEvalSource(t, `lanjut`)
+	if errObj, ok := resContinue.(*evaluator.Error); !ok || !strings.Contains(errObj.Message, "hanya dapat digunakan di dalam perulangan") {
+		t.Fatalf("expected error for top-level continue, got %v", resContinue)
+	}
 
+	// 3. Break inside function should error and not escape to outer loop
+	codeFnBreak := `
+	fungsi coba_berhenti() {
+		berhenti
+	}
+	buat loopCount = 0
+	selama loopCount < 3 {
+		loopCount += 1
+		coba_berhenti()
+	}
+	loopCount
+	`
+	resFnBreak := testEvalSource(t, codeFnBreak)
+	if _, ok := resFnBreak.(*evaluator.Error); !ok {
+		t.Fatalf("expected error when function executes break, got %v", resFnBreak)
+	}
+}
 
+func TestEvaluator_NegativeIndexSlicing(t *testing.T) {
+	code := `
+	buat arr = [10, 20, 30, 40, 50]
+	buat s1 = arr[-2..]
+	buat s2 = arr[..-1]
+	buat s3 = arr[-3..-1]
+	buat s4 = arr.potong(-2)
+
+	buat kata = "Nusantara"
+	buat sub1 = kata[-3..]
+	buat sub2 = kata[..-4]
+
+	[s1, s2, s3, s4, sub1, sub2]
+	`
+	res := testEvalSource(t, code)
+	arr, ok := res.(*evaluator.Array)
+	if !ok {
+		t.Fatalf("expected array, got %s", res.Inspect())
+	}
+	if arr.Elements[0].Inspect() != "[40, 50]" {
+		t.Errorf("expected arr[-2..] = [40, 50], got %s", arr.Elements[0].Inspect())
+	}
+	if arr.Elements[1].Inspect() != "[10, 20, 30, 40]" {
+		t.Errorf("expected arr[..-1] = [10, 20, 30, 40], got %s", arr.Elements[1].Inspect())
+	}
+	if arr.Elements[2].Inspect() != "[30, 40]" {
+		t.Errorf("expected arr[-3..-1] = [30, 40], got %s", arr.Elements[2].Inspect())
+	}
+	if arr.Elements[3].Inspect() != "[40, 50]" {
+		t.Errorf("expected arr.potong(-2) = [40, 50], got %s", arr.Elements[3].Inspect())
+	}
+	if arr.Elements[4].Inspect() != "ara" {
+		t.Errorf("expected kata[-3..] = 'ara', got %s", arr.Elements[4].Inspect())
+	}
+	if arr.Elements[5].Inspect() != "Nusan" {
+		t.Errorf("expected kata[..-4] = 'Nusan', got %s", arr.Elements[5].Inspect())
+	}
+}
+
+func TestEvaluator_MapMethods_WithoutInitialOrder(t *testing.T) {
+	// Test that map operations (kunci, nilai, entri, panjang, ukuran) work even if Map was created without Order
+	code := `
+	waktu_info = waktu.rincian()
+	kunci_list = waktu_info.kunci()
+	p = waktu_info.panjang
+	u = waktu_info.ukuran()
+	[kunci_list.panjang, p, u]
+	`
+	res := testEvalSource(t, code)
+	arr, ok := res.(*evaluator.Array)
+	if !ok {
+		t.Fatalf("expected array, got %s", res.Inspect())
+	}
+	kLen := arr.Elements[0].(*evaluator.Integer).Value
+	pLen := arr.Elements[1].(*evaluator.Integer).Value
+	uLen := arr.Elements[2].(*evaluator.Integer).Value
+	if kLen != 12 || pLen != 12 || uLen != 12 {
+		t.Fatalf("expected 12 keys/length/size, got %d, %d, %d", kLen, pLen, uLen)
+	}
+}

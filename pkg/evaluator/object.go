@@ -2,6 +2,7 @@ package evaluator
 
 import (
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -179,6 +180,29 @@ func (m *Map) Inspect() string {
 	return inspectObjectWithVisited(m, make(map[any]bool))
 }
 
+// GetKeys returns the ordered keys of the Map, automatically reconciling with Pairs if needed.
+func (m *Map) GetKeys() []string {
+	if len(m.Order) != len(m.Pairs) {
+		orderSet := make(map[string]bool, len(m.Order))
+		var newOrder []string
+		for _, k := range m.Order {
+			if _, exists := m.Pairs[k]; exists && !orderSet[k] {
+				orderSet[k] = true
+				newOrder = append(newOrder, k)
+			}
+		}
+		var remaining []string
+		for k := range m.Pairs {
+			if !orderSet[k] {
+				remaining = append(remaining, k)
+			}
+		}
+		sort.Strings(remaining)
+		m.Order = append(newOrder, remaining...)
+	}
+	return m.Order
+}
+
 // Pointer represents a memory reference to a variable in an Environment.
 type Pointer struct {
 	Env     *Environment
@@ -279,7 +303,7 @@ func inspectObjectWithVisited(obj Object, visited map[any]bool) string {
 		visited[o] = true
 		defer delete(visited, o)
 		var pairs []string
-		for _, k := range o.Order {
+		for _, k := range o.GetKeys() {
 			v := o.Pairs[k]
 			pairs = append(pairs, fmt.Sprintf("%q: %s", k, inspectObjectWithVisited(v, visited)))
 		}
@@ -334,12 +358,7 @@ func NewIterator(obj Object) (*IteratorObject, error) {
 		}, nil
 	case *Map:
 		idx := 0
-		keys := o.Order
-		if len(keys) == 0 && len(o.Pairs) > 0 {
-			for k := range o.Pairs {
-				keys = append(keys, k)
-			}
-		}
+		keys := o.GetKeys()
 		return &IteratorObject{
 			NextFunc: func() (Object, bool) {
 				if idx >= len(keys) {

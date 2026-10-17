@@ -406,8 +406,9 @@ func EvalMapMethod(mp *Map, method string, env *Environment, meta *uast.NodeMeta
 	case "kunci", "keys":
 		return &Builtin{
 			Fn: func(args ...Object) Object {
-				keys := make([]Object, len(mp.Order))
-				for i, k := range mp.Order {
+				kList := mp.GetKeys()
+				keys := make([]Object, len(kList))
+				for i, k := range kList {
 					keys[i] = &String{Value: k}
 				}
 				return &Array{Elements: keys}
@@ -417,8 +418,9 @@ func EvalMapMethod(mp *Map, method string, env *Environment, meta *uast.NodeMeta
 	case "nilai", "values":
 		return &Builtin{
 			Fn: func(args ...Object) Object {
-				vals := make([]Object, len(mp.Order))
-				for i, k := range mp.Order {
+				kList := mp.GetKeys()
+				vals := make([]Object, len(kList))
+				for i, k := range kList {
 					vals[i] = mp.Pairs[k]
 				}
 				return &Array{Elements: vals}
@@ -428,8 +430,9 @@ func EvalMapMethod(mp *Map, method string, env *Environment, meta *uast.NodeMeta
 	case "entri", "entries":
 		return &Builtin{
 			Fn: func(args ...Object) Object {
-				entries := make([]Object, len(mp.Order))
-				for i, k := range mp.Order {
+				kList := mp.GetKeys()
+				entries := make([]Object, len(kList))
+				for i, k := range kList {
 					entries[i] = &Array{
 						Elements: []Object{
 							&String{Value: k},
@@ -529,7 +532,7 @@ func EvalMapMethod(mp *Map, method string, env *Environment, meta *uast.NodeMeta
 				if !ok {
 					return newError(meta, fmt.Sprintf("Metode merge/gabung mengharapkan Map, menerima %s", args[0].Type()), "")
 				}
-				for _, k := range other.Order {
+				for _, k := range other.GetKeys() {
 					if _, exists := mp.Pairs[k]; !exists {
 						mp.Order = append(mp.Order, k)
 					}
@@ -549,12 +552,12 @@ func EvalMapMethod(mp *Map, method string, env *Environment, meta *uast.NodeMeta
 		}, true
 
 	case "panjang", "length", "len":
-		return &Integer{Value: int64(len(mp.Order))}, true
+		return &Integer{Value: int64(len(mp.GetKeys()))}, true
 
 	case "ukuran", "size":
 		return &Builtin{
 			Fn: func(args ...Object) Object {
-				return &Integer{Value: int64(len(mp.Order))}
+				return &Integer{Value: int64(len(mp.GetKeys()))}
 			},
 		}, true
 	}

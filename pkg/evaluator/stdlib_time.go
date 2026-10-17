@@ -257,6 +257,7 @@ func initStdlibWaktu(env *Environment) {
 					"durasi_ms":   &Float{Value: msElapsed},
 					"durasi_teks": &String{Value: text},
 				},
+				Order: []string{"hasil", "durasi_ms", "durasi_teks"},
 			}
 		},
 	}
@@ -296,6 +297,11 @@ func initStdlibWaktu(env *Environment) {
 					"detik":             &Integer{Value: int64(t.Second())},
 					"milidetik":         &Integer{Value: int64(t.Nanosecond() / 1e6)},
 					"zona_waktu":        &String{Value: zoneStr},
+				},
+				Order: []string{
+					"tahun", "bulan", "nama_bulan", "hari", "nama_hari",
+					"hari_dalam_minggu", "iso_hari", "jam", "menit",
+					"detik", "milidetik", "zona_waktu",
 				},
 			}
 		},
@@ -436,6 +442,9 @@ func initStdlibWaktu(env *Environment) {
 					"menit":       &Integer{Value: minutes},
 					"detik":       &Integer{Value: seconds},
 					"milidetik":   &Integer{Value: remMs},
+				},
+				Order: []string{
+					"total_ms", "total_detik", "hari", "jam", "menit", "detik", "milidetik",
 				},
 			}
 		},
