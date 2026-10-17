@@ -643,4 +643,97 @@ func TestVM_ReaktifDanPengamat(t *testing.T) {
 	}
 }
 
+func TestVM_Channel_UniversalAndIndonesian(t *testing.T) {
+	codeIndo := `
+	buat ch = Saluran(2)
+	ch.kirim(123)
+	buat val = ch.terima()
+	buat p = ch.panjang
+	buat k = ch.kapasitas
+	ch.tutup()
+	[val, p, k]
+	`
+	res, _, _ := runVM(t, codeIndo)
+	arr := res.(*evaluator.Array)
+	if arr.Elements[0].(*evaluator.Integer).Value != 123 ||
+		arr.Elements[1].(*evaluator.Integer).Value != 0 ||
+		arr.Elements[2].(*evaluator.Integer).Value != 2 {
+		t.Fatalf("unexpected channel result in VM: %s", arr.Inspect())
+	}
+
+	codeUniv := `
+	"use universal"
+	let ch = Channel(2)
+	ch.send(456)
+	let val = ch.recv()
+	let p = ch.length
+	let k = ch.capacity
+	ch.close()
+	[val, p, k]
+	`
+	resUniv, _, _ := runVM(t, codeUniv)
+	arrUniv := resUniv.(*evaluator.Array)
+	if arrUniv.Elements[0].(*evaluator.Integer).Value != 456 ||
+		arrUniv.Elements[1].(*evaluator.Integer).Value != 0 ||
+		arrUniv.Elements[2].(*evaluator.Integer).Value != 2 {
+		t.Fatalf("unexpected universal channel result in VM: %s", arrUniv.Inspect())
+	}
+}
+
+func TestVM_Ticket_UniversalAndIndonesian(t *testing.T) {
+	codeIndo := `
+	buat t1 = titip 789
+	buat r = t1.jemput()
+	buat s = t1.selesai
+	[r, s]
+	`
+	res, _, _ := runVM(t, codeIndo)
+	arr := res.(*evaluator.Array)
+	if arr.Elements[0].(*evaluator.Integer).Value != 789 ||
+		!arr.Elements[1].(*evaluator.Boolean).Value {
+		t.Fatalf("unexpected ticket result in VM: %s", arr.Inspect())
+	}
+
+	codeUniv := `
+	"use universal"
+	let t1 = spawn 321
+	let r = t1.await()
+	let s = t1.done
+	[r, s]
+	`
+	resUniv, _, _ := runVM(t, codeUniv)
+	arrUniv := resUniv.(*evaluator.Array)
+	if arrUniv.Elements[0].(*evaluator.Integer).Value != 321 ||
+		!arrUniv.Elements[1].(*evaluator.Boolean).Value {
+		t.Fatalf("unexpected universal ticket result in VM: %s", arrUniv.Inspect())
+	}
+}
+
+func TestVM_MapAndStruct_StringIndexAssignment(t *testing.T) {
+	code := `
+	bentuk Pengguna {
+		nama: Teks
+	}
+	buat user = Pengguna("Awal")
+	user["nama"] = "Budi"
+
+	buat data = {}
+	buat k = "kunci"
+	data[k] = 999
+	[user["nama"], data["kunci"]]
+	`
+	res, _, _ := runVM(t, code)
+	arr, ok := res.(*evaluator.Array)
+	if !ok {
+		t.Fatalf("expected array, got %s", res.Inspect())
+	}
+	if arr.Elements[0].(*evaluator.String).Value != "Budi" {
+		t.Errorf("expected user['nama'] = 'Budi', got %v", arr.Elements[0])
+	}
+	if arr.Elements[1].(*evaluator.Integer).Value != 999 {
+		t.Errorf("expected data['kunci'] = 999, got %v", arr.Elements[1])
+	}
+}
+
+
 

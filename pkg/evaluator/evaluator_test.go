@@ -2230,3 +2230,96 @@ func TestEvaluator_MapMethods_WithoutInitialOrder(t *testing.T) {
 		t.Fatalf("expected 12 keys/length/size, got %d, %d, %d", kLen, pLen, uLen)
 	}
 }
+
+func TestEvaluator_FloatNaturalSort(t *testing.T) {
+	code := `
+	buat arr = [0.9, 0.1, 0.5, 0.2]
+	buat diurut = arr.urutkan()
+	[diurut[0], diurut[1], diurut[2], diurut[3]]
+	`
+	res := testEvalSource(t, code)
+	arr, ok := res.(*evaluator.Array)
+	if !ok {
+		t.Fatalf("expected array, got %s", res.Inspect())
+	}
+	v0 := arr.Elements[0].(*evaluator.Float).Value
+	v1 := arr.Elements[1].(*evaluator.Float).Value
+	v2 := arr.Elements[2].(*evaluator.Float).Value
+	v3 := arr.Elements[3].(*evaluator.Float).Value
+	if v0 != 0.1 || v1 != 0.2 || v2 != 0.5 || v3 != 0.9 {
+		t.Errorf("expected sorted floats [0.1, 0.2, 0.5, 0.9], got [%v, %v, %v, %v]", v0, v1, v2, v3)
+	}
+}
+
+func TestEvaluator_Rentang_StrictIntegers(t *testing.T) {
+	code := `rentang(1.5, 3.5)`
+	res := testEvalSource(t, code)
+	if _, ok := res.(*evaluator.Error); !ok {
+		t.Fatalf("expected error passing floats to rentang(), got %s", res.Inspect())
+	}
+}
+
+func TestEvaluator_SafeNavigationParity(t *testing.T) {
+	code := `
+	buat arr = [10, 20, 30]
+	buat mp = {"nama": "Celang"}
+	buat teks = "Halo"
+	buat objKosong = null
+
+	buat pArr = arr?.panjang
+	arr?.tambah(40)
+	buat pArr2 = arr?.panjang
+	buat kMp = mp?.kunci()
+	buat ch0 = teks?.[0]
+
+	buat pNull = objKosong?.panjang
+	buat mNull = objKosong?.kunci()
+
+	[pArr, pArr2, kMp.panjang, ch0, pNull == null, mNull == null]
+	`
+	res := testEvalSource(t, code)
+	arr, ok := res.(*evaluator.Array)
+	if !ok {
+		t.Fatalf("expected array, got %s", res.Inspect())
+	}
+	if arr.Elements[0].(*evaluator.Integer).Value != 3 {
+		t.Errorf("expected arr?.panjang == 3, got %v", arr.Elements[0])
+	}
+	if arr.Elements[1].(*evaluator.Integer).Value != 4 {
+		t.Errorf("expected arr?.panjang after push == 4, got %v", arr.Elements[1])
+	}
+	if arr.Elements[2].(*evaluator.Integer).Value != 1 {
+		t.Errorf("expected mp?.kunci().panjang == 1, got %v", arr.Elements[2])
+	}
+	if arr.Elements[3].(*evaluator.String).Value != "H" {
+		t.Errorf("expected teks?.[0] == 'H', got %v", arr.Elements[3])
+	}
+	if !arr.Elements[4].(*evaluator.Boolean).Value {
+		t.Errorf("expected objKosong?.panjang == null, got %v", arr.Elements[4])
+	}
+	if !arr.Elements[5].(*evaluator.Boolean).Value {
+		t.Errorf("expected objKosong?.kunci() == null, got %v", arr.Elements[5])
+	}
+}
+
+func TestEvaluator_SliceBounds_Validation(t *testing.T) {
+	// 1. Array slicing with invalid non-integer bound
+	resArr := testEvalSource(t, `buat a = [1, 2, 3]; a["satu"..2]`)
+	if _, ok := resArr.(*evaluator.Error); !ok {
+		t.Fatalf("expected error for non-integer array slice bound, got %s", resArr.Inspect())
+	}
+
+	// 2. String slicing with invalid non-integer bound
+	resStr := testEvalSource(t, `buat s = "halo"; s[0.."dua"]`)
+	if _, ok := resStr.(*evaluator.Error); !ok {
+		t.Fatalf("expected error for non-integer string slice bound, got %s", resStr.Inspect())
+	}
+
+	// 3. potong/slice method with non-integer arg
+	resPotong := testEvalSource(t, `buat a = [1, 2, 3]; a.potong("bukan_angka")`)
+	if _, ok := resPotong.(*evaluator.Error); !ok {
+		t.Fatalf("expected error for non-integer potong argument, got %s", resPotong.Inspect())
+	}
+}
+
+

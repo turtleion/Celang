@@ -695,6 +695,9 @@ func (vm *VM) evalIndex(targetObj, indexObj evaluator.Object) (evaluator.Object,
 
 	case *evaluator.StructInstance:
 		key := indexObj.Inspect()
+		if s, ok := indexObj.(*evaluator.String); ok {
+			key = s.Value
+		}
 		if val, exists := obj.Fields[key]; exists {
 			return val, nil
 		}
@@ -717,31 +720,49 @@ func (vm *VM) evalIndex(targetObj, indexObj evaluator.Object) (evaluator.Object,
 		if s, ok := indexObj.(*evaluator.String); ok {
 			key = s.Value
 		}
+		if vm.env != nil && vm.env.IsUniversal {
+			switch key {
+			case "kirim":
+				return nil, fmt.Errorf("Indonesian method 'kirim' is not allowed in Universal Mode. Use '.send(data)' instead.")
+			case "terima":
+				return nil, fmt.Errorf("Indonesian method 'terima' is not allowed in Universal Mode. Use '.receive()' or '.recv()' instead.")
+			case "tutup":
+				return nil, fmt.Errorf("Indonesian method 'tutup' is not allowed in Universal Mode. Use '.close()' instead.")
+			case "panjang":
+				return nil, fmt.Errorf("Indonesian property 'panjang' is not allowed in Universal Mode. Use '.length' or '.len' instead.")
+			case "kapasitas":
+				return nil, fmt.Errorf("Indonesian property 'kapasitas' is not allowed in Universal Mode. Use '.capacity' or '.cap' instead.")
+			}
+		}
 		switch key {
-		case "kirim":
+		case "kirim", "send":
 			return &evaluator.Builtin{
 				Fn: func(args ...evaluator.Object) evaluator.Object {
 					if len(args) == 0 {
-						return &evaluator.Error{Message: "kirim() membutuhkan 1 argumen data"}
+						msg := "Metode kirim() membutuhkan 1 argumen data"
+						if vm.env != nil && vm.env.IsUniversal {
+							msg = "Method send() requires 1 data argument"
+						}
+						return &evaluator.Error{Message: msg}
 					}
 					return obj.Send(args[0], nil)
 				},
 			}, nil
-		case "terima":
+		case "terima", "receive", "recv":
 			return &evaluator.Builtin{
 				Fn: func(args ...evaluator.Object) evaluator.Object {
 					return obj.Receive(0)
 				},
 			}, nil
-		case "tutup":
+		case "tutup", "close":
 			return &evaluator.Builtin{
 				Fn: func(args ...evaluator.Object) evaluator.Object {
 					return obj.Close()
 				},
 			}, nil
-		case "panjang":
+		case "panjang", "length", "len":
 			return &evaluator.Integer{Value: int64(len(obj.Ch))}, nil
-		case "kapasitas":
+		case "kapasitas", "capacity", "cap":
 			return &evaluator.Integer{Value: int64(obj.Capacity)}, nil
 		}
 		return &evaluator.Null{}, nil
@@ -751,8 +772,23 @@ func (vm *VM) evalIndex(targetObj, indexObj evaluator.Object) (evaluator.Object,
 		if s, ok := indexObj.(*evaluator.String); ok {
 			key = s.Value
 		}
+		if vm.env != nil && vm.env.IsUniversal {
+			switch key {
+			case "selesai":
+				return nil, fmt.Errorf("Indonesian property 'selesai' is not allowed in Universal Mode. Use '.done' instead.")
+			case "hasil":
+				return nil, fmt.Errorf("Indonesian property 'hasil' is not allowed in Universal Mode. Use '.result' instead.")
+			case "jemput":
+				return nil, fmt.Errorf("Indonesian method 'jemput' is not allowed in Universal Mode. Use '.await()' instead.")
+			}
+		}
 		switch key {
-		case "hasil", "jemput":
+		case "selesai", "done":
+			if obj.IsDone() {
+				return evaluator.TRUE, nil
+			}
+			return evaluator.FALSE, nil
+		case "hasil", "result", "jemput", "await":
 			return &evaluator.Builtin{
 				Fn: func(args ...evaluator.Object) evaluator.Object {
 					return obj.Await(0, nil)
@@ -809,6 +845,9 @@ func (vm *VM) evalSetIndex(targetObj, indexObj, val evaluator.Object) error {
 
 	case *evaluator.Map:
 		key := indexObj.Inspect()
+		if s, ok := indexObj.(*evaluator.String); ok {
+			key = s.Value
+		}
 		obj.Pairs[key] = val
 		found := false
 		for _, k := range obj.Order {
@@ -824,6 +863,9 @@ func (vm *VM) evalSetIndex(targetObj, indexObj, val evaluator.Object) error {
 
 	case *evaluator.StructInstance:
 		key := indexObj.Inspect()
+		if s, ok := indexObj.(*evaluator.String); ok {
+			key = s.Value
+		}
 		obj.Fields[key] = val
 		return nil
 

@@ -59,10 +59,10 @@ func EvalArrayMethod(arr *Array, method string, env *Environment, meta *uast.Nod
 			return newError(meta, fmt.Sprintf("Indonesian method '%s' is not allowed in Universal Mode.", method), "Use '.unshift(...)' instead."), true
 		case "hapus_indeks":
 			return newError(meta, "Indonesian method 'hapus_indeks' is not allowed in Universal Mode.", "Use '.remove_at(index)' instead."), true
-		case "balik":
-			return newError(meta, "Indonesian method 'balik' is not allowed in Universal Mode.", "Use '.reverse()' instead."), true
-		case "urut":
-			return newError(meta, "Indonesian method 'urut' is not allowed in Universal Mode.", "Use '.sort()' instead."), true
+		case "balik", "balikkan":
+			return newError(meta, fmt.Sprintf("Indonesian method '%s' is not allowed in Universal Mode.", method), "Use '.reverse()' instead."), true
+		case "urut", "urutkan":
+			return newError(meta, fmt.Sprintf("Indonesian method '%s' is not allowed in Universal Mode.", method), "Use '.sort()' instead."), true
 		case "gabung":
 			return newError(meta, "Indonesian method 'gabung' is not allowed in Universal Mode.", "Use '.join(separator)' instead."), true
 		case "berisi":
@@ -173,7 +173,7 @@ func EvalArrayMethod(arr *Array, method string, env *Environment, meta *uast.Nod
 			},
 		}, true
 
-	case "balik", "reverse":
+	case "balik", "balikkan", "reverse":
 		return &Builtin{
 			Fn: func(args ...Object) Object {
 				for i, j := 0, len(arr.Elements)-1; i < j; i, j = i+1, j-1 {
@@ -183,7 +183,7 @@ func EvalArrayMethod(arr *Array, method string, env *Environment, meta *uast.Nod
 			},
 		}, true
 
-	case "urut", "sort":
+	case "urut", "urutkan", "sort":
 		return &Builtin{
 			Fn: func(args ...Object) Object {
 				if len(args) > 0 && (args[0].Type() == FUNCTION_OBJ || args[0].Type() == BUILTIN_OBJ) {
@@ -216,10 +216,13 @@ func EvalArrayMethod(arr *Array, method string, env *Environment, meta *uast.Nod
 				sort.SliceStable(arr.Elements, func(i, j int) bool {
 					elA := arr.Elements[i]
 					elB := arr.Elements[j]
-					numA, _, _, okA := CoerceToNumeric(elA)
-					numB, _, _, okB := CoerceToNumeric(elB)
+					iA, fA, isIntA, okA := CoerceToNumeric(elA)
+					iB, fB, isIntB, okB := CoerceToNumeric(elB)
 					if okA && okB {
-						return numA < numB
+						if isIntA && isIntB {
+							return iA < iB
+						}
+						return fA < fB
 					}
 					if sA, ok := elA.(*String); ok {
 						if sB, ok := elB.(*String); ok {
@@ -303,15 +306,25 @@ func EvalArrayMethod(arr *Array, method string, env *Environment, meta *uast.Nod
 				end := n
 				if len(args) > 0 {
 					sVal, _, isInt, ok := CoerceToNumeric(args[0])
-					if ok && isInt {
-						start = int(sVal)
+					if !ok || !isInt {
+						msg := "Indeks awal potong/slice harus berupa bilangan bulat"
+						if isUniversal {
+							msg = "Start index for slice must be an integer"
+						}
+						return newError(meta, msg, "")
 					}
+					start = int(sVal)
 				}
 				if len(args) > 1 {
 					eVal, _, isInt, ok := CoerceToNumeric(args[1])
-					if ok && isInt {
-						end = int(eVal)
+					if !ok || !isInt {
+						msg := "Indeks akhir potong/slice harus berupa bilangan bulat"
+						if isUniversal {
+							msg = "End index for slice must be an integer"
+						}
+						return newError(meta, msg, "")
 					}
+					end = int(eVal)
 				}
 				if start < 0 {
 					start = n + start

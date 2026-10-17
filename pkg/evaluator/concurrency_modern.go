@@ -26,6 +26,12 @@ func NewTicket() *Ticket {
 
 func (t *Ticket) Type() ObjectType { return TICKET_OBJ }
 
+func (t *Ticket) IsDone() bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.isDone
+}
+
 func (t *Ticket) Inspect() string {
 	t.mu.Lock()
 	defer t.mu.Unlock()

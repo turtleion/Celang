@@ -1019,295 +1019,8 @@ func Eval(node uast.Node, env *Environment) Object {
 		if n.Safe && (obj == NULL || obj == nil) {
 			return NULL
 		}
+		return evalMemberAccess(obj, n, env)
 
-		// 1. Array index access, slicing, or built-in methods (arr.push, arr.pop, arr.insert, etc.)
-		if arr, ok := obj.(*Array); ok {
-			propName := n.Property
-			if n.Computed && n.PropertyExpr != nil {
-				pObj := Eval(n.PropertyExpr, env)
-				if !isError(pObj) {
-					if s, ok := pObj.(*String); ok {
-						propName = s.Value
-					}
-				}
-			}
-			if methodObj, ok := EvalArrayMethod(arr, propName, env, n.GetMetadata()); ok {
-				return methodObj
-			}
-			if rng, isRng := n.PropertyExpr.(*uast.RangeExpression); isRng {
-				return evalArraySlice(arr, rng, env, n.GetMetadata())
-			}
-			var intIdx int64
-			var hasInt bool
-			if n.Computed && n.PropertyExpr != nil {
-				idxObj := Eval(n.PropertyExpr, env)
-				if iVal, _, isInt, ok := CoerceToNumeric(idxObj); ok && isInt {
-					intIdx = iVal
-					hasInt = true
-				}
-			} else if parsed, err := strconv.ParseInt(n.Property, 10, 64); err == nil {
-				intIdx = parsed
-				hasInt = true
-			} else {
-				idxObj := Eval(uast.NewIdentifier(n.Property), env)
-				if iVal, _, isInt, ok := CoerceToNumeric(idxObj); ok && isInt {
-					intIdx = iVal
-					hasInt = true
-				}
-			}
-			if hasInt {
-				if intIdx >= 0 && int(intIdx) < len(arr.Elements) {
-					return arr.Elements[intIdx]
-				}
-				return newError(n.GetMetadata(), fmt.Sprintf("Indeks array %d di luar jangkauan (panjang: %d)", intIdx, len(arr.Elements)), "Gunakan indeks yang valid antara 0 hingga panjang array - 1.")
-			}
-		}
-
-		// 1b. String index access and slicing (e.g. str[0] or str[0..2])
-		if str, ok := obj.(*String); ok {
-			if rng, isRng := n.PropertyExpr.(*uast.RangeExpression); isRng {
-				return evalStringSlice(str, rng, env, n.GetMetadata())
-			}
-			var intIdx int64
-			var hasInt bool
-			if n.Computed && n.PropertyExpr != nil {
-				idxObj := Eval(n.PropertyExpr, env)
-				if iVal, _, isInt, ok := CoerceToNumeric(idxObj); ok && isInt {
-					intIdx = iVal
-					hasInt = true
-				}
-			} else if parsed, err := strconv.ParseInt(n.Property, 10, 64); err == nil {
-				intIdx = parsed
-				hasInt = true
-			}
-			if hasInt {
-				runes := []rune(str.Value)
-				if intIdx >= 0 && int(intIdx) < len(runes) {
-					return &String{Value: string(runes[intIdx])}
-				}
-				return newError(n.GetMetadata(), fmt.Sprintf("Indeks teks %d di luar jangkauan (panjang: %d)", intIdx, len(runes)), "")
-			}
-		}
-
-		// 2. Struct instance field or method access
-		if inst, ok := obj.(*StructInstance); ok {
-			prop := n.Property
-			if n.Computed && n.PropertyExpr != nil {
-				keyObj := Eval(n.PropertyExpr, env)
-				if isError(keyObj) {
-					return keyObj
-				}
-				if s, ok := keyObj.(*String); ok {
-					prop = s.Value
-				} else {
-					prop = keyObj.Inspect()
-				}
-			}
-			if val, exists := inst.Fields[prop]; exists {
-				if inst.Def.PrivateFields[prop] && !isInternalAccess(inst, env) {
-					return newError(n.GetMetadata(),
-						fmt.Sprintf("Properti '%s' bersifat privat pada bentuk '%s' dan tidak dapat diakses dari luar", prop, inst.Def.Name),
-						"Akses hanya diperbolehkan dari dalam metode bentuk menggunakan 'diri' atau '@'.")
-				}
-				return val
-			}
-			if method, exists := inst.Def.Methods[prop]; exists {
-				if inst.Def.PrivateMethods[prop] && !isInternalAccess(inst, env) {
-					return newError(n.GetMetadata(),
-						fmt.Sprintf("Metode '%s' bersifat privat pada bentuk '%s' dan tidak dapat dipanggil dari luar", prop, inst.Def.Name),
-						"Metode privat hanya dapat dipanggil secara internal dari dalam metode bentuk.")
-				}
-				boundEnv := NewEnclosedEnvironment(method.Env)
-				boundEnv.Define("diri", inst, false, inst.Def.Name)
-				boundEnv.Define("this", inst, false, inst.Def.Name)
-				boundEnv.Define("self", inst, false, inst.Def.Name)
-				return &Function{
-					Name:       method.Name,
-					Parameters: method.Parameters,
-					Body:       method.Body,
-					Env:        boundEnv,
-				}
-			}
-		}
-
-		// 3. Map property access and built-in methods (mp.keys, mp.values, mp.get, etc.)
-		if mp, ok := obj.(*Map); ok {
-			key := n.Property
-			if n.Computed && n.PropertyExpr != nil {
-				keyObj := Eval(n.PropertyExpr, env)
-				if isError(keyObj) {
-					return keyObj
-				}
-				if s, ok := keyObj.(*String); ok {
-					key = s.Value
-				} else {
-					key = keyObj.Inspect()
-				}
-			}
-			if val, exists := mp.Pairs[key]; exists {
-				return val
-			}
-			if methodObj, ok := EvalMapMethod(mp, key, env, n.GetMetadata()); ok {
-				return methodObj
-			}
-		}
-
-		// 3b. Channel member access
-		if ch, ok := obj.(*Channel); ok {
-			if env.IsUniversal {
-				switch n.Property {
-				case "kirim":
-					return newError(n.GetMetadata(), "Indonesian method 'kirim' is not allowed in Universal Mode.", "Use '.send(data)' instead.")
-				case "terima":
-					return newError(n.GetMetadata(), "Indonesian method 'terima' is not allowed in Universal Mode.", "Use '.receive()' or '.recv()' instead.")
-				case "tutup":
-					return newError(n.GetMetadata(), "Indonesian method 'tutup' is not allowed in Universal Mode.", "Use '.close()' instead.")
-				case "panjang":
-					return newError(n.GetMetadata(), "Indonesian property 'panjang' is not allowed in Universal Mode.", "Use '.length' or '.len' instead.")
-				case "kapasitas":
-					return newError(n.GetMetadata(), "Indonesian property 'kapasitas' is not allowed in Universal Mode.", "Use '.capacity' or '.cap' instead.")
-				}
-			}
-			switch n.Property {
-			case "kirim", "send":
-				return &Builtin{
-					Fn: func(args ...Object) Object {
-						if len(args) == 0 {
-							msg := "Metode kirim() membutuhkan 1 argumen data"
-							hint := "Contoh: saluran.kirim(data)"
-							if env.IsUniversal {
-								msg = "Method send() requires 1 data argument"
-								hint = "Example: channel.send(data)"
-							}
-							return newError(n.GetMetadata(), msg, hint)
-						}
-						return ch.Send(args[0], n.GetMetadata())
-					},
-				}
-			case "terima", "receive", "recv":
-				return &Builtin{
-					Fn: func(args ...Object) Object {
-						var to time.Duration = 0
-						if len(args) > 0 {
-							to = parseTimeoutValue(args[0])
-						}
-						return ch.Receive(to)
-					},
-				}
-			case "tutup", "close":
-				return &Builtin{
-					Fn: func(args ...Object) Object {
-						return ch.Close()
-					},
-				}
-			case "panjang", "length", "len":
-				return &Integer{Value: int64(len(ch.Ch))}
-			case "kapasitas", "capacity", "cap":
-				return &Integer{Value: int64(ch.Capacity)}
-			}
-		}
-
-		// 3c. Ticket member access
-		if t, ok := obj.(*Ticket); ok {
-			if env.IsUniversal {
-				switch n.Property {
-				case "selesai":
-					return newError(n.GetMetadata(), "Indonesian property 'selesai' is not allowed in Universal Mode.", "Use '.done' instead.")
-				case "hasil":
-					return newError(n.GetMetadata(), "Indonesian property 'hasil' is not allowed in Universal Mode.", "Use '.result' instead.")
-				case "jemput":
-					return newError(n.GetMetadata(), "Indonesian method 'jemput' is not allowed in Universal Mode.", "Use '.await()' instead.")
-				}
-			}
-			switch n.Property {
-			case "selesai", "done":
-				t.mu.Lock()
-				done := t.isDone
-				t.mu.Unlock()
-				return nativeBool(done)
-			case "hasil", "result", "jemput", "await":
-				return &Builtin{
-					Fn: func(args ...Object) Object {
-						var to time.Duration = 0
-						if len(args) > 0 {
-							to = parseTimeoutValue(args[0])
-						}
-						return t.Await(to, n.GetMetadata())
-					},
-				}
-			}
-		}
-
-		// 3d. Numeric cultural, nominal, terbilang, data size & duration helpers (e.g. 50.ribu, 3.detik, 10.mb, 15000.rupiah, 50000.terbilang, 50.k, 25.usd)
-		numProp := n.Property
-		if n.Computed && n.PropertyExpr != nil {
-			pObj := Eval(n.PropertyExpr, env)
-			if !isError(pObj) {
-				if s, ok := pObj.(*String); ok {
-					numProp = s.Value
-				} else {
-					numProp = pObj.Inspect()
-				}
-			}
-		}
-		if res, ok := EvalNumericMemberWithEnv(obj, numProp, env); ok {
-			return res
-		}
-
-		// 4. Time-Travel Variable access fallback (e.g. x.sebelumnya, x.awal, x.histori, x.previous, x.initial, x.history)
-		if id, ok := n.Object.(*uast.Identifier); ok {
-			entry, exists := env.GetEntry(id.Name)
-			if exists {
-				if env.IsUniversal {
-					switch n.Property {
-					case "sebelumnya":
-						return newError(n.GetMetadata(), "Indonesian property '.sebelumnya' is not allowed in Universal Mode.", "Use '.previous' or '.prev' instead.")
-					case "awal":
-						return newError(n.GetMetadata(), "Indonesian property '.awal' is not allowed in Universal Mode.", "Use '.initial' instead.")
-					case "histori":
-						return newError(n.GetMetadata(), "Indonesian property '.histori' is not allowed in Universal Mode.", "Use '.history' instead.")
-					}
-				}
-				switch n.Property {
-				case "sebelumnya", "prev", "previous":
-					prev, hasPrev := entry.Previous()
-					if !hasPrev {
-						return NULL
-					}
-					return prev
-				case "awal", "initial", "first":
-					return entry.Initial()
-				case "histori", "history":
-					arr := &Array{Elements: make([]Object, len(entry.History))}
-					copy(arr.Elements, entry.History)
-					return arr
-				}
-			}
-		}
-
-		// 5. Missing property on Map returns NULL
-		if _, ok := obj.(*Map); ok {
-			return NULL
-		}
-
-		// 6. Missing property on Struct reports friendly error
-		if inst, ok := obj.(*StructInstance); ok {
-			msg := fmt.Sprintf("Properti atau fungsi '%s' tidak ditemukan pada bentuk '%s'", n.Property, inst.Def.Name)
-			hint := "Pastikan nama field atau fungsi dieja dengan benar."
-			if env.IsUniversal {
-				msg = fmt.Sprintf("Property or method '%s' not found on struct '%s'", n.Property, inst.Def.Name)
-				hint = "Ensure the field or method name is spelled correctly."
-			}
-			return newError(n.GetMetadata(), msg, hint)
-		}
-
-		msg := fmt.Sprintf("Properti '%s' tidak ditemukan pada objek", n.Property)
-		hint := "Pastikan properti yang diakses valid."
-		if env.IsUniversal {
-			msg = fmt.Sprintf("Property '%s' not found on object", n.Property)
-			hint = "Ensure the accessed property exists and is valid."
-		}
-		return newError(n.GetMetadata(), msg, hint)
 
 	case *uast.BinaryExpression:
 		if n.Operator == "|>" {
@@ -1442,6 +1155,9 @@ func Eval(node uast.Node, env *Environment) Object {
 		callee := Eval(n.Callee, env)
 		if isError(callee) {
 			return callee
+		}
+		if mem, ok := n.Callee.(*uast.MemberExpression); ok && mem.Safe && (callee == NULL || callee == nil) {
+			return NULL
 		}
 		if fn, ok := callee.(*Function); ok {
 			return applyFunctionWithASTArgs(fn, n.Arguments, env, n.GetMetadata(), n.TypeArguments)
@@ -2124,6 +1840,294 @@ func applyFunctionWithASTArgs(fn *Function, argNodes []uast.Expression, callerEn
 	return res
 }
 
+func evalMemberAccess(obj Object, n *uast.MemberExpression, env *Environment) Object {
+	// 1. Array index access, slicing, or built-in methods (arr.push, arr.pop, arr.insert, etc.)
+	if arr, ok := obj.(*Array); ok {
+		propName := n.Property
+		if n.Computed && n.PropertyExpr != nil {
+			pObj := Eval(n.PropertyExpr, env)
+			if !isError(pObj) {
+				if s, ok := pObj.(*String); ok {
+					propName = s.Value
+				}
+			}
+		}
+		if methodObj, ok := EvalArrayMethod(arr, propName, env, n.GetMetadata()); ok {
+			return methodObj
+		}
+		if rng, isRng := n.PropertyExpr.(*uast.RangeExpression); isRng {
+			return evalArraySlice(arr, rng, env, n.GetMetadata())
+		}
+		var intIdx int64
+		var hasInt bool
+		if n.Computed && n.PropertyExpr != nil {
+			idxObj := Eval(n.PropertyExpr, env)
+			if iVal, _, isInt, ok := CoerceToNumeric(idxObj); ok && isInt {
+				intIdx = iVal
+				hasInt = true
+			}
+		} else if parsed, err := strconv.ParseInt(n.Property, 10, 64); err == nil {
+			intIdx = parsed
+			hasInt = true
+		} else {
+			idxObj := Eval(uast.NewIdentifier(n.Property), env)
+			if iVal, _, isInt, ok := CoerceToNumeric(idxObj); ok && isInt {
+				intIdx = iVal
+				hasInt = true
+			}
+		}
+		if hasInt {
+			if intIdx >= 0 && int(intIdx) < len(arr.Elements) {
+				return arr.Elements[intIdx]
+			}
+			return newError(n.GetMetadata(), fmt.Sprintf("Indeks array %d di luar jangkauan (panjang: %d)", intIdx, len(arr.Elements)), "Gunakan indeks yang valid antara 0 hingga panjang array - 1.")
+		}
+	}
+
+	// 1b. String index access and slicing (e.g. str[0] or str[0..2])
+	if str, ok := obj.(*String); ok {
+		if rng, isRng := n.PropertyExpr.(*uast.RangeExpression); isRng {
+			return evalStringSlice(str, rng, env, n.GetMetadata())
+		}
+		var intIdx int64
+		var hasInt bool
+		if n.Computed && n.PropertyExpr != nil {
+			idxObj := Eval(n.PropertyExpr, env)
+			if iVal, _, isInt, ok := CoerceToNumeric(idxObj); ok && isInt {
+				intIdx = iVal
+				hasInt = true
+			}
+		} else if parsed, err := strconv.ParseInt(n.Property, 10, 64); err == nil {
+			intIdx = parsed
+			hasInt = true
+		}
+		if hasInt {
+			runes := []rune(str.Value)
+			if intIdx >= 0 && int(intIdx) < len(runes) {
+				return &String{Value: string(runes[intIdx])}
+			}
+			return newError(n.GetMetadata(), fmt.Sprintf("Indeks teks %d di luar jangkauan (panjang: %d)", intIdx, len(runes)), "")
+		}
+	}
+
+	// 2. Struct instance field or method access
+	if inst, ok := obj.(*StructInstance); ok {
+		prop := n.Property
+		if n.Computed && n.PropertyExpr != nil {
+			keyObj := Eval(n.PropertyExpr, env)
+			if isError(keyObj) {
+				return keyObj
+			}
+			if s, ok := keyObj.(*String); ok {
+				prop = s.Value
+			} else {
+				prop = keyObj.Inspect()
+			}
+		}
+		if val, exists := inst.Fields[prop]; exists {
+			if inst.Def.PrivateFields[prop] && !isInternalAccess(inst, env) {
+				return newError(n.GetMetadata(),
+					fmt.Sprintf("Properti '%s' bersifat privat pada bentuk '%s' dan tidak dapat diakses dari luar", prop, inst.Def.Name),
+					"Akses hanya diperbolehkan dari dalam metode bentuk menggunakan 'diri' atau '@'.")
+			}
+			return val
+		}
+		if method, exists := inst.Def.Methods[prop]; exists {
+			if inst.Def.PrivateMethods[prop] && !isInternalAccess(inst, env) {
+				return newError(n.GetMetadata(),
+					fmt.Sprintf("Metode '%s' bersifat privat pada bentuk '%s' dan tidak dapat dipanggil dari luar", prop, inst.Def.Name),
+					"Metode privat hanya dapat dipanggil secara internal dari dalam metode bentuk.")
+			}
+			boundEnv := NewEnclosedEnvironment(method.Env)
+			boundEnv.Define("diri", inst, false, inst.Def.Name)
+			boundEnv.Define("this", inst, false, inst.Def.Name)
+			boundEnv.Define("self", inst, false, inst.Def.Name)
+			return &Function{
+				Name:       method.Name,
+				Parameters: method.Parameters,
+				Body:       method.Body,
+				Env:        boundEnv,
+			}
+		}
+	}
+
+	// 3. Map property access and built-in methods (mp.keys, mp.values, mp.get, etc.)
+	if mp, ok := obj.(*Map); ok {
+		key := n.Property
+		if n.Computed && n.PropertyExpr != nil {
+			keyObj := Eval(n.PropertyExpr, env)
+			if isError(keyObj) {
+				return keyObj
+			}
+			if s, ok := keyObj.(*String); ok {
+				key = s.Value
+			} else {
+				key = keyObj.Inspect()
+			}
+		}
+		if val, exists := mp.Pairs[key]; exists {
+			return val
+		}
+		if methodObj, ok := EvalMapMethod(mp, key, env, n.GetMetadata()); ok {
+			return methodObj
+		}
+	}
+
+	// 3b. Channel member access
+	if ch, ok := obj.(*Channel); ok {
+		if env.IsUniversal {
+			switch n.Property {
+			case "kirim":
+				return newError(n.GetMetadata(), "Indonesian method 'kirim' is not allowed in Universal Mode.", "Use '.send(data)' instead.")
+			case "terima":
+				return newError(n.GetMetadata(), "Indonesian method 'terima' is not allowed in Universal Mode.", "Use '.receive()' or '.recv()' instead.")
+			case "tutup":
+				return newError(n.GetMetadata(), "Indonesian method 'tutup' is not allowed in Universal Mode.", "Use '.close()' instead.")
+			case "panjang":
+				return newError(n.GetMetadata(), "Indonesian property 'panjang' is not allowed in Universal Mode.", "Use '.length' or '.len' instead.")
+			case "kapasitas":
+				return newError(n.GetMetadata(), "Indonesian property 'kapasitas' is not allowed in Universal Mode.", "Use '.capacity' or '.cap' instead.")
+			}
+		}
+		switch n.Property {
+		case "kirim", "send":
+			return &Builtin{
+				Fn: func(args ...Object) Object {
+					if len(args) == 0 {
+						msg := "Metode kirim() membutuhkan 1 argumen data"
+						hint := "Contoh: saluran.kirim(data)"
+						if env.IsUniversal {
+							msg = "Method send() requires 1 data argument"
+							hint = "Example: channel.send(data)"
+						}
+						return newError(n.GetMetadata(), msg, hint)
+					}
+					return ch.Send(args[0], n.GetMetadata())
+				},
+			}
+		case "terima", "receive", "recv":
+			return &Builtin{
+				Fn: func(args ...Object) Object {
+					var to time.Duration = 0
+					if len(args) > 0 {
+						to = parseTimeoutValue(args[0])
+					}
+					return ch.Receive(to)
+				},
+			}
+		case "tutup", "close":
+			return &Builtin{
+				Fn: func(args ...Object) Object {
+					return ch.Close()
+				},
+			}
+		case "panjang", "length", "len":
+			return &Integer{Value: int64(len(ch.Ch))}
+		case "kapasitas", "capacity", "cap":
+			return &Integer{Value: int64(ch.Capacity)}
+		}
+	}
+
+	// 3c. Ticket member access
+	if t, ok := obj.(*Ticket); ok {
+		if env.IsUniversal {
+			switch n.Property {
+			case "selesai":
+				return newError(n.GetMetadata(), "Indonesian property 'selesai' is not allowed in Universal Mode.", "Use '.done' instead.")
+			case "hasil":
+				return newError(n.GetMetadata(), "Indonesian property 'hasil' is not allowed in Universal Mode.", "Use '.result' instead.")
+			case "jemput":
+				return newError(n.GetMetadata(), "Indonesian method 'jemput' is not allowed in Universal Mode.", "Use '.await()' instead.")
+			}
+		}
+		switch n.Property {
+		case "selesai", "done":
+			return nativeBool(t.IsDone())
+		case "hasil", "result", "jemput", "await":
+			return &Builtin{
+				Fn: func(args ...Object) Object {
+					var to time.Duration = 0
+					if len(args) > 0 {
+						to = parseTimeoutValue(args[0])
+					}
+					return t.Await(to, n.GetMetadata())
+				},
+			}
+		}
+	}
+
+	// 3d. Numeric cultural, nominal, terbilang, data size & duration helpers (e.g. 50.ribu, 3.detik, 10.mb, 15000.rupiah, 50000.terbilang, 50.k, 25.usd)
+	numProp := n.Property
+	if n.Computed && n.PropertyExpr != nil {
+		pObj := Eval(n.PropertyExpr, env)
+		if !isError(pObj) {
+			if s, ok := pObj.(*String); ok {
+				numProp = s.Value
+			} else {
+				numProp = pObj.Inspect()
+			}
+		}
+	}
+	if res, ok := EvalNumericMemberWithEnv(obj, numProp, env); ok {
+		return res
+	}
+
+	// 4. Time-Travel Variable access fallback (e.g. x.sebelumnya, x.awal, x.histori, x.previous, x.initial, x.history)
+	if id, ok := n.Object.(*uast.Identifier); ok {
+		entry, exists := env.GetEntry(id.Name)
+		if exists {
+			if env.IsUniversal {
+				switch n.Property {
+				case "sebelumnya":
+					return newError(n.GetMetadata(), "Indonesian property '.sebelumnya' is not allowed in Universal Mode.", "Use '.previous' or '.prev' instead.")
+				case "awal":
+					return newError(n.GetMetadata(), "Indonesian property '.awal' is not allowed in Universal Mode.", "Use '.initial' instead.")
+				case "histori":
+					return newError(n.GetMetadata(), "Indonesian property '.histori' is not allowed in Universal Mode.", "Use '.history' instead.")
+				}
+			}
+			switch n.Property {
+			case "sebelumnya", "prev", "previous":
+				prev, hasPrev := entry.Previous()
+				if !hasPrev {
+					return NULL
+				}
+				return prev
+			case "awal", "initial", "first":
+				return entry.Initial()
+			case "histori", "history":
+				arr := &Array{Elements: make([]Object, len(entry.History))}
+				copy(arr.Elements, entry.History)
+				return arr
+			}
+		}
+	}
+
+	// 5. Missing property on Map returns NULL
+	if _, ok := obj.(*Map); ok {
+		return NULL
+	}
+
+	// 6. Missing property on Struct reports friendly error
+	if inst, ok := obj.(*StructInstance); ok {
+		msg := fmt.Sprintf("Properti atau fungsi '%s' tidak ditemukan pada bentuk '%s'", n.Property, inst.Def.Name)
+		hint := "Pastikan nama field atau fungsi dieja dengan benar."
+		if env.IsUniversal {
+			msg = fmt.Sprintf("Property or method '%s' not found on struct '%s'", n.Property, inst.Def.Name)
+			hint = "Ensure the field or method name is spelled correctly."
+		}
+		return newError(n.GetMetadata(), msg, hint)
+	}
+
+	msg := fmt.Sprintf("Properti '%s' tidak ditemukan pada objek", n.Property)
+	hint := "Pastikan properti yang diakses valid."
+	if env.IsUniversal {
+		msg = fmt.Sprintf("Property '%s' not found on object", n.Property)
+		hint = "Ensure the accessed property exists and is valid."
+	}
+	return newError(n.GetMetadata(), msg, hint)
+}
+
 func evalSafeNavigation(expr uast.Expression, env *Environment) Object {
 	if expr == nil {
 		return NULL
@@ -2135,88 +2139,11 @@ func evalSafeNavigation(expr uast.Expression, env *Environment) Object {
 		if obj == NULL || obj == nil || isError(obj) {
 			return NULL
 		}
-
-		// Safe member access on obj
-		if arr, ok := obj.(*Array); ok {
-			if rng, isRng := e.PropertyExpr.(*uast.RangeExpression); isRng {
-				return evalArraySlice(arr, rng, env, e.GetMetadata())
-			}
-			var intIdx int64
-			var hasInt bool
-			if e.Computed && e.PropertyExpr != nil {
-				idxObj := evalSafeNavigation(e.PropertyExpr, env)
-				if iVal, _, isInt, ok := CoerceToNumeric(idxObj); ok && isInt {
-					intIdx = iVal
-					hasInt = true
-				}
-			} else if parsed, err := strconv.ParseInt(e.Property, 10, 64); err == nil {
-				intIdx = parsed
-				hasInt = true
-			}
-			if hasInt && intIdx >= 0 && int(intIdx) < len(arr.Elements) {
-				return arr.Elements[intIdx]
-			}
+		res := evalMemberAccess(obj, e, env)
+		if isError(res) {
 			return NULL
 		}
-
-		if str, ok := obj.(*String); ok {
-			if rng, isRng := e.PropertyExpr.(*uast.RangeExpression); isRng {
-				return evalStringSlice(str, rng, env, e.GetMetadata())
-			}
-			return NULL
-		}
-
-		if inst, ok := obj.(*StructInstance); ok {
-			prop := e.Property
-			if e.Computed && e.PropertyExpr != nil {
-				keyObj := Eval(e.PropertyExpr, env)
-				if isError(keyObj) {
-					return NULL
-				}
-				if s, ok := keyObj.(*String); ok {
-					prop = s.Value
-				} else {
-					prop = keyObj.Inspect()
-				}
-			}
-			if val, exists := inst.Fields[prop]; exists {
-				return val
-			}
-			if method, exists := inst.Def.Methods[prop]; exists {
-				boundEnv := NewEnclosedEnvironment(method.Env)
-				boundEnv.Define("diri", inst, false, inst.Def.Name)
-				boundEnv.Define("this", inst, false, inst.Def.Name)
-				boundEnv.Define("self", inst, false, inst.Def.Name)
-				return &Function{
-					Name:       method.Name,
-					Parameters: method.Parameters,
-					Body:       method.Body,
-					Env:        boundEnv,
-				}
-			}
-			return NULL
-		}
-
-		if mp, ok := obj.(*Map); ok {
-			key := e.Property
-			if e.Computed && e.PropertyExpr != nil {
-				keyObj := Eval(e.PropertyExpr, env)
-				if isError(keyObj) {
-					return NULL
-				}
-				if s, ok := keyObj.(*String); ok {
-					key = s.Value
-				} else {
-					key = keyObj.Inspect()
-				}
-			}
-			if val, exists := mp.Pairs[key]; exists {
-				return val
-			}
-			return NULL
-		}
-
-		return NULL
+		return res
 
 	case *uast.CallExpression:
 		callee := evalSafeNavigation(e.Callee, env)
@@ -2303,6 +2230,12 @@ func evalArraySlice(arr *Array, rng *uast.RangeExpression, env *Environment, met
 		}
 		if iVal, _, isInt, ok := CoerceToNumeric(sVal); ok && isInt {
 			start = int(iVal)
+		} else {
+			msg := "Batas awal rentang slicing harus berupa bilangan bulat"
+			if env.IsUniversal {
+				msg = "Start index for slicing must be an integer"
+			}
+			return newError(rng.GetMetadata(), msg, "")
 		}
 	}
 	if rng.End != nil {
@@ -2312,6 +2245,12 @@ func evalArraySlice(arr *Array, rng *uast.RangeExpression, env *Environment, met
 		}
 		if iVal, _, isInt, ok := CoerceToNumeric(eVal); ok && isInt {
 			end = int(iVal)
+		} else {
+			msg := "Batas akhir rentang slicing harus berupa bilangan bulat"
+			if env.IsUniversal {
+				msg = "End index for slicing must be an integer"
+			}
+			return newError(rng.GetMetadata(), msg, "")
 		}
 	}
 	if start < 0 {
@@ -2353,6 +2292,12 @@ func evalStringSlice(str *String, rng *uast.RangeExpression, env *Environment, m
 		}
 		if iVal, _, isInt, ok := CoerceToNumeric(sVal); ok && isInt {
 			start = int(iVal)
+		} else {
+			msg := "Batas awal rentang teks harus berupa bilangan bulat"
+			if env.IsUniversal {
+				msg = "Start index for string slicing must be an integer"
+			}
+			return newError(rng.GetMetadata(), msg, "")
 		}
 	}
 	if rng.End != nil {
@@ -2362,6 +2307,12 @@ func evalStringSlice(str *String, rng *uast.RangeExpression, env *Environment, m
 		}
 		if iVal, _, isInt, ok := CoerceToNumeric(eVal); ok && isInt {
 			end = int(iVal)
+		} else {
+			msg := "Batas akhir rentang teks harus berupa bilangan bulat"
+			if env.IsUniversal {
+				msg = "End index for string slicing must be an integer"
+			}
+			return newError(rng.GetMetadata(), msg, "")
 		}
 	}
 	if start < 0 {

@@ -131,10 +131,15 @@ var keywords = map[string]TokenType{
 
 	// Modern Concurrency & Generics
 	"titip":     TITIP,
+	"spawn":     TITIP,
 	"jemput":    JEMPUT,
+	"await":     JEMPUT,
 	"harus":     HARUS,
+	"must":      HARUS,
 	"sembarang": SEMBARANG,
+	"any":       SEMBARANG,
 	"saluran":   SALURAN,
+	"channel":   SALURAN,
 
 	// Exclusive Killer Features: Transactions & Reactivity
 	"transaksi":   TRANSACTION,

@@ -112,9 +112,9 @@ func RegisterBuiltinsWithIO(env *Environment, in io.Reader, out io.Writer) {
 				}
 				end = s
 			} else {
-				s, _, _, ok1 := CoerceToNumeric(args[0])
-				e, _, _, ok2 := CoerceToNumeric(args[1])
-				if !ok1 || !ok2 {
+				s, _, isInt1, ok1 := CoerceToNumeric(args[0])
+				e, _, isInt2, ok2 := CoerceToNumeric(args[1])
+				if !ok1 || !ok2 || !isInt1 || !isInt2 {
 					return &Error{Message: "argumen rentang harus bilangan bulat"}
 				}
 				start = s

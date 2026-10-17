@@ -2422,6 +2422,9 @@ func (p *Parser) parseCastExpression(left uast.Expression) uast.Expression {
 
 func (p *Parser) parseDeferStatement() *uast.DeferStatement {
 	meta := p.currentMetadata()
+	if p.IsUniversal && p.curToken.Literal == "saat_selesai" {
+		p.addError("Indonesian keyword 'saat_selesai' is not allowed in Universal Mode. Use 'defer' instead.")
+	}
 	p.nextToken() // eat 'saat_selesai' / 'defer'
 
 	var body uast.Statement
@@ -2668,6 +2671,9 @@ func (p *Parser) parseTypeParameters() []uast.TypeParameter {
 
 func (p *Parser) parseTitipExpression() uast.Expression {
 	meta := p.currentMetadata()
+	if p.IsUniversal && p.curToken.Literal == "titip" {
+		p.addError("Indonesian keyword 'titip' is not allowed in Universal Mode. Use 'spawn' instead.")
+	}
 	p.nextToken() // move to argument expression
 	arg := p.parseExpression(PREFIX)
 	return &uast.TitipExpression{
@@ -2679,11 +2685,17 @@ func (p *Parser) parseTitipExpression() uast.Expression {
 
 func (p *Parser) parseJemputExpression() uast.Expression {
 	meta := p.currentMetadata()
+	if p.IsUniversal && p.curToken.Literal == "jemput" {
+		p.addError("Indonesian keyword 'jemput' is not allowed in Universal Mode. Use 'await' instead.")
+	}
 	p.nextToken() // move to argument expression
 	arg := p.parseExpression(PREFIX)
 	var timeout uast.Expression
 	if p.peekTokenIs(IN) {
-		p.nextToken() // eat 'dalam'
+		p.nextToken() // eat 'dalam' / 'in'
+		if p.IsUniversal && p.curToken.Literal == "dalam" {
+			p.addError("Indonesian keyword 'dalam' is not allowed in Universal Mode. Use 'in' instead.")
+		}
 		p.nextToken() // move to timeout expr
 		timeout = p.parseExpression(PREFIX)
 	}
