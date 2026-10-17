@@ -108,6 +108,7 @@ func (t *Ticket) Await(timeout time.Duration, meta *uast.NodeMetadata) Object {
 // Channel represents Celang's CSP channel (Saluran) for inter-goroutine communication.
 type Channel struct {
 	Ch       chan Object
+	stop     chan struct{}
 	Capacity int
 	Closed   bool
 	ElemType string
@@ -120,6 +121,7 @@ func NewChannel(capacity int, elemType string) *Channel {
 	}
 	return &Channel{
 		Ch:       make(chan Object, capacity),
+		stop:     make(chan struct{}),
 		Capacity: capacity,
 		ElemType: elemType,
 	}
@@ -141,7 +143,7 @@ func (c *Channel) Inspect() string {
 	return fmt.Sprintf("<Saluran%s: kapasitas=%d, isi=%d, status=%s>", typeStr, c.Capacity, len(c.Ch), status)
 }
 
-func (c *Channel) Send(val Object, meta *uast.NodeMetadata) Object {
+func (c *Channel) Send(val Object, meta *uast.NodeMetadata) (res Object) {
 	c.mu.Lock()
 	if c.Closed {
 		c.mu.Unlock()
@@ -150,6 +152,7 @@ func (c *Channel) Send(val Object, meta *uast.NodeMetadata) Object {
 			"Pastikan saluran masih terbuka sebelum memanggil kirim().")
 	}
 	elemType := c.ElemType
+	stop := c.stop
 	c.mu.Unlock()
 
 	// Validate element type constraint if specified
@@ -161,17 +164,79 @@ func (c *Channel) Send(val Object, meta *uast.NodeMetadata) Object {
 		}
 	}
 
+	defer func() {
+		if r := recover(); r != nil {
+			res = newError(meta,
+				"Tidak dapat mengirim data ke saluran yang sudah ditutup",
+				"Saluran ditutup sebelum atau saat pengiriman data berlangsung.")
+		}
+	}()
+
+	if stop != nil {
+		select {
+		case <-stop:
+			return newError(meta,
+				"Tidak dapat mengirim data ke saluran yang sudah ditutup",
+				"Saluran ditutup sebelum atau saat pengiriman data berlangsung.")
+		case c.Ch <- val:
+			return val
+		}
+	}
+
 	c.Ch <- val
 	return val
 }
 
 func (c *Channel) Receive(timeout time.Duration) Object {
+	c.mu.Lock()
+	stop := c.stop
+	c.mu.Unlock()
+
 	if timeout <= 0 {
+		if stop != nil {
+			select {
+			case val, ok := <-c.Ch:
+				if !ok {
+					return NULL
+				}
+				return val
+			case <-stop:
+				select {
+				case val, ok := <-c.Ch:
+					if ok {
+						return val
+					}
+				default:
+				}
+				return NULL
+			}
+		}
 		val, ok := <-c.Ch
 		if !ok {
 			return NULL
 		}
 		return val
+	}
+
+	if stop != nil {
+		select {
+		case val, ok := <-c.Ch:
+			if !ok {
+				return NULL
+			}
+			return val
+		case <-stop:
+			select {
+			case val, ok := <-c.Ch:
+				if ok {
+					return val
+				}
+			default:
+			}
+			return NULL
+		case <-time.After(timeout):
+			return NULL
+		}
 	}
 
 	select {
@@ -190,7 +255,9 @@ func (c *Channel) Close() Object {
 	defer c.mu.Unlock()
 	if !c.Closed {
 		c.Closed = true
-		close(c.Ch)
+		if c.stop != nil {
+			close(c.stop)
+		}
 	}
 	return NULL
 }

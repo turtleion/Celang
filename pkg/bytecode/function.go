@@ -18,9 +18,10 @@ func SetVMRunner(runner VMRunnerFunc) {
 
 // CompiledFunction represents an executable function compiled to bytecode.
 type CompiledFunction struct {
-	Name      string
-	NumParams int
-	Chunk     *Chunk
+	Name       string
+	NumParams  int
+	Chunk      *Chunk
+	LocalNames []string
 }
 
 func (cf *CompiledFunction) Type() evaluator.ObjectType { return "COMPILED_FUNCTION" }

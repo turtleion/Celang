@@ -47,8 +47,17 @@ func Eval(node uast.Node, env *Environment) Object {
 				return val
 			}
 		}
-		if _, err := env.DefineWithVisibility(n.Name, val, n.IsMutable, n.TypeHint, n.Visibility); err != nil {
+		if existing, exists := env.GetLocalEntry(n.Name); exists && existing.IsConstant {
+			return newError(n.GetMetadata(),
+				fmt.Sprintf("variabel '%s' bersifat tetap (konstan) dan tidak dapat dideklarasikan ulang", n.Name),
+				"Gunakan nama variabel yang berbeda.")
+		}
+		entry, err := env.DefineWithVisibility(n.Name, val, n.IsMutable, n.TypeHint, n.Visibility)
+		if err != nil {
 			return newError(n.GetMetadata(), err.Error(), "Gunakan nama variabel yang berbeda.")
+		}
+		if !n.IsMutable {
+			entry.IsConstant = true
 		}
 		return val
 
@@ -398,7 +407,7 @@ func Eval(node uast.Node, env *Environment) Object {
 				} else if parsed, err := strconv.ParseInt(prop, 10, 64); err == nil {
 					intIdx = parsed
 					hasInt = true
-				} else if prop != "" {
+				} else if target.Computed && prop != "" {
 					idxObj := Eval(uast.NewIdentifier(prop), env)
 					if iVal, _, isInt, ok := CoerceToNumeric(idxObj); ok && isInt {
 						intIdx = iVal
@@ -572,7 +581,11 @@ func Eval(node uast.Node, env *Environment) Object {
 		} else if ch, ok := iterVal.(*Channel); ok {
 			forEnv := NewEnclosedEnvironment(env)
 			var result Object = NULL
-			for el := range ch.Ch {
+			for {
+				el := ch.Receive(0)
+				if el == nil || el.Type() == NULL_OBJ {
+					break
+				}
 				forEnv.Define(n.Item, el, true, "")
 				result = Eval(n.Body, forEnv)
 				if result != nil {
@@ -750,7 +763,7 @@ func Eval(node uast.Node, env *Environment) Object {
 
 		if n.Finalizer != nil {
 			finRes := Eval(n.Finalizer, env)
-			if isError(finRes) || (finRes != nil && finRes.Type() == RETURN_VALUE_OBJ) {
+			if isError(finRes) || (finRes != nil && (finRes.Type() == RETURN_VALUE_OBJ || finRes.Type() == BREAK_SIGNAL_OBJ || finRes.Type() == CONTINUE_SIGNAL_OBJ || finRes.Type() == ROLLBACK_SIGNAL_OBJ)) {
 				return finRes
 			}
 		}
@@ -1869,7 +1882,7 @@ func evalMemberAccess(obj Object, n *uast.MemberExpression, env *Environment) Ob
 		} else if parsed, err := strconv.ParseInt(n.Property, 10, 64); err == nil {
 			intIdx = parsed
 			hasInt = true
-		} else {
+		} else if n.Computed {
 			idxObj := Eval(uast.NewIdentifier(n.Property), env)
 			if iVal, _, isInt, ok := CoerceToNumeric(idxObj); ok && isInt {
 				intIdx = iVal

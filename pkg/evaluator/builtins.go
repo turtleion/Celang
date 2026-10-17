@@ -380,16 +380,21 @@ func RegisterBuiltinsWithIO(env *Environment, in io.Reader, out io.Writer) {
 			if !ok {
 				return &Error{Message: "argumen jemput_semua harus berupa Daftar (Array)"}
 			}
-			results := make([]Object, len(arr.Elements))
-			var firstErr *Error
-			var mu sync.Mutex
-			var wg sync.WaitGroup
-
+			tickets := make([]*Ticket, len(arr.Elements))
 			for i, el := range arr.Elements {
 				ticket, ok := el.(*Ticket)
 				if !ok {
 					return &Error{Message: fmt.Sprintf("Elemen ke-%d bukan merupakan Tiket", i)}
 				}
+				tickets[i] = ticket
+			}
+
+			results := make([]Object, len(tickets))
+			var firstErr *Error
+			var mu sync.Mutex
+			var wg sync.WaitGroup
+
+			for i, ticket := range tickets {
 				wg.Add(1)
 				idx := i
 				t := ticket
@@ -424,12 +429,18 @@ func RegisterBuiltinsWithIO(env *Environment, in io.Reader, out io.Writer) {
 			if !ok || len(arr.Elements) == 0 {
 				return &Error{Message: "argumen jemput_pertama harus berupa Daftar tiket yang tidak kosong"}
 			}
-			resChan := make(chan Object, len(arr.Elements))
-			for _, el := range arr.Elements {
+
+			tickets := make([]*Ticket, len(arr.Elements))
+			for i, el := range arr.Elements {
 				ticket, ok := el.(*Ticket)
 				if !ok {
 					return &Error{Message: "Semua elemen harus berupa Tiket"}
 				}
+				tickets[i] = ticket
+			}
+
+			resChan := make(chan Object, len(tickets))
+			for _, ticket := range tickets {
 				t := ticket
 				go func() {
 					resChan <- t.Await(0, nil)
@@ -447,8 +458,19 @@ func RegisterBuiltinsWithIO(env *Environment, in io.Reader, out io.Writer) {
 }
 
 func deepClone(obj Object) Object {
+	visited := make(map[any]Object)
+	return deepCloneWithVisited(obj, visited, 0)
+}
+
+func deepCloneWithVisited(obj Object, visited map[any]Object, depth int) Object {
 	if obj == nil {
 		return NULL
+	}
+	if depth > 100 {
+		return obj
+	}
+	if cloned, exists := visited[obj]; exists {
+		return cloned
 	}
 	switch o := obj.(type) {
 	case *Integer:
@@ -462,31 +484,35 @@ func deepClone(obj Object) Object {
 	case *Null:
 		return &Null{}
 	case *Array:
-		newElems := make([]Object, len(o.Elements))
+		newArr := &Array{Elements: make([]Object, len(o.Elements))}
+		visited[o] = newArr
 		for i, el := range o.Elements {
-			newElems[i] = deepClone(el)
+			newArr.Elements[i] = deepCloneWithVisited(el, visited, depth+1)
 		}
-		return &Array{Elements: newElems}
+		return newArr
 	case *Map:
-		newPairs := make(map[string]Object, len(o.Pairs))
-		for k, v := range o.Pairs {
-			newPairs[k] = deepClone(v)
+		newMap := &Map{
+			Pairs: make(map[string]Object, len(o.Pairs)),
 		}
-		var newOrder []string
 		if o.Order != nil {
-			newOrder = make([]string, len(o.Order))
-			copy(newOrder, o.Order)
+			newMap.Order = make([]string, len(o.Order))
+			copy(newMap.Order, o.Order)
 		}
-		return &Map{Pairs: newPairs, Order: newOrder}
+		visited[o] = newMap
+		for k, v := range o.Pairs {
+			newMap.Pairs[k] = deepCloneWithVisited(v, visited, depth+1)
+		}
+		return newMap
 	case *StructInstance:
 		newFields := make(map[string]Object, len(o.Fields))
-		for k, v := range o.Fields {
-			newFields[k] = deepClone(v)
-		}
 		cloneInst := &StructInstance{
 			Def:    o.Def,
 			Fields: newFields,
 			Env:    NewEnclosedEnvironment(o.Def.Env),
+		}
+		visited[o] = cloneInst
+		for k, v := range o.Fields {
+			newFields[k] = deepCloneWithVisited(v, visited, depth+1)
 		}
 		cloneInst.Env.Define("diri", cloneInst, false, o.Def.Name)
 		cloneInst.Env.Define("this", cloneInst, false, o.Def.Name)

@@ -2369,5 +2369,98 @@ func TestEvaluator_MathOverflow(t *testing.T) {
 	}
 }
 
+func TestAudit_ChannelSendClosedRecover(t *testing.T) {
+	ch := evaluator.NewChannel(0, "")
+	go func() {
+		time.Sleep(20 * time.Millisecond)
+		ch.Close()
+	}()
+	res := ch.Send(&evaluator.String{Value: "test"}, nil)
+	if _, ok := res.(*evaluator.Error); !ok {
+		t.Fatalf("expected error on send to closed channel, got %v", res)
+	}
+}
+
+func TestAudit_CircularDataStructures(t *testing.T) {
+	code := `
+	buat a = [1]
+	a.tambah(a)
+	buat b = [1]
+	b.tambah(b)
+	buat eq = (a == b)
+	buat c = salin(a)
+	eq
+	`
+	res := testEvalSource(t, code)
+	if b, ok := res.(*evaluator.Boolean); !ok || !b.Value {
+		t.Fatalf("expected circular equality to be true without stack overflow, got %s", res.Inspect())
+	}
+}
+
+func TestAudit_ConstantRedeclaration(t *testing.T) {
+	code := `
+	tetap KUNCI = 100
+	tetap KUNCI = 200
+	`
+	res := testEvalSource(t, code)
+	if _, ok := res.(*evaluator.Error); !ok {
+		t.Fatalf("expected error for re-declaring constant 'tetap', got %s", res.Inspect())
+	}
+}
+
+func TestAudit_ArrayDotNotationProperty(t *testing.T) {
+	code := `
+	buat foo = 0
+	buat arr = [10, 20]
+	arr.foo
+	`
+	res := testEvalSource(t, code)
+	if _, ok := res.(*evaluator.Error); !ok {
+		t.Fatalf("expected error for accessing invalid dot property 'foo' on Array, got %s", res.Inspect())
+	}
+}
+
+func TestAudit_FinallyBlockSignals(t *testing.T) {
+	code := `
+	buat iterasi = 0
+	selama (iterasi < 5) {
+		iterasi = iterasi + 1
+		coba {
+			// normal
+		} akhirnya {
+			berhenti
+		}
+	}
+	iterasi
+	`
+	res := testEvalSource(t, code)
+	if iVal, ok := res.(*evaluator.Integer); !ok || iVal.Value != 1 {
+		t.Fatalf("expected loop to terminate on iteration 1 via finally break, got %s", res.Inspect())
+	}
+}
+
+func TestAudit_JemputAllInvalidElement(t *testing.T) {
+	code := `
+	buat t1 = titip 1
+	jemput_semua([t1, "bukan_tiket"])
+	`
+	res := testEvalSource(t, code)
+	if _, ok := res.(*evaluator.Error); !ok {
+		t.Fatalf("expected error for jemput_semua with non-ticket, got %s", res.Inspect())
+	}
+}
+
+func TestAudit_JSONMaxAutoExpand(t *testing.T) {
+	code := `
+	buat data = []
+	json.setel(data, "[10000000]", 42)
+	`
+	res := testEvalSource(t, code)
+	arr, ok := res.(*evaluator.Array)
+	if !ok || len(arr.Elements) != 0 {
+		t.Fatalf("expected data not to expand to 10M elements, got length %d", len(arr.Elements))
+	}
+}
+
 
 

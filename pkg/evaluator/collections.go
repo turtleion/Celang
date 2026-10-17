@@ -10,6 +10,14 @@ import (
 
 // ObjectsEqual checks if two Celang objects are considered equal.
 func ObjectsEqual(a, b Object) bool {
+	visited := make(map[[2]any]bool)
+	return objectsEqualWithVisited(a, b, visited, 0)
+}
+
+func objectsEqualWithVisited(a, b Object, visited map[[2]any]bool, depth int) bool {
+	if depth > 100 {
+		return true
+	}
 	if a == nil || b == nil {
 		return a == b
 	}
@@ -30,6 +38,13 @@ func ObjectsEqual(a, b Object) bool {
 		}
 		return false
 	}
+
+	pair := [2]any{a, b}
+	if visited[pair] {
+		return true
+	}
+	visited[pair] = true
+
 	switch oA := a.(type) {
 	case *Integer:
 		return oA.Value == b.(*Integer).Value
@@ -47,7 +62,7 @@ func ObjectsEqual(a, b Object) bool {
 			return false
 		}
 		for i := range oA.Elements {
-			if !ObjectsEqual(oA.Elements[i], oB.Elements[i]) {
+			if !objectsEqualWithVisited(oA.Elements[i], oB.Elements[i], visited, depth+1) {
 				return false
 			}
 		}
@@ -59,7 +74,7 @@ func ObjectsEqual(a, b Object) bool {
 		}
 		for k, valA := range oA.Pairs {
 			valB, exists := oB.Pairs[k]
-			if !exists || !ObjectsEqual(valA, valB) {
+			if !exists || !objectsEqualWithVisited(valA, valB, visited, depth+1) {
 				return false
 			}
 		}
@@ -71,7 +86,7 @@ func ObjectsEqual(a, b Object) bool {
 		}
 		for k, valA := range oA.Fields {
 			valB, exists := oB.Fields[k]
-			if !exists || !ObjectsEqual(valA, valB) {
+			if !exists || !objectsEqualWithVisited(valA, valB, visited, depth+1) {
 				return false
 			}
 		}

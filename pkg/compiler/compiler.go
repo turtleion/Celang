@@ -524,10 +524,15 @@ func (c *Compiler) compileStatement(stmt uast.Statement) error {
 		fnComp.emitOp(bytecode.OpNull, line)
 		fnComp.emitOp(bytecode.OpReturn, line)
 
+		localNames := make([]string, len(fnComp.locals))
+		for i, loc := range fnComp.locals {
+			localNames[i] = loc.Name
+		}
 		compiledFn := &bytecode.CompiledFunction{
-			Name:      s.Name,
-			NumParams: len(s.Parameters),
-			Chunk:     fnComp.chunk,
+			Name:       s.Name,
+			NumParams:  len(s.Parameters),
+			Chunk:      fnComp.chunk,
+			LocalNames: localNames,
 		}
 		constIdx := c.chunk.AddConstant(compiledFn)
 		c.emitOp(bytecode.OpConstant, line)

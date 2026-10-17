@@ -372,8 +372,8 @@ func NewIterator(obj Object) (*IteratorObject, error) {
 	case *Channel:
 		return &IteratorObject{
 			NextFunc: func() (Object, bool) {
-				val, ok := <-o.Ch
-				if !ok {
+				val := o.Receive(0)
+				if val == nil || val.Type() == NULL_OBJ {
 					return nil, false
 				}
 				return val, true

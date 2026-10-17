@@ -444,9 +444,40 @@ func (vm *VM) Run() (evaluator.Object, error) {
 				evaluator.RegisterBuiltins(env, os.Stdout)
 				vm.env = env
 			}
-			res := evaluator.Eval(wrapper.Node, env)
+			evalEnv := env
+			if frame.fn != nil && len(frame.fn.LocalNames) > 0 {
+				evalEnv = evaluator.NewEnclosedEnvironment(env)
+				for slot, name := range frame.fn.LocalNames {
+					if name != "" && frame.basePointer+slot < vm.sp {
+						val := vm.stack[frame.basePointer+slot]
+						if val != nil {
+							evalEnv.Define(name, val, true, "")
+						}
+					}
+				}
+			}
+			res := evaluator.Eval(wrapper.Node, evalEnv)
 			if errObj, ok := res.(*evaluator.Error); ok {
 				return nil, fmt.Errorf("%s", errObj.Inspect())
+			}
+			if evalEnv != env {
+				for slot, name := range frame.fn.LocalNames {
+					if name != "" && frame.basePointer+slot < vm.sp {
+						if newVal, ok := evalEnv.Get(name); ok {
+							vm.stack[frame.basePointer+slot] = newVal
+						}
+					}
+				}
+			}
+			if retVal, isRet := res.(*evaluator.ReturnValue); isRet {
+				result := retVal.Value
+				vm.frameCount--
+				if vm.frameCount == 0 {
+					return result, nil
+				}
+				vm.sp = frame.basePointer - 1
+				vm.push(result)
+				break
 			}
 			if _, isExpr := wrapper.Node.(uast.Expression); isExpr {
 				if res == nil {
@@ -621,17 +652,6 @@ func (vm *VM) evalIndex(targetObj, indexObj evaluator.Object) (evaluator.Object,
 		} else if sVal, ok := indexObj.(*evaluator.String); ok {
 			if parsed, err := strconv.Atoi(sVal.Value); err == nil {
 				idx = parsed
-			} else {
-				// Fallback to variable lookup in globals or env
-				varObj, exists := vm.globals[sVal.Value]
-				if !exists && vm.env != nil {
-					varObj, exists = vm.env.Get(sVal.Value)
-				}
-				if exists {
-					if nVal, _, isInt, ok := evaluator.CoerceToNumeric(varObj); ok && isInt {
-						idx = int(nVal)
-					}
-				}
 			}
 		}
 
@@ -647,16 +667,6 @@ func (vm *VM) evalIndex(targetObj, indexObj evaluator.Object) (evaluator.Object,
 		} else if sVal, ok := indexObj.(*evaluator.String); ok {
 			if parsed, err := strconv.Atoi(sVal.Value); err == nil {
 				idx = parsed
-			} else {
-				varObj, exists := vm.globals[sVal.Value]
-				if !exists && vm.env != nil {
-					varObj, exists = vm.env.Get(sVal.Value)
-				}
-				if exists {
-					if nVal, _, isInt, ok := evaluator.CoerceToNumeric(varObj); ok && isInt {
-						idx = int(nVal)
-					}
-				}
 			}
 		}
 
@@ -679,17 +689,6 @@ func (vm *VM) evalIndex(targetObj, indexObj evaluator.Object) (evaluator.Object,
 				return nil, fmt.Errorf("%s", errObj.Inspect())
 			}
 			return methodObj, nil
-		}
-		if sVal, ok := indexObj.(*evaluator.String); ok {
-			varObj, exists := vm.globals[sVal.Value]
-			if !exists && vm.env != nil {
-				varObj, exists = vm.env.Get(sVal.Value)
-			}
-			if exists {
-				if val, found := obj.Pairs[varObj.Inspect()]; found {
-					return val, nil
-				}
-			}
 		}
 		return &evaluator.Null{}, nil
 
@@ -824,16 +823,6 @@ func (vm *VM) evalSetIndex(targetObj, indexObj, val evaluator.Object) error {
 		} else if sVal, ok := indexObj.(*evaluator.String); ok {
 			if parsed, err := strconv.Atoi(sVal.Value); err == nil {
 				idx = parsed
-			} else {
-				varObj, exists := vm.globals[sVal.Value]
-				if !exists && vm.env != nil {
-					varObj, exists = vm.env.Get(sVal.Value)
-				}
-				if exists {
-					if nVal, _, isInt, ok := evaluator.CoerceToNumeric(varObj); ok && isInt {
-						idx = int(nVal)
-					}
-				}
 			}
 		}
 

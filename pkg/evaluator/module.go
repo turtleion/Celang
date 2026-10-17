@@ -163,6 +163,9 @@ func loadModule(targetAbsPath string, env *Environment) (*Environment, error) {
 
 	result := Eval(prog, targetEnv)
 	if isError(result) {
+		env.ModuleRegistry.mu.Lock()
+		delete(env.ModuleRegistry.modules, targetAbsPath)
+		env.ModuleRegistry.mu.Unlock()
 		return nil, fmt.Errorf("kesalahan saat mengevaluasi modul '%s': %s", filepath.Base(targetAbsPath), result.Inspect())
 	}
 

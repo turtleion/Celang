@@ -484,6 +484,9 @@ func setNestedValue(root Object, path string, val Object) Object {
 			if !ok {
 				return root
 			}
+			if tok.index < 0 || tok.index > 100000 {
+				return root
+			}
 			for len(arr.Elements) <= tok.index {
 				arr.Elements = append(arr.Elements, NULL)
 			}
@@ -534,10 +537,12 @@ func setNestedValue(root Object, path string, val Object) Object {
 	lastTok := tokens[len(tokens)-1]
 	if lastTok.isIndex {
 		if arr, ok := cur.(*Array); ok {
-			for len(arr.Elements) <= lastTok.index {
-				arr.Elements = append(arr.Elements, NULL)
+			if lastTok.index >= 0 && lastTok.index <= 100000 {
+				for len(arr.Elements) <= lastTok.index {
+					arr.Elements = append(arr.Elements, NULL)
+				}
+				arr.Elements[lastTok.index] = val
 			}
-			arr.Elements[lastTok.index] = val
 		}
 	} else {
 		if mp, ok := cur.(*Map); ok {

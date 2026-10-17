@@ -761,6 +761,48 @@ func TestVM_StructuralEquality(t *testing.T) {
 	}
 }
 
+func TestAudit_VM_MapLookupNoGlobalFallback(t *testing.T) {
+	code := `
+	buat tamu = "admin"
+	buat peran = {"admin": "AKSES_PENUH"}
+	peran["tamu"]
+	`
+	res, _, _ := runVM(t, code)
+	if res.Type() != evaluator.NULL_OBJ {
+		t.Fatalf("expected peran['tamu'] to be null without falling back to global 'tamu', got %s", res.Inspect())
+	}
+}
+
+func TestAudit_VM_OpEvalAST_FunctionLocals(t *testing.T) {
+	code := `
+	fungsi periksa(nilai) {
+		cocok nilai {
+			kasus 1:
+				kembalikan "satu"
+			kasus 2:
+				kembalikan "dua"
+			lainnya:
+				kembalikan "lainnya"
+		}
+	}
+	[periksa(1), periksa(2), periksa(3)]
+	`
+	res, _, _ := runVM(t, code)
+	arr, ok := res.(*evaluator.Array)
+	if !ok || len(arr.Elements) != 3 {
+		t.Fatalf("expected 3 elements, got %s", res.Inspect())
+	}
+	if arr.Elements[0].(*evaluator.String).Value != "satu" {
+		t.Errorf("expected 'satu', got %s", arr.Elements[0].Inspect())
+	}
+	if arr.Elements[1].(*evaluator.String).Value != "dua" {
+		t.Errorf("expected 'dua', got %s", arr.Elements[1].Inspect())
+	}
+	if arr.Elements[2].(*evaluator.String).Value != "lainnya" {
+		t.Errorf("expected 'lainnya', got %s", arr.Elements[2].Inspect())
+	}
+}
+
 
 
 

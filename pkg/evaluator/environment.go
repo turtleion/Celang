@@ -3,6 +3,7 @@ package evaluator
 import (
 	"fmt"
 	"sync"
+	"sync/atomic"
 
 	"celang/pkg/uast"
 )
@@ -29,6 +30,7 @@ type VariableEntry struct {
 	History      []Object
 	HistoryCap   int
 	IsMutable    bool
+	IsConstant   bool
 	TypeHint     string
 	Visibility   *uast.Visibility
 	AliasedEntry *VariableEntry
@@ -115,7 +117,7 @@ type Environment struct {
 	ModuleRegistry  *ModuleRegistry
 	defers          []uast.Statement
 	savepoints      []*transactionFrame
-	reactivityDepth int
+	reactivityDepth int64
 	activeTracker   *VariableEntry
 	IsUniversal     bool
 }
@@ -182,12 +184,22 @@ func (e *Environment) DefineWithVisibility(name string, val Object, isMutable bo
 	// Track newly defined variable in active transaction frame
 	curr := e
 	for curr != nil {
-		if len(curr.savepoints) > 0 {
+		if curr != e {
+			curr.mu.Lock()
+		}
+		hasSavepoints := len(curr.savepoints) > 0
+		if hasSavepoints {
 			top := curr.savepoints[len(curr.savepoints)-1]
 			top.created = append(top.created, name)
+		}
+		next := curr.outer
+		if curr != e {
+			curr.mu.Unlock()
+		}
+		if hasSavepoints {
 			break
 		}
-		curr = curr.outer
+		curr = next
 	}
 
 	entry := &VariableEntry{
@@ -273,29 +285,27 @@ func (e *Environment) DefineReference(aliasName string, target *VariableEntry) (
 	return entry, nil
 }
 
-// Assign updates an existing variable and records the change into its timeline history.
-func (e *Environment) getReactivityDepth() int {
+func (e *Environment) getRoot() *Environment {
 	curr := e
 	for curr.outer != nil {
 		curr = curr.outer
 	}
-	return curr.reactivityDepth
+	return curr
+}
+
+func (e *Environment) getReactivityDepth() int {
+	root := e.getRoot()
+	return int(atomic.LoadInt64(&root.reactivityDepth))
 }
 
 func (e *Environment) incReactivityDepth() {
-	curr := e
-	for curr.outer != nil {
-		curr = curr.outer
-	}
-	curr.reactivityDepth++
+	root := e.getRoot()
+	atomic.AddInt64(&root.reactivityDepth, 1)
 }
 
 func (e *Environment) decReactivityDepth() {
-	curr := e
-	for curr.outer != nil {
-		curr = curr.outer
-	}
-	curr.reactivityDepth--
+	root := e.getRoot()
+	atomic.AddInt64(&root.reactivityDepth, -1)
 }
 
 // Assign updates an existing variable and records the change into its timeline history.
@@ -395,6 +405,17 @@ func (e *Environment) GetEntry(name string) (*VariableEntry, bool) {
 		return e.outer.GetEntry(name)
 	}
 	return nil, false
+}
+
+// GetLocalEntry retrieves the VariableEntry defined in this scope only (does not traverse outer scopes).
+func (e *Environment) GetLocalEntry(name string) (*VariableEntry, bool) {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	entry, ok := e.store[name]
+	if !ok {
+		return nil, false
+	}
+	return entry.Resolve(), true
 }
 
 // SetActiveTracker sets the reactive entry that is currently collecting dependencies.
