@@ -2,7 +2,7 @@
   "name": "celang",
   "displayName": "Celang Language Support",
   "description": "Dukungan sintaks resmi, pelengkapan kode, dan cuplikan (snippets) untuk bahasa pemrograman Celang.",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "publisher": "celang-project",
   "license": "MIT",
   "repository": {
@@ -19,9 +19,12 @@
   "keywords": [
     "celang",
     "indonesian",
+    "universal-mode",
     "human-centric",
     "syntax-styling",
-    "time-travel"
+    "time-travel",
+    "transactions",
+    "reactivity"
   ],
   "contributes": {
     "languages": [
@@ -57,6 +60,7 @@
           "celang",
           "buat",
           "konstanta",
+          "tetap",
           "selama",
           "kembalikan",
           "sebelumnya",
@@ -74,7 +78,26 @@
           "matematika",
           "waktu",
           "berkas",
-          "dialek"
+          "sistem",
+          "dialek",
+          "transaksi",
+          "batalkan",
+          "pulihkan",
+          "reaktif",
+          "pantau",
+          "saluran",
+          "titip",
+          "jemput",
+          "jemput_semua",
+          "jemput_pertama",
+          "terbilang",
+          "rupiah",
+          "kirim",
+          "terima",
+          "tutup",
+          "milidetik",
+          "miliar",
+          "triliun"
         ]
       }
     }

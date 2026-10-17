@@ -3,6 +3,7 @@
   "name": "Celang",
   "scopeName": "source.celang",
   "patterns": [
+    { "include": "#directives" },
     { "include": "#comments" },
     { "include": "#strings" },
     { "include": "#numbers" },
@@ -15,6 +16,14 @@
     { "include": "#functions" }
   ],
   "repository": {
+    "directives": {
+      "patterns": [
+        {
+          "name": "keyword.control.directive.celang",
+          "match": "\\b(\"use (universal|english|standard)\"|'use (universal|english|standard)')"
+        }
+      ]
+    },
     "comments": {
       "patterns": [
         {
@@ -89,7 +98,15 @@
       "patterns": [
         {
           "name": "keyword.declaration.celang",
-          "match": "\\b(buat|konstanta|bentuk|fungsi|itu|let|const|var|def|function|struct|jieun|tetep|rujuk|ref|tipe|privat)\\b"
+          "match": "\\b(buat|konstanta|tetap|konstan|bentuk|fungsi|itu|let|const|var|def|func|fn|function|struct|jieun|tetep|rujuk|ref|tipe|privat|reaktif|reactive)\\b"
+        },
+        {
+          "name": "keyword.control.transaction.celang",
+          "match": "\\b(transaksi|batalkan|pulihkan|transaction|rollback|recover)\\b"
+        },
+        {
+          "name": "keyword.control.reactive.celang",
+          "match": "\\b(pantau|watch)\\b"
         },
         {
           "name": "keyword.operator.cast.celang",
@@ -97,11 +114,15 @@
         },
         {
           "name": "keyword.control.flow.celang",
-          "match": "\\b(jika|selain jika|selain|selama|untuk|dalam|kembalikan|berhenti|lanjut|if|else|elif|while|for|in|return|break|continue|lamun|salami|pikeun|balikkeun)\\b"
+          "match": "\\b(jika|kalau|bila|selain jika|lain jika|selain|lain|maka|selama|untuk|dalam|kembalikan|mengembalikan|berhenti|lanjut|if|else|elif|while|for|in|return|break|continue|lamun|salami|pikeun|balikkeun|cocok|kasus|lainnya|switch|case|default)\\b"
         },
         {
           "name": "keyword.control.concurrency.celang",
-          "match": "\\b(sambil|bersamaan|async|parallel|bari|babarengan)\\b"
+          "match": "\\b(sambil|bersamaan|async|parallel|bari|babarengan|titip|jemput|await)\\b"
+        },
+        {
+          "name": "keyword.control.defer.celang",
+          "match": "\\b(defer|saat_selesai)\\b"
         },
         {
           "name": "keyword.control.exception.celang",
@@ -121,7 +142,7 @@
       "patterns": [
         {
           "name": "entity.name.type.celang",
-          "match": "\\b(Angka|Pecahan|Teks|Logika|Array|Map|Bentuk|Number|Float|String|Boolean)\\b"
+          "match": "\\b(Angka|Pecahan|Teks|Logika|Array|Map|Bentuk|Number|Float|String|Boolean|Saluran|Channel|channel|Tiket|Ticket)\\b"
         }
       ]
     },
@@ -141,7 +162,7 @@
       "patterns": [
         {
           "name": "support.function.builtin.celang",
-          "match": "\\b(cetak|masukan|panjang|tipe|rentang|saring|petakan|potong_spasi|kapitalisasi|print|input|len|type|range|filter|map|trim|salin|clone)\\b"
+          "match": "\\b(cetak|masukan|panjang|tipe|rentang|saring|petakan|potong_spasi|kapitalisasi|print|input|len|length|type|range|filter|map|trim|capitalize|uppercase|salin|clone|terbilang|rupiah|format_rupiah|format_usd|format_currency|in_words|spelled_out|dollars_in_words|titip|jemput|jemput_semua|jemput_pertama|await_all|await_race|await_first|Saluran|Channel)\\b"
         }
       ]
     },
@@ -149,27 +170,43 @@
       "patterns": [
         {
           "name": "support.class.stdlib.celang",
-          "match": "\\b(matematika|math|teks|strings|waktu|time|berkas|fs|json)\\b"
+          "match": "\\b(matematika|math|teks|strings|waktu|time|berkas|fs|json|sistem|os)\\b"
         },
         {
           "name": "support.variable.property.timetravel.celang",
-          "match": "\\b(sebelumnya|prev|previous|awal|initial|first|histori|history)\\b"
+          "match": "(?<=\\.)(sebelumnya|prev|previous|awal|initial|first|histori|history)\\b"
+        },
+        {
+          "name": "support.variable.property.cultural.celang",
+          "match": "(?<=\\.)(rupiah|terbilang|kata|ejaan|ribu|thousand|k|juta|million|miliar|milyar|billion|triliun|trilyun|trillion|usd|dollar|dollars|words|in_words|dollars_in_words|milidetik|ms|detik|s|sec|second|seconds|menit|m|min|minute|minutes|jam|h|hour|hours|hari|d|day|days|b|byte|bytes|kb|kilobyte|mb|megabyte|gb|gigabyte|tb|terabyte)\\b"
+        },
+        {
+          "name": "support.function.method.channel.celang",
+          "match": "(?<=\\.)(kirim|terima|tutup|send|receive|recv|close|selesai|hasil|done|result)\\b"
         }
       ]
     },
     "operators": {
       "patterns": [
         {
+          "name": "keyword.operator.arrow.celang",
+          "match": "=>"
+        },
+        {
+          "name": "keyword.operator.nullsafety.celang",
+          "match": "(\\?\\.|\\?\\?)"
+        },
+        {
           "name": "keyword.operator.pipeline.celang",
           "match": "\\|>"
         },
         {
           "name": "keyword.operator.logical.celang",
-          "match": "\\b(dan|atau|bukan|and|or|not|sareng|atawa|sanes)\\b"
+          "match": "(\\b(dan|atau|bukan|and|or|not|sareng|atawa|sanes)\\b|(&&|\\|\\||!))"
         },
         {
           "name": "keyword.operator.comparison.celang",
-          "match": "(==|!=|<=|>=|<|>)"
+          "match": "(===|!==|==|!=|<=|>=|<|>)"
         },
         {
           "name": "keyword.operator.assignment.celang",

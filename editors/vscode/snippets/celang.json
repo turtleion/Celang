@@ -1,19 +1,42 @@
 {
-  "Deklarasi Variabel": {
+  "Universal Mode Directive": {
+    "prefix": "universal",
+    "body": [
+      "\"use universal\"",
+      "",
+      "$0"
+    ],
+    "description": "Aktifkan Mode Universal (Strict English syntax & global units)"
+  },
+  "Deklarasi Variabel (buat)": {
     "prefix": "buat",
     "body": [
       "buat ${1:namaVariabel} = ${2:nilai}"
     ],
     "description": "Mendeklarasikan variabel baru yang dapat diubah nilainya"
   },
-  "Deklarasi Konstanta": {
+  "Variable Declaration (let)": {
+    "prefix": "let",
+    "body": [
+      "let ${1:variableName} = ${2:value}"
+    ],
+    "description": "Declare a mutable variable (Universal / Modern style)"
+  },
+  "Deklarasi Konstanta (konstanta)": {
     "prefix": "konstanta",
     "body": [
       "konstanta ${1:NAMA_KONSTANTA} = ${2:nilai}"
     ],
     "description": "Mendeklarasikan konstanta tetap"
   },
-  "Deklarasi Fungsi": {
+  "Constant Declaration (const)": {
+    "prefix": "const",
+    "body": [
+      "const ${1:CONSTANT_NAME} = ${2:value}"
+    ],
+    "description": "Declare an immutable constant"
+  },
+  "Deklarasi Fungsi (fungsi)": {
     "prefix": "fungsi",
     "body": [
       "fungsi ${1:namaFungsi}(${2:parameter}) {",
@@ -23,7 +46,24 @@
     ],
     "description": "Mendeklarasikan fungsi baru"
   },
-  "Deklarasi Bentuk (Struct)": {
+  "Function Declaration (def)": {
+    "prefix": "def",
+    "body": [
+      "def ${1:funcName}(${2:params}) {",
+      "\t${3:// implementation}",
+      "\treturn ${4:result}",
+      "}"
+    ],
+    "description": "Declare a function (Universal / Modern style)"
+  },
+  "Fungsi Panah Ringkas (Arrow Function)": {
+    "prefix": "panah",
+    "body": [
+      "(${1:params}) => ${2:ekspresi}"
+    ],
+    "description": "Fungsi panah satu baris ringkas"
+  },
+  "Deklarasi Bentuk (bentuk / struct)": {
     "prefix": "bentuk",
     "body": [
       "bentuk ${1:NamaBentuk} {",
@@ -37,7 +77,7 @@
     ],
     "description": "Mendeklarasikan cetak biru Bentuk (Struct) baru"
   },
-  "Kondisi Jika-Selain": {
+  "Kondisi Jika-Selain (jika)": {
     "prefix": "jika",
     "body": [
       "jika ${1:kondisi} {",
@@ -48,15 +88,96 @@
     ],
     "description": "Pernyataan percabangan kondisi jika-selain"
   },
-  "Perulangan Selama": {
+  "If-Else Condition (if)": {
+    "prefix": "if",
+    "body": [
+      "if ${1:condition} {",
+      "\t${2:// true branch}",
+      "} else {",
+      "\t${3:// false branch}",
+      "}"
+    ],
+    "description": "Conditional branch statement (Universal style)"
+  },
+  "Transaksi & Rollback (transaksi)": {
+    "prefix": "transaksi",
+    "body": [
+      "transaksi {",
+      "\t${1:// mutasi variabel}",
+      "\tjika ${2:gagal} {",
+      "\t\tbatalkan \"${3:alasan pembatalan}\"",
+      "\t}",
+      "} pulihkan (${4:alasan}) {",
+      "\t${5:// penanganan saat transaksi gagal & dibatalkan}",
+      "}"
+    ],
+    "description": "Blok transaksi ACID status memory dengan rollback otomatis"
+  },
+  "Transaction & Rollback (Universal)": {
+    "prefix": "transaction",
+    "body": [
+      "transaction {",
+      "\t${1:// variable mutations}",
+      "\tif ${2:failed} {",
+      "\t\trollback \"${3:abort reason}\"",
+      "\t}",
+      "} recover (${4:reason}) {",
+      "\t${5:// handle rollback state}",
+      "}"
+    ],
+    "description": "Atomic transaction block with automatic rollback (Universal Mode)"
+  },
+  "Variabel Reaktif (reaktif)": {
+    "prefix": "reaktif",
+    "body": [
+      "reaktif ${1:namaTurunan} = ${2:ekspresi}"
+    ],
+    "description": "Mendeklarasikan variabel reaktif yang otomatis terhitung ulang saat dependen berubah"
+  },
+  "Reactive Variable (Universal)": {
+    "prefix": "reactive",
+    "body": [
+      "reactive ${1:derivedName} = ${2:expression}"
+    ],
+    "description": "Declare an auto-recomputing reactive variable"
+  },
+  "Pengamat Variabel (pantau)": {
+    "prefix": "pantau",
+    "body": [
+      "pantau ${1:target} (${2:baru}, ${3:lama}) {",
+      "\t${4:cetak(\"Nilai berubah:\", baru)}",
+      "}"
+    ],
+    "description": "Mengamati perubahan nilai variabel target dan memicu efek samping"
+  },
+  "Watch Variable (Universal)": {
+    "prefix": "watch",
+    "body": [
+      "watch ${1:target} (${2:newVal}, ${3:oldVal}) {",
+      "\t${4:print(\"Value updated:\", newVal)}",
+      "}"
+    ],
+    "description": "Observe variable changes and trigger side effects (Universal Mode)"
+  },
+  "Perulangan Selama (selama)": {
     "prefix": "selama",
     "body": [
       "selama ${1:kondisi} {",
       "\t${2:// alur perulangan}",
+      "}"
     ],
     "description": "Perulangan bersyarat (while loop)"
   },
-  "Perulangan Untuk Koleksi": {
+  "While Loop (Universal)": {
+    "prefix": "while",
+    "body": [
+      "while ${1:condition} {",
+      "\t${2:// loop body}",
+      "}"
+    ],
+    "description": "Conditional while loop"
+  },
+  "Perulangan Untuk Koleksi (untuk)": {
     "prefix": "untuk",
     "body": [
       "untuk ${1:item} dalam ${2:koleksi} {",
@@ -64,6 +185,41 @@
       "}"
     ],
     "description": "Perulangan for-each untuk array atau rentang"
+  },
+  "For-In Loop (Universal)": {
+    "prefix": "for",
+    "body": [
+      "for ${1:item} in ${2:collection} {",
+      "\t${3:print(item)}",
+      "}"
+    ],
+    "description": "Collection loop (Universal style)"
+  },
+  "Saluran Komunikasi (Saluran / Channel)": {
+    "prefix": "saluran",
+    "body": [
+      "buat ${1:ch} = Saluran(${2:10})",
+      "${1:ch}.kirim(${3:data})",
+      "buat ${4:hasil} = ${1:ch}.terima()"
+    ],
+    "description": "Komunikasi aman antar-pekerjaan menggunakan saluran (channel)"
+  },
+  "Channel Communication (Universal)": {
+    "prefix": "channel",
+    "body": [
+      "let ${1:ch} = Channel(${2:10})",
+      "${1:ch}.send(${3:data})",
+      "let ${4:result} = ${1:ch}.receive()"
+    ],
+    "description": "Thread-safe channel communication (Universal style)"
+  },
+  "Tugas Latar Belakang (titip & jemput)": {
+    "prefix": "titip",
+    "body": [
+      "buat ${1:tiket} = titip ${2:tugas()}",
+      "buat ${3:hasil} = jemput(${1:tiket})"
+    ],
+    "description": "Menjalankan tugas asinkron di latar belakang dan menjemput hasilnya"
   },
   "Asinkron Sambil": {
     "prefix": "sambil",
@@ -84,12 +240,68 @@
     ],
     "description": "Eksekusi paralel terkoordinasi (wait group otomatis)"
   },
-  "Cetak Terminal": {
+  "Cetak Terminal (cetak)": {
     "prefix": "cetak",
     "body": [
       "cetak(${1:pesan})"
     ],
     "description": "Mencetak teks atau nilai ke output terminal"
+  },
+  "Print Terminal (print)": {
+    "prefix": "print",
+    "body": [
+      "print(${1:message})"
+    ],
+    "description": "Print values to terminal (Universal style)"
+  },
+  "Time-Travel Variable History": {
+    "prefix": "prev",
+    "body": [
+      "${1:variabel}.sebelumnya"
+    ],
+    "description": "Mengakses nilai variabel sebelum perubahan terakhir"
+  },
+  "Time-Travel Variable History (Universal)": {
+    "prefix": "previous",
+    "body": [
+      "${1:variable}.previous"
+    ],
+    "description": "Access variable's previous value in time-travel tracking"
+  },
+  "Format Mata Uang Rupiah": {
+    "prefix": "rupiah",
+    "body": [
+      "${1:nominal}.rupiah"
+    ],
+    "description": "Format angka menjadi format mata uang Indonesia (Rp 50.000)"
+  },
+  "Format USD (Universal)": {
+    "prefix": "usd",
+    "body": [
+      "${1:amount}.usd"
+    ],
+    "description": "Format numeric value into USD ($1,250.00)"
+  },
+  "Angka Terbilang (terbilang)": {
+    "prefix": "terbilang",
+    "body": [
+      "${1:angka}.terbilang"
+    ],
+    "description": "Mengonversi angka menjadi ejaan kata bahasa Indonesia"
+  },
+  "Numbers In Words (Universal)": {
+    "prefix": "words",
+    "body": [
+      "${1:number}.words"
+    ],
+    "description": "Spells out numeric value into English words"
+  },
+  "Penyaluran Nilai (Pipeline)": {
+    "prefix": "pipe",
+    "body": [
+      "${1:data} |> ${2:fungsi1} |> ${3:fungsi2}"
+    ],
+    "description": "Rantai pengolahan data menggunakan operator pipeline (|\\>)"
   },
   "In-Code Styling Block": {
     "prefix": "gaya",
@@ -124,4 +336,3 @@
     "description": "Blok enkapsulasi privat dalam bentuk (struct)"
   }
 }
-
