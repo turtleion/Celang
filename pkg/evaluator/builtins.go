@@ -70,6 +70,8 @@ func RegisterBuiltinsWithIO(env *Environment, in io.Reader, out io.Writer) {
 			switch arg := args[0].(type) {
 			case *String:
 				return &Integer{Value: int64(utf8.RuneCountInString(arg.Value))}
+			case *Bytes:
+				return &Integer{Value: int64(len(arg.Elements))}
 			case *Array:
 				return &Integer{Value: int64(len(arg.Elements))}
 			case *Map:
@@ -267,6 +269,49 @@ func RegisterBuiltinsWithIO(env *Environment, in io.Reader, out io.Writer) {
 	env.Define("logika", logikaFn, false, "function")
 	env.Define("Boolean", logikaFn, false, "function")
 	env.Define("boolean", logikaFn, false, "function")
+
+	bitaFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) == 0 {
+				return &Bytes{Elements: []byte{}}
+			}
+			switch a := args[0].(type) {
+			case *Bytes:
+				cp := make([]byte, len(a.Elements))
+				copy(cp, a.Elements)
+				return &Bytes{Elements: cp}
+			case *String:
+				return &Bytes{Elements: []byte(a.Value)}
+			case *Integer:
+				if a.Value < 0 {
+					return &Error{Message: "ukuran alokasi bita tidak boleh negatif"}
+				}
+				if a.Value > 100_000_000 {
+					return &Error{Message: "ukuran alokasi bita melebihi batas aman (100MB)"}
+				}
+				return &Bytes{Elements: make([]byte, a.Value)}
+			case *Array:
+				elems := make([]byte, len(a.Elements))
+				for i, el := range a.Elements {
+					if iVal, _, isInt, ok := CoerceToNumeric(el); ok && isInt {
+						if iVal < 0 || iVal > 255 {
+							return &Error{Message: fmt.Sprintf("nilai elemen bita harus di antara 0 dan 255, menerima %d", iVal)}
+						}
+						elems[i] = byte(iVal)
+					} else {
+						return &Error{Message: fmt.Sprintf("elemen array untuk bita harus berupa angka (0..255), menerima %s", el.Type())}
+					}
+				}
+				return &Bytes{Elements: elems}
+			default:
+				return &Error{Message: fmt.Sprintf("tidak dapat membuat bita dari tipe %s", a.Type())}
+			}
+		},
+	}
+	env.Define("Bita", bitaFn, false, "function")
+	env.Define("bita", bitaFn, false, "function")
+	env.Define("Bytes", bitaFn, false, "function")
+	env.Define("bytes", bitaFn, false, "function")
 
 	// Indonesian Culture Builtins: terbilang(angka), rupiah(angka) / format_rupiah(angka)
 	terbilangFn := &Builtin{
@@ -481,6 +526,10 @@ func deepCloneWithVisited(obj Object, visited map[any]Object, depth int) Object 
 		return &String{Value: o.Value}
 	case *Boolean:
 		return &Boolean{Value: o.Value}
+	case *Bytes:
+		cloned := make([]byte, len(o.Elements))
+		copy(cloned, o.Elements)
+		return &Bytes{Elements: cloned}
 	case *Null:
 		return &Null{}
 	case *Array:

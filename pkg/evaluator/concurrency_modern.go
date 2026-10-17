@@ -319,6 +319,9 @@ func checkValueMatchesType(val Object, expectedType string) bool {
 	case "kamus", "peta", "map":
 		_, ok := val.(*Map)
 		return ok
+	case "bita", "bytes", "byte":
+		_, ok := val.(*Bytes)
+		return ok
 	case "saluran", "channel":
 		_, ok := val.(*Channel)
 		return ok

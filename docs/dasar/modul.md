@@ -35,6 +35,7 @@ Mengambil hanya fungsi, konstanta, atau tipe yang dibutuhkan:
 // Dari pustaka bawaan atau paket (tanpa kutip):
 ambil { akar, PI } dari matematika
 ambil { uraikan, rapi } dari json
+ambil { get, post, server } dari http
 
 // Dari berkas lokal (menggunakan kutip):
 ambil { formatTanggal, namaBulan } dari "./utilitas.ce"

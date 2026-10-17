@@ -1,6 +1,9 @@
 package evaluator
 
 import (
+	"bytes"
+	"encoding/base64"
+	"encoding/hex"
 	"fmt"
 	"sort"
 	"strings"
@@ -54,6 +57,8 @@ func objectsEqualWithVisited(a, b Object, visited map[[2]any]bool, depth int) bo
 		return oA.Value == b.(*String).Value
 	case *Boolean:
 		return oA.Value == b.(*Boolean).Value
+	case *Bytes:
+		return bytes.Equal(oA.Elements, b.(*Bytes).Elements)
 	case *Null:
 		return true
 	case *Array:
@@ -637,3 +642,136 @@ func EvalMapMethod(mp *Map, method string, env *Environment, meta *uast.NodeMeta
 
 	return nil, false
 }
+
+// EvalBytesMethod dispatches member method invocations and properties on a Bytes object.
+func EvalBytesMethod(b *Bytes, prop string, env *Environment, meta *uast.NodeMetadata) (Object, bool) {
+	isUniversal := env != nil && env.IsUniversal
+
+	if isUniversal {
+		switch prop {
+		case "ke_teks":
+			return newError(meta, "Indonesian method 'ke_teks' is not allowed in Universal Mode.", "Use '.to_string()' or '.to_text()' instead."), true
+		case "ke_heks":
+			return newError(meta, "Indonesian method 'ke_heks' is not allowed in Universal Mode.", "Use '.to_hex()' instead."), true
+		case "ke_daftar":
+			return newError(meta, "Indonesian method 'ke_daftar' is not allowed in Universal Mode.", "Use '.to_array()' instead."), true
+		case "ke_base64":
+			return newError(meta, "Indonesian method 'ke_base64' is not allowed in Universal Mode.", "Use '.to_base64()' instead."), true
+		case "tambah":
+			return newError(meta, "Indonesian method 'tambah' is not allowed in Universal Mode.", "Use '.append()' instead."), true
+		case "panjang":
+			return newError(meta, "Indonesian property 'panjang' is not allowed in Universal Mode.", "Use '.length' or '.len' instead."), true
+		}
+	}
+
+	switch prop {
+	case "ke_teks", "to_string", "to_text":
+		return &Builtin{
+			Fn: func(args ...Object) Object {
+				return &String{Value: string(b.Elements)}
+			},
+		}, true
+
+	case "ke_heks", "to_hex", "heks", "hex":
+		return &Builtin{
+			Fn: func(args ...Object) Object {
+				return &String{Value: hex.EncodeToString(b.Elements)}
+			},
+		}, true
+
+	case "ke_base64", "to_base64":
+		return &Builtin{
+			Fn: func(args ...Object) Object {
+				return &String{Value: base64.StdEncoding.EncodeToString(b.Elements)}
+			},
+		}, true
+
+	case "ke_daftar", "to_array":
+		return &Builtin{
+			Fn: func(args ...Object) Object {
+				elems := make([]Object, len(b.Elements))
+				for i, by := range b.Elements {
+					elems[i] = &Integer{Value: int64(by)}
+				}
+				return &Array{Elements: elems}
+			},
+		}, true
+
+	case "tambah", "append":
+		return &Builtin{
+			Fn: func(args ...Object) Object {
+				for _, arg := range args {
+					if iVal, _, isInt, ok := CoerceToNumeric(arg); ok && isInt {
+						b.Elements = append(b.Elements, byte(iVal))
+					} else if otherB, ok := arg.(*Bytes); ok {
+						b.Elements = append(b.Elements, otherB.Elements...)
+					} else if otherArr, ok := arg.(*Array); ok {
+						for _, el := range otherArr.Elements {
+							if elInt, _, isI, ok := CoerceToNumeric(el); ok && isI {
+								b.Elements = append(b.Elements, byte(elInt))
+							}
+						}
+					} else if s, ok := arg.(*String); ok {
+						b.Elements = append(b.Elements, []byte(s.Value)...)
+					}
+				}
+				return b
+			},
+		}, true
+
+	case "potong", "slice", "sub":
+		return &Builtin{
+			Fn: func(args ...Object) Object {
+				if len(args) == 0 {
+					return b
+				}
+				start := 0
+				end := len(b.Elements)
+				if iVal, _, isInt, ok := CoerceToNumeric(args[0]); ok && isInt {
+					start = int(iVal)
+					if start < 0 {
+						start = len(b.Elements) + start
+					}
+					if start < 0 {
+						start = 0
+					}
+					if start > len(b.Elements) {
+						start = len(b.Elements)
+					}
+				}
+				if len(args) > 1 {
+					if iVal, _, isInt, ok := CoerceToNumeric(args[1]); ok && isInt {
+						end = int(iVal)
+						if end < 0 {
+							end = len(b.Elements) + end
+						}
+						if end < start {
+							end = start
+						}
+						if end > len(b.Elements) {
+							end = len(b.Elements)
+						}
+					}
+				}
+				sliced := make([]byte, end-start)
+				copy(sliced, b.Elements[start:end])
+				return &Bytes{Elements: sliced}
+			},
+		}, true
+
+	case "panjang", "length", "len":
+		return &Integer{Value: int64(len(b.Elements))}, true
+
+	case "salin", "clone":
+		return &Builtin{
+			Fn: func(args ...Object) Object {
+				cp := make([]byte, len(b.Elements))
+				copy(cp, b.Elements)
+				return &Bytes{Elements: cp}
+			},
+		}, true
+	}
+
+	return nil, false
+}
+

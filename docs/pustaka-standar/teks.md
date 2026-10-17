@@ -239,8 +239,129 @@ cetak(teks.berisi("halo dunia", "dunia"))           // benar
 cetak(teks.dimulai_dengan("celang.go", "celang"))   // benar
 cetak(teks.diakhiri_dengan("dokumen.pdf", ".pdf"))  // benar
 
+cetak(teks.diakhiri_dengan("dokumen.pdf", ".pdf"))  // benar
+
 // 7. Penggantian teks biasa:
 cetak(teks.ganti("kucing merah", "merah", "putih")) // "kucing putih"
+```
+
+---
+
+## ✂️ Pemotongan & Pemecahan Canggih (Cut, Fields, Split Variants)
+
+### 1. `potong_teks` / `cut` & `potong_teks_terakhir` / `cut_last`
+Memotong string berdasarkan pemisah pertama atau terakhir dan mengembalikan Kamus (`Map`) dengan kunci `sebelum`, `sesudah`, dan `ditemukan`:
+
+```celang
+// Potong pada pemisah pertama:
+buat hasil = teks.potong_teks("nama:budi_santoso", ":")
+jika hasil.ditemukan {
+    cetak("Kunci :", hasil.sebelum) // "nama"
+    cetak("Nilai :", hasil.sesudah) // "budi_santoso"
+}
+
+// Potong pada pemisah terakhir:
+buat jalur = teks.potong_teks_terakhir("dokumen.laporan.final.pdf", ".")
+cetak("Nama dasar :", jalur.sebelum) // "dokumen.laporan.final"
+cetak("Ekstensi   :", jalur.sesudah) // "pdf"
+```
+
+### 2. `pangkas_awalan` / `trim_prefix` & `pangkas_akhiran` / `trim_suffix`
+Berbeda dengan `potong_kiri` yang memperlakukan argumen sebagai himpunan karakter acak, fungsi ini memotong **kata atau substring utuh**:
+
+```celang
+buat urlBersih = teks.pangkas_awalan("https://celang.org", "https://")
+cetak(urlBersih) // "celang.org"
+
+buat namaModul = teks.pangkas_akhiran("server.ce", ".ce")
+cetak(namaModul) // "server"
+```
+
+### 3. `kata` / `fields` & `kata_fungsi` / `fields_func`
+Memecah kalimat berdasarkan satu atau lebih spasi/tab/baris baru tanpa menghasilkan teks kosong `""`:
+
+```celang
+buat kataKunci = teks.kata("  budi   makan    nasi   goreng  ")
+cetak(kataKunci) // ["budi", "makan", "nasi", "goreng"]
+
+// Memecah dengan fungsi pemisah kustom:
+buat data = teks.kata_fungsi("user:101;admin:202", fungsi(karakter) {
+    kembalikan karakter == ":" atau karakter == ";"
+})
+cetak(data) // ["user", "101", "admin", "202"]
+```
+
+### 4. `pisah_n`, `pisah_setelah`, `pisah_setelah_n`
+Varian pemecahan teks dengan batas jumlah atau menyertakan pemisah di akhir potongan:
+
+```celang
+// Pecah maksimal n bagian:
+buat bagian = teks.pisah_n("a:b:c:d", ":", 2)
+cetak(bagian) // ["a", "b:c:d"]
+
+// Pemisah tetap disertakan pada tiap potongan:
+buat rute = teks.pisah_setelah("jakarta,bandung,surabaya", ",")
+cetak(rute) // ["jakarta,", "bandung,", "surabaya"]
+```
+
+---
+
+## 🔎 Pencarian & Penggantian Lanjutan
+
+### 1. Kesetaraan Bebas Kasus Huruf (`sama_abaikan_kasus` / `equal_fold`)
+Memeriksa kesetaraan dua teks secara *case-insensitive* berbasis pemetaan Unicode yang cepat tanpa alokasi memori baru:
+
+```celang
+cetak(teks.sama_abaikan_kasus("CELANG", "celang")) // benar
+cetak(teks.equal_fold("admin@celang.id", "Admin@Celang.Id")) // benar
+```
+
+### 2. Pencarian Set Karakter (`berisi_karakter` & `indeks_karakter`)
+Mengecek keberadaan salah satu karakter dari sekumpulan karakter:
+
+```celang
+// Validasi apakah password memiliki karakter simbol:
+buat punyaSimbol = teks.berisi_karakter("Rahasia123!", "!@#$%^&*")
+cetak("Memiliki simbol:", punyaSimbol) // benar
+
+// Mencari letak karakter vokal pertama & terakhir:
+cetak(teks.indeks_karakter("halo dunia", "aeiou"))          // 1 (huruf 'a')
+cetak(teks.indeks_karakter_terakhir("halo dunia", "aeiou")) // 9 (huruf 'a' terakhir)
+```
+
+### 3. Predikat Karakter Berbasis Fungsi (`berisi_fungsi` & `indeks_fungsi`)
+Mencari karakter menggunakan fungsi penentu (closure) Celang:
+
+```celang
+buat adaDigit = teks.berisi_fungsi("celang2026", fungsi(c) {
+    kembalikan teks.sesuai(c, "[0-9]")
+})
+cetak("Ada angka:", adaDigit) // benar
+
+buat posDigitPertama = teks.indeks_fungsi("versi-2.0", fungsi(c) {
+    kembalikan teks.sesuai(c, "[0-9]")
+})
+cetak("Posisi angka:", posDigitPertama) // 6
+```
+
+### 4. Penggantian Multi-Pola Sekaligus (`ganti_banyak` / `replace_many`)
+Mengganti banyak kata sekaligus dalam **1 kali lintasan (*single-pass*)** berkinerja tinggi menggunakan algoritma Trie/Aho-Corasick:
+
+```celang
+buat kamusPengganti = {
+    "\{nama}": "Andi",
+    "\{peran}": "Administrator",
+    "\{status}": "Aktif"
+}
+buat hasil = teks.ganti_banyak("Pengguna \{nama} bertindak sebagai \{peran} [\{status}].", kamusPengganti)
+cetak(hasil) // "Pengguna Andi bertindak sebagai Administrator [Aktif]."
+```
+
+### 5. Sanitasi UTF-8 (`ke_valid_utf8` / `to_valid_utf8`)
+Mengganti byte yang rusak atau tidak valid dalam encoding UTF-8 dengan karakter pengganti:
+
+```celang
+buat bersih = teks.ke_valid_utf8(teksKotor, "?")
 ```
 
 ---
@@ -249,6 +370,24 @@ cetak(teks.ganti("kucing merah", "merah", "putih")) // "kucing putih"
 
 | Fungsi Bahasa Indonesia | Alias Internasional | Keterangan Singkat |
 | :--- | :--- | :--- |
+| **`potong_teks(teks, sep)`** | `cut` | Memotong di pemisah pertama $\rightarrow$ `{sebelum, sesudah, ditemukan}` |
+| **`potong_teks_terakhir(s, sep)`**| `cut_last` | Memotong di pemisah terakhir $\rightarrow$ `{sebelum, sesudah, ditemukan}` |
+| **`pangkas_awalan(teks, awal)`** | `trim_prefix` | Memotong kata/substring awalan utuh |
+| **`pangkas_akhiran(teks, akhir)`**| `trim_suffix` | Memotong kata/substring akhiran utuh |
+| **`kata(teks)`** | `fields` | Memecah teks berdasarkan whitespace tanpa elemen kosong |
+| **`kata_fungsi(teks, fn)`** | `fields_func` | Memecah teks dengan predikat closure pemisah |
+| **`sama_abaikan_kasus(a, b)`** | `equal_fold` | Perbandingan teks case-insensitive Unicode |
+| **`berisi_karakter(teks, chars)`**| `contains_any` | Cek keberadaan salah satu karakter himpunan |
+| **`indeks_karakter(teks, chars)`**| `index_any` | Posisi pertama karakter dari himpunan (-1 jika tiada) |
+| **`indeks_karakter_terakhir(...)`**| `last_index_any`| Posisi terakhir karakter dari himpunan |
+| **`berisi_fungsi(teks, fn)`** | `contains_func` | Cek karakter yang memenuhi closure predikat |
+| **`indeks_fungsi(teks, fn)`** | `index_func` | Posisi pertama karakter yang memenuhi closure predikat |
+| **`indeks_fungsi_terakhir(t, fn)`**| `last_index_func`| Posisi terakhir karakter yang memenuhi closure predikat |
+| **`ganti_banyak(teks, kamus)`** | `replace_many` | Penggantian multi-pola sekaligus (*single-pass Replacer*) |
+| **`pisah_n(teks, sep, n)`** | `split_n` | Memecah teks dengan batas maksimal `n` potongan |
+| **`pisah_setelah(teks, sep)`** | `split_after` | Memecah teks dengan pemisah tetap disertakan |
+| **`pisah_setelah_n(t, sep, n)`** | `split_after_n` | Memecah teks dengan pemisah disertakan dan batas `n` |
+| **`ke_valid_utf8(teks, rep)`** | `to_valid_utf8` | Sanitasi byte UTF-8 yang rusak dengan string pengganti |
 | **`slug(teks)`** | `slug` | Mengubah kalimat menjadi URL slug SEO yang bersih |
 | **`samarkan(teks, [simbol])`** | `mask` | Sensor otomatis email / nomor telepon / teks sensitif |
 | **`kemiripan(teksA, teksB)`** | `similarity` | Skor kemiripan teks (0.0 sampai 1.0) |
@@ -259,7 +398,7 @@ cetak(teks.ganti("kucing merah", "merah", "putih")) // "kucing putih"
 | **`unta(teks)`** | `camel` | Mengonversi format kalimat ke `camelCase` |
 | **`ular(teks)`** | `snake` | Mengonversi format kalimat ke `snake_case` |
 | **`kebab(teks)`** | `kebab` | Mengonversi format kalimat ke `kebab-case` |
-| **`sesuai(teks, pola)`** | `match` / `apakah_cocok` | Memeriksa kecocokan pola Regex (boolean) |
+| **`sesuai(teks, pola)`** | `match` / `cocok` | Memeriksa kecocokan pola Regex (boolean) |
 | **`temukan_semua(teks, pola)`** | `find_all` | Mengambil seluruh kecocokan Regex ke dalam daftar |
 | **`ganti_pola(teks, pola, baru)`**| `replace_regex` | Substitusi teks dengan aturan Regex |
 | **`isi_kiri(teks, len, [pad])`** | `pad_start` / `pad_left` | Menambahkan karakter pengisi di sisi kiri |

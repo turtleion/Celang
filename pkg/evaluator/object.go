@@ -28,6 +28,7 @@ const (
 	STRUCT_INSTANCE_OBJ ObjectType = "STRUCT_INSTANCE"
 	TICKET_OBJ          ObjectType = "TIKET"
 	CHANNEL_OBJ         ObjectType = "SALURAN"
+	BYTES_OBJ           ObjectType = "BITA"
 	ITERATOR_OBJ        ObjectType = "ITERATOR"
 	ROLLBACK_SIGNAL_OBJ ObjectType = "ROLLBACK_SIGNAL"
 	BREAK_SIGNAL_OBJ    ObjectType = "BREAK_SIGNAL"
@@ -84,6 +85,26 @@ type String struct {
 
 func (s *String) Type() ObjectType { return STRING_OBJ }
 func (s *String) Inspect() string  { return s.Value }
+
+// Bytes represents an arbitrary binary collection ([]byte).
+type Bytes struct {
+	Elements []byte
+}
+
+func (b *Bytes) Type() ObjectType { return BYTES_OBJ }
+func (b *Bytes) Inspect() string {
+	if len(b.Elements) == 0 {
+		return "bita([])"
+	}
+	if len(b.Elements) <= 20 {
+		var parts []string
+		for _, by := range b.Elements {
+			parts = append(parts, strconv.Itoa(int(by)))
+		}
+		return fmt.Sprintf("bita([%s])", strings.Join(parts, ", "))
+	}
+	return fmt.Sprintf("<bita: %d bita>", len(b.Elements))
+}
 
 // Null represents absence of value.
 type Null struct{}
@@ -376,6 +397,18 @@ func NewIterator(obj Object) (*IteratorObject, error) {
 				if val == nil || val.Type() == NULL_OBJ {
 					return nil, false
 				}
+				return val, true
+			},
+		}, nil
+	case *Bytes:
+		idx := 0
+		return &IteratorObject{
+			NextFunc: func() (Object, bool) {
+				if idx >= len(o.Elements) {
+					return nil, false
+				}
+				val := &Integer{Value: int64(o.Elements[idx])}
+				idx++
 				return val, true
 			},
 		}, nil

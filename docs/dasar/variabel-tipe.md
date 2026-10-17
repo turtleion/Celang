@@ -72,6 +72,7 @@ Celang menyediakan beberapa jenis nilai yang sering kita jumpai dalam kehidupan 
 | **Bilangan Desimal** | `Angka` / `Pecahan` | `3.14`, `-0.05` | Angka dengan tanda titik sebagai koma desimal |
 | **Tulisan / Teks** | `Teks` | `"Halo"`, `'Dunia'` | Tulisan huruf, kata, atau kalimat |
 | **Pilihan Logika** | `Logika` | `benar`, `salah` | Jawaban ya atau tidak |
+| **Koleksi Bita Biner** | `Bita` / `Bytes` | `bita("Halo")`, `bita(8)` | Kumpulan byte mentah (0–255) untuk data biner (gambar, berkas, jaringan) |
 | **Nilai Kosong** | - | `kosong` (nihil) | Menandakan belum ada data atau tidak ada nilai |
 
 ---
@@ -124,7 +125,30 @@ buat adaGaji = pengguna.has("gaji") // benar
 pengguna.set("lokasi", "Jakarta")   // menambah atau mengubah data
 ```
 
-> 💡 **Panduan Lengkap Koleksi:** Pelajari seluruh metode manipulasi array dan map (seperti `.shift()`, `.unshift()`, `.insert()`, `.remove_at()`, `.join()`, `.contains()`, `.get()`, `.merge()`, dll) pada bab khusus [Manipulasi Koleksi (Array & Map)](/fitur-khas/koleksi-array-map).
+### C. Koleksi Bita Biner (`Bita` / `Bytes`)
+`Bita` adalah wadah koleksi biner efisien yang menyimpan deretan bita mentah (angka bulat `0` hingga `255`). Berbeda dengan `Teks` yang memproses karakter Unicode, `Bita` dirancang khusus untuk memanipulasi berkas biner (gambar, audio, ZIP, PDF), protokol jaringan, dan data heksadesimal/base64:
+
+```celang
+// 1. Berbagai cara membuat Bita:
+buat b1 = bita("Halo")              // dari string: bita([72, 97, 108, 111])
+buat b2 = bita(4)                   // alokasi 4 byte nol: bita([0, 0, 0, 0])
+buat b3 = bita([0x43, 0x65, 0x6C])  // dari array kode ASCII/byte
+
+// 2. Akses indeks dan pengubahan nilai byte secara langsung:
+cetak(b1[0])       // 72 (kode ASCII huruf 'H')
+b1[0] = 74         // Ubah 'H' menjadi 'J' (ASCII 74)
+cetak(b1.ke_teks()) // "Jalo"
+
+// 3. Pemotongan rentang (slicing) & replikasi:
+buat cuplikan = b1[0..2] // bita([74, 97])
+buat ganda = b1 * 2      // bita([74, 97, 108, 111, 74, 97, 108, 111])
+
+// 4. Konversi format data biner:
+cetak(b1.ke_heks())   // "4a616c6f"
+cetak(b1.ke_base64()) // "SmFsbw=="
+```
+
+> 💡 **Panduan Lengkap Koleksi:** Pelajari seluruh metode manipulasi array, map, dan bita (seperti `.shift()`, `.unshift()`, `.insert()`, `.remove_at()`, `.join()`, `.contains()`, `.ke_heks()`, `.ke_base64()`, dll) pada bab khusus [Manipulasi Koleksi (Array & Map)](/fitur-khas/koleksi-array-map).
 
 ---
 
@@ -138,5 +162,9 @@ buat angkaMurni = Angka(teksAngka) // Mengubah teks menjadi angka 25000
 
 buat total = 1000
 buat kalimat = Teks(total)         // Mengubah angka 1000 menjadi teks "1000"
+
+// Konversi data biner (Bita) dan teks:
+buat dataBiner = Bita("Celang")     // Mengubah teks ke objek Bita
+buat teksBalik = Teks(dataBiner)     // Mengubah Bita kembali ke teks "Celang"
 ```
 Celang juga secara cerdas mengenali tulisan berformat mata uang (misalnya `"Rp 150000" - 25000` akan otomatis menghasilkan angka `125000`).

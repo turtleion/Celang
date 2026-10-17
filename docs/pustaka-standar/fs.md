@@ -39,6 +39,10 @@ buat watcher = fs.watch("./src")
 untuk event dalam watcher {
     cetak("Perubahan:", event.path, event.action)
 }
+
+// 6. Baca & Tulis Data Biner Mentah (Bytes):
+buat fotoBytes = fs.read_bytes("./foto.png")
+fs.write_bytes("./foto_salinan.png", fotoBytes)
 ```
 
 Untuk tabel fungsi lengkap dan penjelasan detail setiap fungsi, silakan buka **[Dokumentasi Lengkap Berkas](/pustaka-standar/berkas)**.

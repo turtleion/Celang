@@ -179,7 +179,56 @@ cetak("Jumlah setelah dibersihkan:", akun.length) // 0
 
 ---
 
-## 3. Dukungan Mode Universal (`"use universal"`)
+## 3. Manipulasi Koleksi Bita Biner (`Bita` / `Bytes`)
+
+Koleksi bita biner `Bita` di Celang dirancang sebagai wadah byte efisien (`[]byte`) untuk memanipulasi berkas biner, soket jaringan, dan enkripsi. Objek `Bita` memiliki serangkaian metode bawaan yang mendukung nama Bahasa Indonesia dan nama internasional (Universal).
+
+### Ringkasan Metode Bita
+
+| Metode (Universal) | Metode (Indonesia) | Argumen | Keterangan | Nilai Kembali |
+| :--- | :--- | :--- | :--- | :--- |
+| `.to_string()` | `.ke_teks()` | *(tidak ada)* | Mengonversi isi bita menjadi tulisan string teks UTF-8 | `Teks` |
+| `.to_hex()` | `.ke_heks()` | *(tidak ada)* | Mengonversi deretan bita menjadi string heksadesimal | `Teks` |
+| `.to_base64()` | `.ke_base64()` | *(tidak ada)* | Mengonversi deretan bita menjadi string Base64 | `Teks` |
+| `.to_array()` | `.ke_daftar()` | *(tidak ada)* | Mengonversi bita menjadi array berisi angka bulat `0..255` | `Array` |
+| `.append(...)` | `.tambah(...)` | `data_bita` | Menambahkan bita, teks, atau array integer ke akhir bita | Bita (memungkinkan *chaining*) |
+| `.slice(mulai, [akhir])` | `.potong(mulai, [akhir])` | `mulai, [akhir]` | Mengambil cuplikan rentang bita | Objek `Bita` baru |
+| `.clone()` | `.salin()` | *(tidak ada)* | Membuat salinan utuh (*deep copy*) mandiri | Objek `Bita` baru |
+| `.length` / `.len` | `.panjang` | *(properti)* | Mengambil ukuran total bita | `Angka` (*Integer*) |
+
+---
+
+### Contoh Penggunaan Bita
+
+```celang
+// Membuat bita dari teks
+buat b = bita("Celang")
+
+// Menambah bita secara fluent chaining
+b.tambah(" v2").tambah([33]) // kode ASCII 33 adalah '!'
+cetak(b.ke_teks())           // "Celang v2!"
+
+// Mengakses dan mengubah nilai byte langsung
+cetak(b[0])                  // 67 (huruf 'C')
+b[0] = 71                    // ganti dengan 'G' (ASCII 71)
+cetak(b.ke_teks())           // "Gelang v2!"
+
+// Enkoding heksadesimal dan Base64
+cetak(b.ke_heks())           // "47656c616e6720763221"
+cetak(b.ke_base64())         // "R2VsYW5nIHYyIQ=="
+
+// Operasi potong (slice)
+buat potong = b[0..6]        // bita([71, 101, 108, 97, 110, 103])
+cetak(potong.ke_teks())      // "Gelang"
+
+// Menggandakan bita (operator perkalian)
+buat ulang = bita("ABC") * 3
+cetak(ulang.ke_teks())       // "ABCABCABC"
+```
+
+---
+
+## 4. Dukungan Mode Universal (`"use universal"`)
 
 Di bawah direktif `"use universal"` pada baris pertama file program, Celang memberlakukan standar metode internasional dalam Bahasa Inggris.
 

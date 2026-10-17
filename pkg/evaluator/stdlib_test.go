@@ -1395,3 +1395,257 @@ func TestStdlib_Sistem(t *testing.T) {
 	}
 }
 
+func TestStdlib_Teks_ExtendedFunctions(t *testing.T) {
+	code := `
+	# 1. potong_teks / cut
+	buat cut1 = teks.potong_teks("nama:budi_santoso", ":")
+	buat cut2 = teks.cut("kunci=nilai=tambahan", "=")
+	buat cut_fail = teks.potong_teks("tanpa_pemisah", ":")
+
+	# 2. potong_teks_terakhir / cut_last
+	buat cut_last1 = teks.potong_teks_terakhir("a.b.c.d", ".")
+	buat cut_last2 = teks.cut_last("file_tanpa_ekstensi", ".")
+
+	# 3. pangkas_awalan / pangkas_akhiran
+	buat pref = teks.pangkas_awalan("https://celang.org", "https://")
+	buat suff = teks.pangkas_akhiran("program.ce", ".ce")
+
+	# 4. kata / fields
+	buat words = teks.kata("  budi   makan   nasi \n goreng ")
+
+	# 5. sama_abaikan_kasus / equal_fold
+	buat eq_fold1 = teks.sama_abaikan_kasus("CELANG", "celang")
+	buat eq_fold2 = teks.equal_fold("Admin", "admin")
+
+	# 6. berisi_karakter & indeks_karakter
+	buat ada_simbol = teks.berisi_karakter("Password123!", "!@#$%")
+	buat idx_simbol = teks.indeks_karakter("halo dunia", "aeiou")
+	buat idx_last = teks.indeks_karakter_terakhir("halo dunia", "aeiou")
+
+	# 7. higher-order functions: berisi_fungsi, indeks_fungsi
+	buat ada_angka = teks.berisi_fungsi("celang2026", fungsi(c) { kembalikan teks.cocok(c, "[0-9]") })
+	buat idx_angka = teks.indeks_fungsi("abc789", fungsi(c) { kembalikan teks.cocok(c, "[0-9]") })
+
+	# 8. ganti_banyak / replace_many
+	buat rep_res = teks.ganti_banyak("Halo \\{nama}, status \\{status}!", {"\\{nama}": "Budi", "\\{status}": "Aktif"})
+
+	# 9. pisah_n, pisah_setelah
+	buat split_n_res = teks.pisah_n("x:y:z", ":", 2)
+	buat split_after_res = teks.pisah_setelah("x,y,z", ",")
+
+	[
+		cut1.sebelum == "nama" dan cut1.sesudah == "budi_santoso" dan cut1.ditemukan == benar,
+		cut2.before == "kunci" dan cut2.after == "nilai=tambahan" dan cut2.found == benar,
+		cut_fail.ditemukan == salah dan cut_fail.sebelum == "tanpa_pemisah",
+		cut_last1.sebelum == "a.b.c" dan cut_last1.sesudah == "d" dan cut_last1.ditemukan == benar,
+		cut_last2.ditemukan == salah,
+		pref == "celang.org",
+		suff == "program",
+		panjang(words) == 4 dan words[0] == "budi" dan words[3] == "goreng",
+		eq_fold1 == benar dan eq_fold2 == benar,
+		ada_simbol == benar,
+		idx_simbol == 1,
+		idx_last == 9,
+		ada_angka == benar,
+		idx_angka == 3,
+		rep_res == "Halo Budi, status Aktif!",
+		panjang(split_n_res) == 2 dan split_n_res[1] == "y:z",
+		panjang(split_after_res) == 3 dan split_after_res[0] == "x,"
+	]
+	`
+	res := runCelangTestCode(t, code)
+	arr, ok := res.(*Array)
+	if !ok {
+		t.Fatalf("expected array, got %s", res.Inspect())
+	}
+	for i, el := range arr.Elements {
+		if b, ok := el.(*Boolean); !ok || !b.Value {
+			t.Errorf("assertion %d failed: got %s", i, el.Inspect())
+		}
+	}
+}
+
+func TestStdlib_Bita_BytesCollection(t *testing.T) {
+	tmpDir := t.TempDir()
+	binFile := filepath.Join(tmpDir, "test.bin")
+
+	code := `
+	# 1. Inisialisasi bita
+	buat b_kosong = bita()
+	buat b_teks = bita("ABC")
+	buat b_arr = bita([72, 101, 108, 108, 111]) # "Hello"
+	buat b_alokasi = bita(3)
+
+	# 2. Panjang dan pengindeksan
+	buat len_b = panjang(b_arr)
+	buat byte0 = b_arr[0]
+	buat byte_last = b_arr[-1]
+
+	# 3. Mutasi
+	b_arr[0] = 74 # 'H' -> 'J' ("Jello")
+	buat jello_str = b_arr.ke_teks()
+
+	# 4. Slicing
+	buat sub_b = b_arr[1..4] # [101, 108, 108] ("ell")
+	buat sub_str = sub_b.ke_teks()
+
+	# 5. Method: ke_heks, ke_base64, ke_daftar
+	buat heks_val = b_teks.ke_heks()     # "ABC" -> "414243"
+	buat b64_val = b_teks.ke_base64()    # "ABC" -> "QUJD"
+	buat dftr = b_teks.ke_daftar()       # [65, 66, 67]
+
+	# 6. Tambah (append) dan penggabungan (+)
+	buat b_gabung = b_teks + bita("DEF")
+	buat teks_gabung = b_gabung.ke_teks()
+
+	# 7. File I/O biner
+	buat tulis_ok = berkas.tulis_bita("` + binFile + `", b_gabung)
+	buat b_baca = berkas.baca_bita("` + binFile + `")
+	buat sama_file = (b_baca == b_gabung)
+
+	# 8. Perulangan (Iterator)
+	buat total = 0
+	untuk x dalam b_teks {
+		total = total + x
+	}
+	# 65 + 66 + 67 = 198
+
+	[
+		panjang(b_kosong) == 0,
+		panjang(b_teks) == 3,
+		len_b == 5,
+		byte0 == 72,
+		byte_last == 111,
+		jello_str == "Jello",
+		sub_str == "ell",
+		heks_val == "414243",
+		b64_val == "QUJD",
+		panjang(dftr) == 3 dan dftr[0] == 65,
+		teks_gabung == "ABCDEF",
+		tulis_ok == benar,
+		sama_file == benar,
+		total == 198
+	]
+	`
+	res := runCelangTestCode(t, code)
+	arr, ok := res.(*Array)
+	if !ok {
+		t.Fatalf("expected array, got %s", res.Inspect())
+	}
+	for i, el := range arr.Elements {
+		if b, ok := el.(*Boolean); !ok || !b.Value {
+			t.Errorf("assertion %d failed: got %s", i, el.Inspect())
+		}
+	}
+}
+
+func TestStdlib_HTTP_ClientAndServer(t *testing.T) {
+	code := `
+	# 1. URL Helpers
+	buat uri = "https://celang.org:8080/api/kamus?kategori=teknologi&halaman=1#bab1"
+	buat p = http.parse_url(uri)
+	buat enc = http.encode_uri_component("halo dunia & selamat pagi!")
+	buat dec = http.decode_uri_component(enc)
+
+	# 2. Server HTTP & Router
+	buat app = http.server()
+
+	# Middleware header
+	app.use(fungsi(req, res, next) {
+		res.header("X-Celang-Framework", "v2")
+		next()
+	})
+
+	# Route GET sederhana
+	app.get("/halo", fungsi(req, res) {
+		res.kirim("Halo dari Server Celang!")
+	})
+
+	# Route dengan parameter jalur (:id)
+	app.get("/api/pengguna/:id", fungsi(req, res) {
+		res.json({
+			"id": req.params.id,
+			"nama": "Budi Santoso",
+			"status": "aktif"
+		})
+	})
+
+	# Route POST dengan JSON body
+	app.post("/api/pesan", fungsi(req, res) {
+		buat body = req.json()
+		res.status(201).json({
+			"status": "diterima",
+			"konten": body.konten
+		})
+	})
+
+	# Route bita biner
+	app.get("/biner", fungsi(req, res) {
+		res.kirim(bita([72, 69, 88])) # "HEX"
+	})
+
+	# Jalankan server di background pada port acak (0)
+	app.start(0)
+	buat port = app.port
+	buat base = "http://127.0.0.1:" + Teks(port)
+
+	# 3. Klien HTTP
+	# Test 1: GET /halo
+	buat r1 = http.get(base + "/halo")
+
+	# Test 2: GET /api/pengguna/42
+	buat r2 = http.get(base + "/api/pengguna/42")
+	buat dataUser = r2.json()
+
+	# Test 3: POST /api/pesan dengan payload Map JSON
+	buat r3 = http.post(base + "/api/pesan", {"konten": "Halo Web!"})
+	buat dataPesan = r3.json()
+
+	# Test 4: GET /biner menerima Bita
+	buat r4 = http.get(base + "/biner")
+	buat binerRes = r4.bita()
+
+	# Test 5: 404 Route
+	buat r5 = http.get(base + "/tidak-ada")
+
+	# Hentikan server
+	app.close()
+
+	[
+		p.scheme == "https",
+		p.host == "celang.org",
+		p.port == 8080,
+		p.path == "/api/kamus",
+		p.params.kategori == "teknologi",
+		p.fragment == "bab1",
+		dec == "halo dunia & selamat pagi!",
+		r1.status == 200,
+		r1.sukses == benar,
+		r1.headers["x-celang-framework"] == "v2",
+		r1.teks() == "Halo dari Server Celang!",
+		r2.status == 200,
+		dataUser.id == "42",
+		dataUser.nama == "Budi Santoso",
+		r3.status == 201,
+		dataPesan.status == "diterima",
+		dataPesan.konten == "Halo Web!",
+		r4.status == 200,
+		binerRes.ke_teks() == "HEX",
+		r5.status == 404,
+		r5.sukses == salah
+	]
+	`
+	res := runCelangTestCode(t, code)
+	arr, ok := res.(*Array)
+	if !ok {
+		t.Fatalf("expected array, got %s", res.Inspect())
+	}
+	for i, el := range arr.Elements {
+		if b, ok := el.(*Boolean); !ok || !b.Value {
+			t.Errorf("assertion %d failed: got %s", i, el.Inspect())
+		}
+	}
+}
+
+
+

@@ -567,6 +567,7 @@ func initStdlibTeks(env *Environment) {
 		},
 	}
 	definePublicFunction(env, "sesuai", cocokFn)
+	definePublicFunction(env, "cocok", cocokFn)
 	definePublicFunction(env, "apakah_cocok", cocokFn)
 	definePublicFunction(env, "match", cocokFn)
 
@@ -749,6 +750,440 @@ func initStdlibTeks(env *Environment) {
 		},
 	}
 	definePublicFunction(env, "format", formatFn)
+
+	// -------------------------------------------------------------
+	// 7. Pemotongan & Pemecahan Canggih (Cut, Fields, Split variants)
+	// -------------------------------------------------------------
+
+	// potong_teks / cut(str, sep) -> Map {sebelum, sesudah, ditemukan, before, after, found}
+	potongTeksFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 2 {
+				return newError(nil, "teks.potong_teks mengharapkan 2 argumen: teks dan pemisah", "Contoh: teks.potong_teks(\"kunci:nilai\", \":\")")
+			}
+			str, ok1 := args[0].(*String)
+			sep, ok2 := args[1].(*String)
+			if !ok1 || !ok2 {
+				return newError(nil, "argumen untuk teks.potong_teks harus berupa teks", "")
+			}
+			before, after, found := strings.Cut(str.Value, sep.Value)
+			bObj := &String{Value: before}
+			aObj := &String{Value: after}
+			fObj := nativeBool(found)
+			return &Map{
+				Pairs: map[string]Object{
+					"sebelum":   bObj,
+					"sesudah":   aObj,
+					"ditemukan": fObj,
+					"before":    bObj,
+					"after":     aObj,
+					"found":     fObj,
+				},
+				Order: []string{"sebelum", "sesudah", "ditemukan"},
+			}
+		},
+	}
+	definePublicFunction(env, "potong_teks", potongTeksFn)
+	definePublicFunction(env, "cut", potongTeksFn)
+
+	// potong_teks_terakhir / cut_last(str, sep) -> Map
+	potongTeksTerakhirFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 2 {
+				return newError(nil, "teks.potong_teks_terakhir mengharapkan 2 argumen: teks dan pemisah", "Contoh: teks.potong_teks_terakhir(\"a.b.c\", \".\")")
+			}
+			str, ok1 := args[0].(*String)
+			sep, ok2 := args[1].(*String)
+			if !ok1 || !ok2 {
+				return newError(nil, "argumen untuk teks.potong_teks_terakhir harus berupa teks", "")
+			}
+			idx := strings.LastIndex(str.Value, sep.Value)
+			var before, after string
+			found := idx != -1
+			if found {
+				before = str.Value[:idx]
+				after = str.Value[idx+len(sep.Value):]
+			} else {
+				before = str.Value
+				after = ""
+			}
+			bObj := &String{Value: before}
+			aObj := &String{Value: after}
+			fObj := nativeBool(found)
+			return &Map{
+				Pairs: map[string]Object{
+					"sebelum":   bObj,
+					"sesudah":   aObj,
+					"ditemukan": fObj,
+					"before":    bObj,
+					"after":     aObj,
+					"found":     fObj,
+				},
+				Order: []string{"sebelum", "sesudah", "ditemukan"},
+			}
+		},
+	}
+	definePublicFunction(env, "potong_teks_terakhir", potongTeksTerakhirFn)
+	definePublicFunction(env, "cut_last", potongTeksTerakhirFn)
+
+	// pangkas_awalan / trim_prefix(str, prefix)
+	pangkasAwalanFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 2 {
+				return newError(nil, "teks.pangkas_awalan mengharapkan 2 argumen: teks dan awalan", "Contoh: teks.pangkas_awalan(\"v1.0.0\", \"v\")")
+			}
+			str, ok1 := args[0].(*String)
+			pref, ok2 := args[1].(*String)
+			if !ok1 || !ok2 {
+				return newError(nil, "argumen teks.pangkas_awalan harus berupa teks", "")
+			}
+			return &String{Value: strings.TrimPrefix(str.Value, pref.Value)}
+		},
+	}
+	definePublicFunction(env, "pangkas_awalan", pangkasAwalanFn)
+	definePublicFunction(env, "trim_prefix", pangkasAwalanFn)
+
+	// pangkas_akhiran / trim_suffix(str, suffix)
+	pangkasAkhiranFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 2 {
+				return newError(nil, "teks.pangkas_akhiran mengharapkan 2 argumen: teks dan akhiran", "Contoh: teks.pangkas_akhiran(\"file.ce\", \".ce\")")
+			}
+			str, ok1 := args[0].(*String)
+			suff, ok2 := args[1].(*String)
+			if !ok1 || !ok2 {
+				return newError(nil, "argumen teks.pangkas_akhiran harus berupa teks", "")
+			}
+			return &String{Value: strings.TrimSuffix(str.Value, suff.Value)}
+		},
+	}
+	definePublicFunction(env, "pangkas_akhiran", pangkasAkhiranFn)
+	definePublicFunction(env, "trim_suffix", pangkasAkhiranFn)
+
+	// kata / fields(str)
+	kataFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 {
+				return newError(nil, "teks.kata mengharapkan 1 argumen teks", "Contoh: teks.kata(\"satu dua tiga\")")
+			}
+			str, ok := args[0].(*String)
+			if !ok {
+				return newError(nil, "argumen teks.kata harus berupa teks", "")
+			}
+			words := strings.Fields(str.Value)
+			elems := make([]Object, len(words))
+			for i, w := range words {
+				elems[i] = &String{Value: w}
+			}
+			return &Array{Elements: elems}
+		},
+	}
+	definePublicFunction(env, "kata", kataFn)
+	definePublicFunction(env, "fields", kataFn)
+
+	// kata_fungsi / fields_func(str, fn)
+	kataFungsiFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 2 {
+				return newError(nil, "teks.kata_fungsi mengharapkan 2 argumen: teks dan fungsi", "")
+			}
+			str, ok := args[0].(*String)
+			if !ok {
+				return newError(nil, "argumen pertama teks.kata_fungsi harus teks", "")
+			}
+			fn := args[1]
+			words := strings.FieldsFunc(str.Value, func(r rune) bool {
+				res := applyFunction(fn, []Object{&String{Value: string(r)}}, nil)
+				return CoerceToBoolean(res)
+			})
+			elems := make([]Object, len(words))
+			for i, w := range words {
+				elems[i] = &String{Value: w}
+			}
+			return &Array{Elements: elems}
+		},
+	}
+	definePublicFunction(env, "kata_fungsi", kataFungsiFn)
+	definePublicFunction(env, "fields_func", kataFungsiFn)
+
+	// sama_abaikan_kasus / equal_fold(s1, s2)
+	samaAbaikanKasusFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 2 {
+				return newError(nil, "teks.sama_abaikan_kasus mengharapkan 2 argumen teks", "Contoh: teks.sama_abaikan_kasus(\"abc\", \"ABC\")")
+			}
+			s1, ok1 := args[0].(*String)
+			s2, ok2 := args[1].(*String)
+			if !ok1 || !ok2 {
+				return newError(nil, "kedua argumen teks.sama_abaikan_kasus harus berupa teks", "")
+			}
+			return nativeBool(strings.EqualFold(s1.Value, s2.Value))
+		},
+	}
+	definePublicFunction(env, "sama_abaikan_kasus", samaAbaikanKasusFn)
+	definePublicFunction(env, "equal_fold", samaAbaikanKasusFn)
+
+	// berisi_karakter / contains_any(str, chars)
+	berisiKarakterFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 2 {
+				return newError(nil, "teks.berisi_karakter mengharapkan 2 argumen: teks dan kumpulan_karakter", "")
+			}
+			str, ok1 := args[0].(*String)
+			chars, ok2 := args[1].(*String)
+			if !ok1 || !ok2 {
+				return newError(nil, "argumen teks.berisi_karakter harus berupa teks", "")
+			}
+			return nativeBool(strings.ContainsAny(str.Value, chars.Value))
+		},
+	}
+	definePublicFunction(env, "berisi_karakter", berisiKarakterFn)
+	definePublicFunction(env, "contains_any", berisiKarakterFn)
+
+	// indeks_karakter / index_any(str, chars)
+	indeksKarakterFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 2 {
+				return newError(nil, "teks.indeks_karakter mengharapkan 2 argumen: teks dan kumpulan_karakter", "")
+			}
+			str, ok1 := args[0].(*String)
+			chars, ok2 := args[1].(*String)
+			if !ok1 || !ok2 {
+				return newError(nil, "argumen teks.indeks_karakter harus berupa teks", "")
+			}
+			idx := strings.IndexAny(str.Value, chars.Value)
+			if idx == -1 {
+				return &Integer{Value: -1}
+			}
+			runeIdx := len([]rune(str.Value[:idx]))
+			return &Integer{Value: int64(runeIdx)}
+		},
+	}
+	definePublicFunction(env, "indeks_karakter", indeksKarakterFn)
+	definePublicFunction(env, "index_any", indeksKarakterFn)
+
+	// indeks_karakter_terakhir / last_index_any(str, chars)
+	indeksKarakterTerakhirFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 2 {
+				return newError(nil, "teks.indeks_karakter_terakhir mengharapkan 2 argumen: teks dan kumpulan_karakter", "")
+			}
+			str, ok1 := args[0].(*String)
+			chars, ok2 := args[1].(*String)
+			if !ok1 || !ok2 {
+				return newError(nil, "argumen teks.indeks_karakter_terakhir harus berupa teks", "")
+			}
+			idx := strings.LastIndexAny(str.Value, chars.Value)
+			if idx == -1 {
+				return &Integer{Value: -1}
+			}
+			runeIdx := len([]rune(str.Value[:idx]))
+			return &Integer{Value: int64(runeIdx)}
+		},
+	}
+	definePublicFunction(env, "indeks_karakter_terakhir", indeksKarakterTerakhirFn)
+	definePublicFunction(env, "last_index_any", indeksKarakterTerakhirFn)
+
+	// berisi_fungsi / contains_func(str, fn)
+	berisiFungsiFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 2 {
+				return newError(nil, "teks.berisi_fungsi mengharapkan 2 argumen: teks dan fungsi", "")
+			}
+			str, ok := args[0].(*String)
+			if !ok {
+				return newError(nil, "argumen pertama teks.berisi_fungsi harus berupa teks", "")
+			}
+			fn := args[1]
+			for _, r := range str.Value {
+				res := applyFunction(fn, []Object{&String{Value: string(r)}}, nil)
+				if CoerceToBoolean(res) {
+					return TRUE
+				}
+			}
+			return FALSE
+		},
+	}
+	definePublicFunction(env, "berisi_fungsi", berisiFungsiFn)
+	definePublicFunction(env, "contains_func", berisiFungsiFn)
+
+	// indeks_fungsi / index_func(str, fn)
+	indeksFungsiFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 2 {
+				return newError(nil, "teks.indeks_fungsi mengharapkan 2 argumen: teks dan fungsi", "")
+			}
+			str, ok := args[0].(*String)
+			if !ok {
+				return newError(nil, "argumen pertama teks.indeks_fungsi harus berupa teks", "")
+			}
+			fn := args[1]
+			runes := []rune(str.Value)
+			for i, r := range runes {
+				res := applyFunction(fn, []Object{&String{Value: string(r)}}, nil)
+				if CoerceToBoolean(res) {
+					return &Integer{Value: int64(i)}
+				}
+			}
+			return &Integer{Value: -1}
+		},
+	}
+	definePublicFunction(env, "indeks_fungsi", indeksFungsiFn)
+	definePublicFunction(env, "index_func", indeksFungsiFn)
+
+	// indeks_fungsi_terakhir / last_index_func(str, fn)
+	indeksFungsiTerakhirFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 2 {
+				return newError(nil, "teks.indeks_fungsi_terakhir mengharapkan 2 argumen: teks dan fungsi", "")
+			}
+			str, ok := args[0].(*String)
+			if !ok {
+				return newError(nil, "argumen pertama teks.indeks_fungsi_terakhir harus berupa teks", "")
+			}
+			fn := args[1]
+			runes := []rune(str.Value)
+			for i := len(runes) - 1; i >= 0; i-- {
+				res := applyFunction(fn, []Object{&String{Value: string(runes[i])}}, nil)
+				if CoerceToBoolean(res) {
+					return &Integer{Value: int64(i)}
+				}
+			}
+			return &Integer{Value: -1}
+		},
+	}
+	definePublicFunction(env, "indeks_fungsi_terakhir", indeksFungsiTerakhirFn)
+	definePublicFunction(env, "last_index_func", indeksFungsiTerakhirFn)
+
+	// ganti_banyak / replace_many(str, kamusAtauArray)
+	gantiBanyakFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 2 {
+				return newError(nil, "teks.ganti_banyak mengharapkan 2 argumen: teks dan kamus_pengganti (atau array pasangan)", "Contoh: teks.ganti_banyak(\"a b\", {\"a\": \"1\", \"b\": \"2\"})")
+			}
+			str, ok := args[0].(*String)
+			if !ok {
+				return newError(nil, "argumen pertama teks.ganti_banyak harus berupa teks", "")
+			}
+			var pairs []string
+			if mp, ok := args[1].(*Map); ok {
+				for _, k := range mp.GetKeys() {
+					pairs = append(pairs, k, mp.Pairs[k].Inspect())
+					if s, ok := mp.Pairs[k].(*String); ok {
+						pairs[len(pairs)-1] = s.Value
+					}
+				}
+			} else if arr, ok := args[1].(*Array); ok {
+				for _, el := range arr.Elements {
+					if subArr, ok := el.(*Array); ok && len(subArr.Elements) >= 2 {
+						kStr := subArr.Elements[0].Inspect()
+						if s, ok := subArr.Elements[0].(*String); ok {
+							kStr = s.Value
+						}
+						vStr := subArr.Elements[1].Inspect()
+						if s, ok := subArr.Elements[1].(*String); ok {
+							vStr = s.Value
+						}
+						pairs = append(pairs, kStr, vStr)
+					}
+				}
+			} else {
+				return newError(nil, "argumen kedua teks.ganti_banyak harus berupa Kamus atau Array pasangan", "")
+			}
+			if len(pairs) == 0 {
+				return str
+			}
+			replacer := strings.NewReplacer(pairs...)
+			return &String{Value: replacer.Replace(str.Value)}
+		},
+	}
+	definePublicFunction(env, "ganti_banyak", gantiBanyakFn)
+	definePublicFunction(env, "replace_many", gantiBanyakFn)
+
+	// pisah_n / split_n(str, sep, n)
+	pisahNFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 3 {
+				return newError(nil, "teks.pisah_n mengharapkan 3 argumen: teks, pemisah, batas_jumlah", "Contoh: teks.pisah_n(\"a:b:c\", \":\", 2)")
+			}
+			str, ok1 := args[0].(*String)
+			sep, ok2 := args[1].(*String)
+			nVal, ok3 := args[2].(*Integer)
+			if !ok1 || !ok2 || !ok3 {
+				return newError(nil, "argumen teks.pisah_n harus berupa (teks, teks, angka)", "")
+			}
+			parts := strings.SplitN(str.Value, sep.Value, int(nVal.Value))
+			elems := make([]Object, len(parts))
+			for i, p := range parts {
+				elems[i] = &String{Value: p}
+			}
+			return &Array{Elements: elems}
+		},
+	}
+	definePublicFunction(env, "pisah_n", pisahNFn)
+	definePublicFunction(env, "split_n", pisahNFn)
+
+	// pisah_setelah / split_after(str, sep)
+	pisahSetelahFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 2 {
+				return newError(nil, "teks.pisah_setelah mengharapkan 2 argumen: teks dan pemisah", "")
+			}
+			str, ok1 := args[0].(*String)
+			sep, ok2 := args[1].(*String)
+			if !ok1 || !ok2 {
+				return newError(nil, "argumen teks.pisah_setelah harus berupa teks", "")
+			}
+			parts := strings.SplitAfter(str.Value, sep.Value)
+			elems := make([]Object, len(parts))
+			for i, p := range parts {
+				elems[i] = &String{Value: p}
+			}
+			return &Array{Elements: elems}
+		},
+	}
+	definePublicFunction(env, "pisah_setelah", pisahSetelahFn)
+	definePublicFunction(env, "split_after", pisahSetelahFn)
+
+	// pisah_setelah_n / split_after_n(str, sep, n)
+	pisahSetelahNFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 3 {
+				return newError(nil, "teks.pisah_setelah_n mengharapkan 3 argumen: teks, pemisah, batas", "")
+			}
+			str, ok1 := args[0].(*String)
+			sep, ok2 := args[1].(*String)
+			nVal, ok3 := args[2].(*Integer)
+			if !ok1 || !ok2 || !ok3 {
+				return newError(nil, "argumen harus berupa (teks, teks, angka)", "")
+			}
+			parts := strings.SplitAfterN(str.Value, sep.Value, int(nVal.Value))
+			elems := make([]Object, len(parts))
+			for i, p := range parts {
+				elems[i] = &String{Value: p}
+			}
+			return &Array{Elements: elems}
+		},
+	}
+	definePublicFunction(env, "pisah_setelah_n", pisahSetelahNFn)
+	definePublicFunction(env, "split_after_n", pisahSetelahNFn)
+
+	// ke_valid_utf8 / to_valid_utf8(str, replacement)
+	keValidUtf8Fn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 2 {
+				return newError(nil, "teks.ke_valid_utf8 mengharapkan 2 argumen: teks dan teks_pengganti", "")
+			}
+			str, ok1 := args[0].(*String)
+			rep, ok2 := args[1].(*String)
+			if !ok1 || !ok2 {
+				return newError(nil, "argumen harus berupa teks", "")
+			}
+			return &String{Value: strings.ToValidUTF8(str.Value, rep.Value)}
+		},
+	}
+	definePublicFunction(env, "ke_valid_utf8", keValidUtf8Fn)
+	definePublicFunction(env, "to_valid_utf8", keValidUtf8Fn)
 }
 
 // -------------------------------------------------------------

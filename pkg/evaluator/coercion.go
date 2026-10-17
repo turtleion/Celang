@@ -80,6 +80,10 @@ func CoerceToBoolean(obj Object) bool {
 		return len(o.Value) > 0
 	case *Array:
 		return len(o.Elements) > 0
+	case *Error:
+		return false
+	case *ReturnValue:
+		return CoerceToBoolean(o.Value)
 	default:
 		return true
 	}

@@ -10,7 +10,7 @@ Seluruh fungsi bawaan mendukung **nama Bahasa Indonesia yang ramah** serta **nam
 
 Pilih kategori fungsi bawaan berdasarkan jenis data yang ingin Anda kelola:
 
-- [1. Konversi Tipe Data & Meta-Objek](#1-konversi-tipe-data--meta-objek) (`tipe`, `Angka`, `Teks`, `Logika`, `salin`)
+- [1. Konversi Tipe Data & Meta-Objek](#1-konversi-tipe-data--meta-objek) (`tipe`, `Angka`, `Teks`, `Logika`, `Bita` / `bita`, `salin`)
 - [2. Manipulasi Teks / String](#2-manipulasi-teks--string) (`panjang`, `potong_spasi`, `kapitalisasi`)
 - [3. Format Mata Uang & Angka Terbilang](#3-format-mata-uang--angka-terbilang) (`rupiah`, `terbilang`, `format_usd`, `in_words`, `dollars_in_words`)
 - [4. Koleksi & Larik (Array & Iterasi)](#4-koleksi--larik-array--iterasi) (`rentang`, `saring`, `petakan`, `panjang`)
@@ -27,8 +27,9 @@ Pilih kategori fungsi bawaan berdasarkan jenis data yang ingin Anda kelola:
 | **Meta & Tipe** | `Angka(x)` | `Number`, `number` | `x: ApaPun` | `Angka`/`Pecahan` | Mengubah teks atau nilai lain menjadi angka |
 | **Meta & Tipe** | `Teks(x)` | `String`, `string` | `x: ApaPun` | `Teks` | Mengubah nilai apa pun menjadi tulisan teks |
 | **Meta & Tipe** | `Logika(x)` | `Boolean`, `boolean` | `x: ApaPun` | `Logika` | Mengevaluasi status kebenaran boolean |
+| **Meta & Tipe** | `Bita(x)` / `bita(x)` | `Bytes`, `bytes` | `x: Teks/Angka/Array` | `Bita` | Membuat atau mengonversi data ke koleksi bita biner |
 | **Meta & Tipe** | `salin(x)` | `clone` | `x: ApaPun` | Objek Baru | Membuat salinan utuh (*deep copy*) mandiri |
-| **Teks** | `panjang(s)` | `len`, `length` | `s: Teks` | `Angka` | Menghitung jumlah karakter teks (Unicode) |
+| **Teks & Bita** | `panjang(s)` | `len`, `length` | `s: Teks / Bita` | `Angka` | Menghitung jumlah karakter teks (Unicode) atau bita |
 | **Teks** | `potong_spasi(s)`| `trim` | `s: Teks` | `Teks` | Memangkas spasi di ujung kiri dan kanan |
 | **Teks** | `kapitalisasi(s)`| `uppercase`, `capitalize`| `s: Teks` | `Teks` | Mengubah seluruh huruf menjadi kapital |
 | **Mata Uang & Kata**| `rupiah(n)` | `format_rupiah` | `n: Numerik` | `Teks` | Format nominal Rupiah (`Rp 150.000,00`) |
@@ -102,8 +103,25 @@ cetak(Logika(""))         // salah
 cetak(Logika([]))         // salah
 ```
 
+### `Bita(nilai)` / `bita` / `Bytes` / `bytes`
+Membuat objek koleksi bita biner [**`Bita`**](/dasar/variabel-tipe#c-koleksi-bita-biner-bita--bytes). Fungsi ini dapat menerima argumen berupa teks string UTF-8, angka kapasitas (alokasi nol), deretan array kode byte (`0..255`), maupun menyalin objek bita yang sudah ada:
+
+```celang
+// 1. Dari teks UTF-8:
+buat b1 = bita("Celang")            // bita([67, 101, 108, 97, 110, 103])
+
+// 2. Alokasi bita nol berdasarkan ukuran (kapasitas):
+buat b2 = bita(4)                   // bita([0, 0, 0, 0])
+
+// 3. Dari array bilangan bulat 0-255:
+buat b3 = bita([0x48, 0x69, 33])    // bita([72, 105, 33])
+
+// 4. Menggandakan objek Bita yang sudah ada:
+buat b4 = bita(b1)                  // salinan mandiri dari b1
+```
+
 ### `salin(objek)` / `clone`
-Melakukan penggandaan utuh (*deep copy*) pada memori terhadap Array, Map, atau Bentuk (Struct). Mengubah salinan data tidak akan pernah memengaruhi data aslinya:
+Melakukan penggandaan utuh (*deep copy*) pada memori terhadap Array, Map, Bita, atau Bentuk (Struct). Mengubah salinan data tidak akan pernah memengaruhi data aslinya:
 
 ```celang
 buat asli = [10, 20, 30]
@@ -118,10 +136,12 @@ cetak(tiruan) // [10, 20, 30, 40]
 
 ## 2. Manipulasi Teks / String
 
-Fungsi bawaan untuk mengukur panjang dan memanipulasi susunan huruf pada tipe data `Teks`.
+Fungsi bawaan untuk mengukur panjang dan memanipulasi susunan huruf pada tipe data `Teks` serta koleksi biner `Bita`.
 
-### `panjang(teks)` / `len` / `length`
-Menghitung jumlah karakter dalam teks. Fungsi ini menghitung karakter Unicode secara akurat (*rune-aware*), sehingga emoji atau karakter multi-byte dihitung sebagai 1 karakter utuh:
+### `panjang(teks_atau_bita)` / `len` / `length`
+Menghitung jumlah karakter dalam teks atau total byte dalam koleksi `Bita`:
+- Pada `Teks`, menghitung karakter Unicode secara akurat (*rune-aware*), sehingga emoji atau multi-byte dihitung sebagai 1 karakter.
+- Pada `Bita`, menghitung jumlah bita biner mentah yang tersimpan.
 
 ```celang
 buat judul = "Celang"
@@ -129,6 +149,9 @@ cetak(panjang(judul)) // 6
 
 buat sapaan = "Halo 👋"
 cetak(panjang(sapaan)) // 6 (termasuk 1 karakter emoji)
+
+buat dataBiner = bita("Halo")
+cetak(panjang(dataBiner)) // 4 (panjang dalam byte)
 ```
 
 ### `potong_spasi(teks)` / `trim`

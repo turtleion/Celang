@@ -1,6 +1,7 @@
 package evaluator
 
 import (
+	"bytes"
 	"fmt"
 	"math"
 	"path/filepath"
@@ -430,6 +431,44 @@ func Eval(node uast.Node, env *Environment) Object {
 					return newError(n.GetMetadata(), fmt.Sprintf("Indeks array %d di luar jangkauan (panjang: %d)", intIdx, len(arr.Elements)), "")
 				}
 			}
+			if b, ok := obj.(*Bytes); ok {
+				var intIdx int64
+				var hasInt bool
+				if computedIndexObj != nil {
+					if iVal, _, isInt, ok := CoerceToNumeric(computedIndexObj); ok && isInt {
+						intIdx = iVal
+						hasInt = true
+					}
+				} else if parsed, err := strconv.ParseInt(prop, 10, 64); err == nil {
+					intIdx = parsed
+					hasInt = true
+				} else if target.Computed && prop != "" {
+					idxObj := Eval(uast.NewIdentifier(prop), env)
+					if iVal, _, isInt, ok := CoerceToNumeric(idxObj); ok && isInt {
+						intIdx = iVal
+						hasInt = true
+					}
+				}
+				if hasInt {
+					if intIdx < 0 {
+						intIdx = int64(len(b.Elements)) + intIdx
+					}
+					if intIdx >= 0 && int(intIdx) < len(b.Elements) {
+						var byteVal byte
+						if iVal, _, isInt, ok := CoerceToNumeric(val); ok && isInt {
+							if iVal < 0 || iVal > 255 {
+								return newError(n.GetMetadata(), fmt.Sprintf("Nilai bita harus di antara 0 dan 255, menerima %d", iVal), "")
+							}
+							byteVal = byte(iVal)
+						} else {
+							return newError(n.GetMetadata(), fmt.Sprintf("Nilai bita harus berupa angka (0..255), menerima %s", val.Type()), "")
+						}
+						b.Elements[intIdx] = byteVal
+						return val
+					}
+					return newError(n.GetMetadata(), fmt.Sprintf("Indeks bita %d di luar jangkauan (panjang: %d)", intIdx, len(b.Elements)), "")
+				}
+			}
 			return newError(n.GetMetadata(), fmt.Sprintf("Target properti '%s' tidak dapat ditugaskan", prop), "")
 
 		default:
@@ -567,6 +606,10 @@ func Eval(node uast.Node, env *Environment) Object {
 		} else if str, ok := iterVal.(*String); ok {
 			for _, r := range str.Value {
 				elements = append(elements, &String{Value: string(r)})
+			}
+		} else if b, ok := iterVal.(*Bytes); ok {
+			for _, by := range b.Elements {
+				elements = append(elements, &Integer{Value: int64(by)})
 			}
 		} else if mp, ok := iterVal.(*Map); ok {
 			if len(mp.Order) > 0 {
@@ -1350,6 +1393,36 @@ func evalBinaryOp(op string, left, right Object, meta *uast.NodeMetadata) Object
 			newElems[len(leftArr.Elements)] = right
 			return &Array{Elements: newElems}
 		}
+
+		// Bytes concatenation
+		if leftB, ok := left.(*Bytes); ok {
+			if rightB, ok := right.(*Bytes); ok {
+				newElems := make([]byte, len(leftB.Elements)+len(rightB.Elements))
+				copy(newElems, leftB.Elements)
+				copy(newElems[len(leftB.Elements):], rightB.Elements)
+				return &Bytes{Elements: newElems}
+			}
+			if rightStr, ok := right.(*String); ok {
+				newElems := make([]byte, len(leftB.Elements)+len(rightStr.Value))
+				copy(newElems, leftB.Elements)
+				copy(newElems[len(leftB.Elements):], []byte(rightStr.Value))
+				return &Bytes{Elements: newElems}
+			}
+		}
+	}
+
+	if op == "*" {
+		if leftB, ok := left.(*Bytes); ok {
+			if cnt, _, isInt, ok := CoerceToNumeric(right); ok && isInt {
+				if cnt <= 0 {
+					return &Bytes{Elements: []byte{}}
+				}
+				if cnt > 1_000_000 || int64(len(leftB.Elements))*cnt > 50_000_000 {
+					return newError(meta, "hasil pengulangan bita melebihi batas aman (50MB)", "")
+				}
+				return &Bytes{Elements: bytes.Repeat(leftB.Elements, int(cnt))}
+			}
+		}
 	}
 
 	// Smart Fallback Arithmetic (-, *, /, %) with adaptive coercion
@@ -1759,8 +1832,26 @@ func castValueToType(val Object, targetType string, meta *uast.NodeMetadata, env
 	case "Logika", "logika", "Bool", "bool", "Boolean":
 		return nativeBool(CoerceToBoolean(val))
 
+	case "Bita", "bita", "Bytes", "bytes":
+		switch v := val.(type) {
+		case *Bytes:
+			return v
+		case *String:
+			return &Bytes{Elements: []byte(v.Value)}
+		case *Array:
+			elems := make([]byte, len(v.Elements))
+			for i, el := range v.Elements {
+				if iVal, _, isInt, ok := CoerceToNumeric(el); ok && isInt {
+					elems[i] = byte(iVal)
+				}
+			}
+			return &Bytes{Elements: elems}
+		default:
+			return newError(meta, fmt.Sprintf("Tidak dapat mengubah tipe %s menjadi Bita", val.Type()), "")
+		}
+
 	default:
-		return newError(meta, fmt.Sprintf("Tipe tujuan casting '%s' tidak didukung", targetType), "Tipe yang didukung: Angka, Pecahan, Teks, Logika, atau alias yang terdaftar.")
+		return newError(meta, fmt.Sprintf("Tipe tujuan casting '%s' tidak didukung", targetType), "Tipe yang didukung: Angka, Pecahan, Teks, Logika, Bita, atau alias yang terdaftar.")
 	}
 }
 
@@ -1920,6 +2011,52 @@ func evalMemberAccess(obj Object, n *uast.MemberExpression, env *Environment) Ob
 				return &String{Value: string(runes[intIdx])}
 			}
 			return newError(n.GetMetadata(), fmt.Sprintf("Indeks teks %d di luar jangkauan (panjang: %d)", intIdx, len(runes)), "")
+		}
+	}
+
+	// 1c. Bytes index access, slicing, and methods (e.g. b[0], b[0..2], b.ke_teks())
+	if b, ok := obj.(*Bytes); ok {
+		propName := n.Property
+		if n.Computed && n.PropertyExpr != nil {
+			pObj := Eval(n.PropertyExpr, env)
+			if !isError(pObj) {
+				if s, ok := pObj.(*String); ok {
+					propName = s.Value
+				}
+			}
+		}
+		if methodObj, ok := EvalBytesMethod(b, propName, env, n.GetMetadata()); ok {
+			return methodObj
+		}
+		if rng, isRng := n.PropertyExpr.(*uast.RangeExpression); isRng {
+			return evalBytesSlice(b, rng, env, n.GetMetadata())
+		}
+		var intIdx int64
+		var hasInt bool
+		if n.Computed && n.PropertyExpr != nil {
+			idxObj := Eval(n.PropertyExpr, env)
+			if iVal, _, isInt, ok := CoerceToNumeric(idxObj); ok && isInt {
+				intIdx = iVal
+				hasInt = true
+			}
+		} else if parsed, err := strconv.ParseInt(n.Property, 10, 64); err == nil {
+			intIdx = parsed
+			hasInt = true
+		} else if n.Computed {
+			idxObj := Eval(uast.NewIdentifier(n.Property), env)
+			if iVal, _, isInt, ok := CoerceToNumeric(idxObj); ok && isInt {
+				intIdx = iVal
+				hasInt = true
+			}
+		}
+		if hasInt {
+			if intIdx < 0 {
+				intIdx = int64(len(b.Elements)) + intIdx
+			}
+			if intIdx >= 0 && int(intIdx) < len(b.Elements) {
+				return &Integer{Value: int64(b.Elements[intIdx])}
+			}
+			return newError(n.GetMetadata(), fmt.Sprintf("Indeks bita %d di luar jangkauan (panjang: %d)", intIdx, len(b.Elements)), "")
 		}
 	}
 
@@ -2363,6 +2500,67 @@ func evalStringSlice(str *String, rng *uast.RangeExpression, env *Environment, m
 	}
 
 	return &String{Value: string(runes[start:end])}
+}
+
+func evalBytesSlice(b *Bytes, rng *uast.RangeExpression, env *Environment, meta *uast.NodeMetadata) Object {
+	n := len(b.Elements)
+	start := 0
+	end := n
+	if rng.Start != nil {
+		sVal := Eval(rng.Start, env)
+		if isError(sVal) {
+			return sVal
+		}
+		if iVal, _, isInt, ok := CoerceToNumeric(sVal); ok && isInt {
+			start = int(iVal)
+		} else {
+			msg := "Batas awal rentang slicing harus berupa bilangan bulat"
+			if env.IsUniversal {
+				msg = "Start index for slicing must be an integer"
+			}
+			return newError(rng.GetMetadata(), msg, "")
+		}
+	}
+	if rng.End != nil {
+		eVal := Eval(rng.End, env)
+		if isError(eVal) {
+			return eVal
+		}
+		if iVal, _, isInt, ok := CoerceToNumeric(eVal); ok && isInt {
+			end = int(iVal)
+		} else {
+			msg := "Batas akhir rentang slicing harus berupa bilangan bulat"
+			if env.IsUniversal {
+				msg = "End index for slicing must be an integer"
+			}
+			return newError(rng.GetMetadata(), msg, "")
+		}
+	}
+	if start < 0 {
+		start = n + start
+		if start < 0 {
+			start = 0
+		}
+	}
+	if start > n {
+		start = n
+	}
+	if end < 0 {
+		end = n + end
+		if end < 0 {
+			end = 0
+		}
+	}
+	if end < start {
+		end = start
+	}
+	if end > n {
+		end = n
+	}
+
+	sliced := make([]byte, end-start)
+	copy(sliced, b.Elements[start:end])
+	return &Bytes{Elements: sliced}
 }
 
 func findRootIdentifier(expr uast.Expression) string {

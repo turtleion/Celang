@@ -46,7 +46,7 @@ export default defineConfig({
           },
           {
             name: 'support.function.celang',
-            match: '\\b(cetak|masukan|panjang|tipe|rentang|saring|petakan|potong_spasi|kapitalisasi|salin|clone|Saluran|jemput_semua|jemput_pertama|terbilang|rupiah|format_rupiah|Angka|Pecahan|Teks|Logika|print|input|len|type|range|filter|map|trim|format_usd|format_currency|in_words|spelled_out|dollars_in_words|Channel|channel|await|await_all|await_race|Number|String|Boolean)\\b'
+            match: '\\b(cetak|masukan|panjang|tipe|rentang|saring|petakan|potong_spasi|kapitalisasi|salin|clone|Saluran|jemput_semua|jemput_pertama|terbilang|rupiah|format_rupiah|Angka|Pecahan|Teks|Logika|Bita|bita|print|input|len|type|range|filter|map|trim|format_usd|format_currency|in_words|spelled_out|dollars_in_words|Channel|channel|await|await_all|await_race|Number|String|Boolean|Bytes|bytes)\\b'
           },
           {
             name: 'constant.numeric.celang',
@@ -155,7 +155,8 @@ export default defineConfig({
           { text: 'Sistem Berkas & I/O (berkas / fs)', link: '/pustaka-standar/berkas' },
           { text: 'Waktu, Tanggal & Durasi (waktu / time)', link: '/pustaka-standar/waktu' },
           { text: 'Pertukaran Data JSON (json)', link: '/pustaka-standar/json' },
-          { text: 'Sistem Operasi & Proses (sistem / os)', link: '/pustaka-standar/sistem' }
+          { text: 'Sistem Operasi & Proses (sistem / os)', link: '/pustaka-standar/sistem' },
+          { text: 'Jaringan & Protokol HTTP (http / jaringan)', link: '/pustaka-standar/http' }
         ]
       },
       {
