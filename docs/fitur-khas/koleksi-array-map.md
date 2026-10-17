@@ -15,10 +15,10 @@ Array di Celang merepresentasikan kumpulan data berurutan. Anda dapat memanipula
 | Metode (Universal) | Metode (Indonesia) | Argumen | Keterangan | Nilai Kembali |
 | :--- | :--- | :--- | :--- | :--- |
 | `.push(...)` | `.tambah(...)` | `elemen, ...` | Menambahkan satu atau lebih elemen ke ujung belakang array | Array (memungkinkan *chaining*) |
-| `.pop()` | `.ambil_terakhir()` | *(tidak ada)* | Mengambil dan menghapus elemen terakhir dari array | Elemen yang terhapus / `kosong` |
-| `.shift()` | `.geser()` | *(tidak ada)* | Mengambil dan menghapus elemen pertama dari array | Elemen yang terhapus / `kosong` |
-| `.unshift(...)` | `.sisip_depan(...)` | `elemen, ...` | Menyisipkan satu atau lebih elemen di awal array | Array (memungkinkan *chaining*) |
-| `.insert(indeks, el)`| `.sisip(indeks, el)` | `indeks, elemen` | Menyisipkan elemen pada indeks tertentu (mendukung indeks negatif) | Array (memungkinkan *chaining*) |
+| `.pop()` | `.hapus_terakhir()` | *(tidak ada)* | Mengambil dan menghapus elemen terakhir dari array | Elemen yang terhapus / `kosong` |
+| `.shift()` | `.hapus_awal()` | *(tidak ada)* | Mengambil dan menghapus elemen pertama dari array | Elemen yang terhapus / `kosong` |
+| `.unshift(...)` | `.sisipkan_depan(...)` | `elemen, ...` | Menyisipkan satu atau lebih elemen di awal array | Array (memungkinkan *chaining*) |
+| `.insert(indeks, el)`| `.sisipkan(indeks, el)` | `indeks, elemen` | Menyisipkan elemen pada indeks tertentu (mendukung indeks negatif) | Array (memungkinkan *chaining*) |
 | `.remove_at(indeks)` | `.hapus_indeks(indeks)` | `indeks` | Menghapus elemen pada indeks tertentu | Elemen yang terhapus |
 | `.reverse()` | `.balik()` | *(tidak ada)* | Membalikkan urutan elemen array secara langsung (*in-place*) | Array (memungkinkan *chaining*) |
 | `.sort([pembanding])`| `.urut([pembanding])` | `[fungsi(a, b)]` | Mengurutkan elemen (alami atau menggunakan fungsi perbandingan kustom) | Array (memungkinkan *chaining*) |
@@ -43,17 +43,17 @@ buat angka = [10, 20, 30]
 angka.push(40, 50)
 cetak(angka) // [10, 20, 30, 40, 50]
 
-// Mengambil elemen terakhir & pertama
-buat terakhir = angka.pop()   // 50
-buat pertama  = angka.shift() // 10
-cetak(terakhir, pertama)     // 50 10
-cetak(angka)                 // [20, 30, 40]
+// Menghapus dan mengambil elemen terakhir & pertama
+buat terakhir = angka.hapus_terakhir() // 50 (alias: .pop() / .ambil_terakhir())
+buat pertama  = angka.hapus_awal()     // 10 (alias: .shift() / .geser())
+cetak(terakhir, pertama)              // 50 10
+cetak(angka)                          // [20, 30, 40]
 
-// Sisip di depan atau pada indeks spesifik
-angka.unshift(5)             // sisip di depan: [5, 20, 30, 40]
-angka.insert(2, 25)          // sisip pada indeks 2: [5, 20, 25, 30, 40]
-buat dihapus = angka.remove_at(1) // hapus elemen pada indeks 1 (nilai 20)
-cetak(angka)                 // [5, 25, 30, 40]
+// Sisipkan di depan atau pada indeks spesifik
+angka.sisipkan_depan(5)               // sisip di depan: [5, 20, 30, 40]
+angka.sisipkan(2, 25)                 // sisipkan pada indeks 2: [5, 20, 25, 30, 40]
+buat dihapus = angka.hapus_indeks(1)  // hapus elemen pada indeks 1 (nilai 20)
+cetak(angka)                          // [5, 25, 30, 40]
 ```
 
 #### Pengurutan (*Sorting*) & Pembalikan (*Reverse*)

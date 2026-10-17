@@ -49,14 +49,14 @@ func EvalArrayMethod(arr *Array, method string, env *Environment, meta *uast.Nod
 		switch method {
 		case "tambah":
 			return newError(meta, "Indonesian method 'tambah' is not allowed in Universal Mode.", "Use '.push(...)' instead."), true
-		case "ambil_terakhir":
-			return newError(meta, "Indonesian method 'ambil_terakhir' is not allowed in Universal Mode.", "Use '.pop()' instead."), true
-		case "geser":
-			return newError(meta, "Indonesian method 'geser' is not allowed in Universal Mode.", "Use '.shift()' instead."), true
-		case "sisip":
-			return newError(meta, "Indonesian method 'sisip' is not allowed in Universal Mode.", "Use '.insert(index, item)' instead."), true
-		case "sisip_depan":
-			return newError(meta, "Indonesian method 'sisip_depan' is not allowed in Universal Mode.", "Use '.unshift(...)' instead."), true
+		case "ambil_terakhir", "hapus_terakhir":
+			return newError(meta, fmt.Sprintf("Indonesian method '%s' is not allowed in Universal Mode.", method), "Use '.pop()' instead."), true
+		case "geser", "hapus_awal":
+			return newError(meta, fmt.Sprintf("Indonesian method '%s' is not allowed in Universal Mode.", method), "Use '.shift()' instead."), true
+		case "sisip", "sisipkan":
+			return newError(meta, fmt.Sprintf("Indonesian method '%s' is not allowed in Universal Mode.", method), "Use '.insert(index, item)' instead."), true
+		case "sisip_depan", "sisipkan_depan", "sisipkan_awal":
+			return newError(meta, fmt.Sprintf("Indonesian method '%s' is not allowed in Universal Mode.", method), "Use '.unshift(...)' instead."), true
 		case "hapus_indeks":
 			return newError(meta, "Indonesian method 'hapus_indeks' is not allowed in Universal Mode.", "Use '.remove_at(index)' instead."), true
 		case "balik":
@@ -91,7 +91,7 @@ func EvalArrayMethod(arr *Array, method string, env *Environment, meta *uast.Nod
 			},
 		}, true
 
-	case "ambil_terakhir", "pop":
+	case "hapus_terakhir", "ambil_terakhir", "pop":
 		return &Builtin{
 			Fn: func(args ...Object) Object {
 				n := len(arr.Elements)
@@ -104,7 +104,7 @@ func EvalArrayMethod(arr *Array, method string, env *Environment, meta *uast.Nod
 			},
 		}, true
 
-	case "geser", "shift":
+	case "hapus_awal", "geser", "shift":
 		return &Builtin{
 			Fn: func(args ...Object) Object {
 				if len(arr.Elements) == 0 {
@@ -116,7 +116,7 @@ func EvalArrayMethod(arr *Array, method string, env *Environment, meta *uast.Nod
 			},
 		}, true
 
-	case "sisip_depan", "unshift":
+	case "sisipkan_depan", "sisipkan_awal", "sisip_depan", "unshift":
 		return &Builtin{
 			Fn: func(args ...Object) Object {
 				newElems := make([]Object, len(args)+len(arr.Elements))
@@ -127,15 +127,15 @@ func EvalArrayMethod(arr *Array, method string, env *Environment, meta *uast.Nod
 			},
 		}, true
 
-	case "sisip", "insert":
+	case "sisipkan", "sisip", "insert":
 		return &Builtin{
 			Fn: func(args ...Object) Object {
 				if len(args) < 2 {
-					return newError(meta, "Metode insert/sisip membutuhkan 2 argumen: (indeks, elemen)", "Contoh: arr.insert(0, 'pertama')")
+					return newError(meta, "Metode insert/sisipkan membutuhkan 2 argumen: (indeks, elemen)", "Contoh: arr.sisipkan(0, 'pertama')")
 				}
 				idxVal, _, isInt, ok := CoerceToNumeric(args[0])
 				if !ok || !isInt {
-					return newError(meta, "Indeks sisip/insert harus berupa bilangan bulat", "")
+					return newError(meta, "Indeks sisipkan/insert harus berupa bilangan bulat", "")
 				}
 				idx := int(idxVal)
 				if idx < 0 {

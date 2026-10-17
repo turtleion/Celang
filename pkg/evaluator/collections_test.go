@@ -9,9 +9,9 @@ func TestArray_BasicMethods(t *testing.T) {
 	code := `
 	buat arr = [1, 2, 3]
 	arr.tambah(4, 5)
-	buat akhir = arr.ambil_terakhir()
-	buat awal = arr.geser()
-	arr.sisip_depan(0)
+	buat akhir = arr.hapus_terakhir()
+	buat awal = arr.hapus_awal()
+	arr.sisipkan_depan(0)
 	[arr, akhir, awal]
 	`
 	res := runCelangTestCode(t, code)
@@ -40,7 +40,7 @@ func TestArray_BasicMethods(t *testing.T) {
 func TestArray_InsertAndRemove(t *testing.T) {
 	code := `
 	buat arr = ["a", "c"]
-	arr.sisip(1, "b")
+	arr.sisipkan(1, "b")
 	buat removed = arr.hapus_indeks(0)
 	[arr, removed]
 	`
