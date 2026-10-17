@@ -492,6 +492,52 @@ func (r *ReturnStatement) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// BreakStatement represents breaking out of the innermost loop.
+type BreakStatement struct {
+	NodeType NodeType      `json:"type"`
+	Metadata *NodeMetadata `json:"metadata,omitempty"`
+}
+
+func (b *BreakStatement) Type() NodeType          { return NodeTypeBreakStatement }
+func (b *BreakStatement) GetMetadata() *NodeMetadata { return b.Metadata }
+func (b *BreakStatement) statementNode()          {}
+
+func (b *BreakStatement) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		NodeType NodeType      `json:"type"`
+		Metadata *NodeMetadata `json:"metadata,omitempty"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	b.NodeType = NodeTypeBreakStatement
+	b.Metadata = raw.Metadata
+	return nil
+}
+
+// ContinueStatement represents skipping to the next iteration of the innermost loop.
+type ContinueStatement struct {
+	NodeType NodeType      `json:"type"`
+	Metadata *NodeMetadata `json:"metadata,omitempty"`
+}
+
+func (c *ContinueStatement) Type() NodeType          { return NodeTypeContinueStatement }
+func (c *ContinueStatement) GetMetadata() *NodeMetadata { return c.Metadata }
+func (c *ContinueStatement) statementNode()          {}
+
+func (c *ContinueStatement) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		NodeType NodeType      `json:"type"`
+		Metadata *NodeMetadata `json:"metadata,omitempty"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	c.NodeType = NodeTypeContinueStatement
+	c.Metadata = raw.Metadata
+	return nil
+}
+
 // ConcurrencyStatement represents concurrent execution block (e.g. 'sambil', 'bersamaan dengan').
 type ConcurrencyStatement struct {
 	NodeType NodeType      `json:"type"`

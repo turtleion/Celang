@@ -289,6 +289,10 @@ func (p *Parser) parseStatement() uast.Statement {
 		return p.parseFunctionDeclaration()
 	case RETURN:
 		return p.parseReturnStatement()
+	case BREAK:
+		return p.parseBreakStatement()
+	case CONTINUE:
+		return p.parseContinueStatement()
 	case ASYNC:
 		return p.parseConcurrencyStatement("sambil")
 	case PARALLEL:
@@ -1621,6 +1625,28 @@ func (p *Parser) parseReturnStatement() *uast.ReturnStatement {
 		NodeType: uast.NodeTypeReturnStatement,
 		Metadata: meta,
 		Value:    val,
+	}
+}
+
+func (p *Parser) parseBreakStatement() *uast.BreakStatement {
+	meta := p.currentMetadata()
+	if p.peekTokenIs(SEMICOLON) {
+		p.nextToken()
+	}
+	return &uast.BreakStatement{
+		NodeType: uast.NodeTypeBreakStatement,
+		Metadata: meta,
+	}
+}
+
+func (p *Parser) parseContinueStatement() *uast.ContinueStatement {
+	meta := p.currentMetadata()
+	if p.peekTokenIs(SEMICOLON) {
+		p.nextToken()
+	}
+	return &uast.ContinueStatement{
+		NodeType: uast.NodeTypeContinueStatement,
+		Metadata: meta,
 	}
 }
 

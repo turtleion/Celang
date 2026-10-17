@@ -48,6 +48,8 @@ var IndonesianToEnglishKeywords = map[string]string{
 	"fungsi":        "function (or fn / def)",
 	"kembalikan":    "return",
 	"mengembalikan": "return",
+	"berhenti":      "break",
+	"lanjut":        "continue",
 	"transaksi":     "transaction",
 	"batalkan":      "rollback",
 	"pulihkan":      "recover",

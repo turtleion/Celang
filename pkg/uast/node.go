@@ -20,6 +20,8 @@ const (
 	NodeTypeForEachStatement     NodeType = "ForEachStatement"
 	NodeTypeFunctionDeclaration  NodeType = "FunctionDeclaration"
 	NodeTypeReturnStatement      NodeType = "ReturnStatement"
+	NodeTypeBreakStatement       NodeType = "BreakStatement"
+	NodeTypeContinueStatement    NodeType = "ContinueStatement"
 	NodeTypeConcurrencyStatement NodeType = "ConcurrencyStatement"
 	NodeTypeImportDeclaration    NodeType = "ImportDeclaration"
 	NodeTypeVisibilityStatement  NodeType = "VisibilityStatement"

@@ -481,9 +481,20 @@ func Eval(node uast.Node, env *Environment) Object {
 				break
 			}
 			result = Eval(n.Body, env)
-			if result != nil && (result.Type() == RETURN_VALUE_OBJ || result.Type() == ERROR_OBJ || result.Type() == ROLLBACK_SIGNAL_OBJ) {
-				return result
+			if result != nil {
+				if result.Type() == BREAK_SIGNAL_OBJ {
+					break
+				}
+				if result.Type() == CONTINUE_SIGNAL_OBJ {
+					continue
+				}
+				if result.Type() == RETURN_VALUE_OBJ || result.Type() == ERROR_OBJ || result.Type() == ROLLBACK_SIGNAL_OBJ {
+					return result
+				}
 			}
+		}
+		if result != nil && (result.Type() == BREAK_SIGNAL_OBJ || result.Type() == CONTINUE_SIGNAL_OBJ) {
+			return NULL
 		}
 		return result
 
@@ -507,8 +518,22 @@ func Eval(node uast.Node, env *Environment) Object {
 				}
 			}
 			result = Eval(n.Body, forEnv)
-			if result != nil && (result.Type() == RETURN_VALUE_OBJ || result.Type() == ERROR_OBJ || result.Type() == ROLLBACK_SIGNAL_OBJ) {
-				return result
+			if result != nil {
+				if result.Type() == BREAK_SIGNAL_OBJ {
+					break
+				}
+				if result.Type() == CONTINUE_SIGNAL_OBJ {
+					if n.Update != nil {
+						updRes := Eval(n.Update, forEnv)
+						if isError(updRes) {
+							return updRes
+						}
+					}
+					continue
+				}
+				if result.Type() == RETURN_VALUE_OBJ || result.Type() == ERROR_OBJ || result.Type() == ROLLBACK_SIGNAL_OBJ {
+					return result
+				}
 			}
 			if n.Update != nil {
 				updRes := Eval(n.Update, forEnv)
@@ -516,6 +541,9 @@ func Eval(node uast.Node, env *Environment) Object {
 					return updRes
 				}
 			}
+		}
+		if result != nil && (result.Type() == BREAK_SIGNAL_OBJ || result.Type() == CONTINUE_SIGNAL_OBJ) {
+			return NULL
 		}
 		return result
 
@@ -547,9 +575,20 @@ func Eval(node uast.Node, env *Environment) Object {
 			for el := range ch.Ch {
 				forEnv.Define(n.Item, el, true, "")
 				result = Eval(n.Body, forEnv)
-				if result != nil && (result.Type() == RETURN_VALUE_OBJ || result.Type() == ERROR_OBJ || result.Type() == ROLLBACK_SIGNAL_OBJ) {
-					return result
+				if result != nil {
+					if result.Type() == BREAK_SIGNAL_OBJ {
+						break
+					}
+					if result.Type() == CONTINUE_SIGNAL_OBJ {
+						continue
+					}
+					if result.Type() == RETURN_VALUE_OBJ || result.Type() == ERROR_OBJ || result.Type() == ROLLBACK_SIGNAL_OBJ {
+						return result
+					}
 				}
+			}
+			if result != nil && (result.Type() == BREAK_SIGNAL_OBJ || result.Type() == CONTINUE_SIGNAL_OBJ) {
+				return NULL
 			}
 			return result
 		} else {
@@ -561,9 +600,20 @@ func Eval(node uast.Node, env *Environment) Object {
 		for _, el := range elements {
 			forEnv.Define(n.Item, el, true, "")
 			result = Eval(n.Body, forEnv)
-			if result != nil && (result.Type() == RETURN_VALUE_OBJ || result.Type() == ERROR_OBJ || result.Type() == ROLLBACK_SIGNAL_OBJ) {
-				return result
+			if result != nil {
+				if result.Type() == BREAK_SIGNAL_OBJ {
+					break
+				}
+				if result.Type() == CONTINUE_SIGNAL_OBJ {
+					continue
+				}
+				if result.Type() == RETURN_VALUE_OBJ || result.Type() == ERROR_OBJ || result.Type() == ROLLBACK_SIGNAL_OBJ {
+					return result
+				}
 			}
+		}
+		if result != nil && (result.Type() == BREAK_SIGNAL_OBJ || result.Type() == CONTINUE_SIGNAL_OBJ) {
+			return NULL
 		}
 		return result
 
@@ -728,6 +778,12 @@ func Eval(node uast.Node, env *Environment) Object {
 			}
 		}
 		return &ReturnValue{Value: val}
+
+	case *uast.BreakStatement:
+		return BREAK_SIGNAL
+
+	case *uast.ContinueStatement:
+		return CONTINUE_SIGNAL
 
 	case *uast.ConcurrencyStatement:
 		// Natural Concurrency:
@@ -1503,7 +1559,7 @@ func evalBlockStatement(stmts []uast.Statement, env *Environment) Object {
 	for _, stmt := range stmts {
 		result = Eval(stmt, env)
 		if result != nil {
-			if result.Type() == RETURN_VALUE_OBJ || result.Type() == ERROR_OBJ || result.Type() == ROLLBACK_SIGNAL_OBJ {
+			if result.Type() == RETURN_VALUE_OBJ || result.Type() == ERROR_OBJ || result.Type() == ROLLBACK_SIGNAL_OBJ || result.Type() == BREAK_SIGNAL_OBJ || result.Type() == CONTINUE_SIGNAL_OBJ {
 				return result
 			}
 		}

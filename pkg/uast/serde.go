@@ -252,6 +252,20 @@ func UnmarshalStatementJSON(data []byte) (Statement, error) {
 		}
 		return &retStmt, nil
 
+	case NodeTypeBreakStatement:
+		var breakStmt BreakStatement
+		if err := json.Unmarshal(data, &breakStmt); err != nil {
+			return nil, err
+		}
+		return &breakStmt, nil
+
+	case NodeTypeContinueStatement:
+		var contStmt ContinueStatement
+		if err := json.Unmarshal(data, &contStmt); err != nil {
+			return nil, err
+		}
+		return &contStmt, nil
+
 	case NodeTypeConcurrencyStatement:
 		var concStmt ConcurrencyStatement
 		if err := json.Unmarshal(data, &concStmt); err != nil {

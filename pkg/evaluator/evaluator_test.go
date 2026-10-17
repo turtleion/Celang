@@ -2099,6 +2099,46 @@ func TestEvaluator_LainBranching(t *testing.T) {
 	}
 }
 
+func TestEvaluator_BreakAndContinue(t *testing.T) {
+	code := `
+	buat sum = 0
+	buat i = 0
+	selama true {
+		i += 1
+		jika i == 2 {
+			lanjut
+		}
+		jika i > 5 {
+			berhenti
+		}
+		sum += i
+	}
+	sum
+	`
+	res := testEvalSource(t, code)
+	if intVal, ok := res.(*evaluator.Integer); !ok || intVal.Value != (1 + 3 + 4 + 5) {
+		t.Fatalf("expected sum 13, got %s", res.Inspect())
+	}
+
+	codeFor := `
+	buat res = []
+	untuk x dalam rentang(1, 10) {
+		jika x % 2 == 0 {
+			lanjut
+		}
+		jika x > 7 {
+			berhenti
+		}
+		res.tambah(x)
+	}
+	res
+	`
+	resFor := testEvalSource(t, codeFor)
+	if arr, ok := resFor.(*evaluator.Array); !ok || arr.Inspect() != "[1, 3, 5, 7]" {
+		t.Fatalf("expected [1, 3, 5, 7], got %s", resFor.Inspect())
+	}
+}
+
 
 
 

@@ -16,7 +16,12 @@ type Local struct {
 	IsMutable bool
 }
 
-// Compiler translates U-AST nodes into bytecode chunks.
+type loopContext struct {
+	startPos   int
+	breakJumps []int
+	scopeDepth int
+}
+
 type Compiler struct {
 	parent     *Compiler
 	chunk      *bytecode.Chunk
@@ -26,6 +31,7 @@ type Compiler struct {
 	numParams  int
 	globals    map[string]bool
 	env        *evaluator.Environment
+	loopStack  []*loopContext
 }
 
 // NewCompiler creates a new top-level Compiler.
@@ -41,6 +47,7 @@ func NewCompilerWithEnv(env *evaluator.Environment) *Compiler {
 		scopeDepth: 0,
 		globals:    make(map[string]bool),
 		env:        env,
+		loopStack:  make([]*loopContext, 0),
 	}
 }
 
@@ -54,6 +61,30 @@ func newFunctionCompiler(parent *Compiler, name string, numParams int) *Compiler
 		numParams:  numParams,
 		globals:    parent.globals,
 		env:        parent.env,
+		loopStack:  make([]*loopContext, 0),
+	}
+}
+
+func (c *Compiler) enterLoop(startPos int) *loopContext {
+	ctx := &loopContext{
+		startPos:   startPos,
+		breakJumps: make([]int, 0),
+		scopeDepth: c.scopeDepth,
+	}
+	c.loopStack = append(c.loopStack, ctx)
+	return ctx
+}
+
+func (c *Compiler) currentLoop() *loopContext {
+	if len(c.loopStack) == 0 {
+		return nil
+	}
+	return c.loopStack[len(c.loopStack)-1]
+}
+
+func (c *Compiler) exitLoop() {
+	if len(c.loopStack) > 0 {
+		c.loopStack = c.loopStack[:len(c.loopStack)-1]
 	}
 }
 
@@ -289,6 +320,7 @@ func (c *Compiler) compileStatement(stmt uast.Statement) error {
 
 	case *uast.WhileStatement:
 		loopStart := len(c.chunk.Instructions)
+		loopCtx := c.enterLoop(loopStart)
 
 		if err := c.compileExpression(s.Condition); err != nil {
 			return err
@@ -304,6 +336,11 @@ func (c *Compiler) compileStatement(stmt uast.Statement) error {
 		c.emitLoop(loopStart, line)
 		c.patchJump(exitJump)
 		c.emitOp(bytecode.OpPop, line)
+
+		for _, bj := range loopCtx.breakJumps {
+			c.patchJump(bj)
+		}
+		c.exitLoop()
 		return nil
 
 	case *uast.ForStatement:
@@ -315,6 +352,7 @@ func (c *Compiler) compileStatement(stmt uast.Statement) error {
 		}
 
 		loopStart := len(c.chunk.Instructions)
+		loopCtx := c.enterLoop(loopStart)
 		var exitJump int = -1
 
 		if s.Condition != nil {
@@ -342,6 +380,11 @@ func (c *Compiler) compileStatement(stmt uast.Statement) error {
 			c.emitOp(bytecode.OpPop, line)
 		}
 
+		for _, bj := range loopCtx.breakJumps {
+			c.patchJump(bj)
+		}
+		c.exitLoop()
+
 		c.endScope(line)
 		return nil
 
@@ -363,6 +406,7 @@ func (c *Compiler) compileStatement(stmt uast.Statement) error {
 
 		// 3. Loop condition / fetch next item
 		loopStart := len(c.chunk.Instructions)
+		loopCtx := c.enterLoop(loopStart)
 		exitJump := c.emitForIter(uint16(iterSlot), line)
 
 		// 4. Assign item to local variable
@@ -385,7 +429,35 @@ func (c *Compiler) compileStatement(stmt uast.Statement) error {
 		// 7. Exit loop
 		c.patchJump(exitJump)
 
+		for _, bj := range loopCtx.breakJumps {
+			c.patchJump(bj)
+		}
+		c.exitLoop()
+
 		c.endScope(line)
+		return nil
+
+	case *uast.BreakStatement:
+		loopCtx := c.currentLoop()
+		if loopCtx == nil {
+			return fmt.Errorf("perintah 'berhenti' (break) hanya dapat digunakan di dalam perulangan")
+		}
+		for i := len(c.locals) - 1; i >= 0 && c.locals[i].Depth > loopCtx.scopeDepth; i-- {
+			c.emitOp(bytecode.OpPop, line)
+		}
+		bj := c.emitJump(bytecode.OpJump, line)
+		loopCtx.breakJumps = append(loopCtx.breakJumps, bj)
+		return nil
+
+	case *uast.ContinueStatement:
+		loopCtx := c.currentLoop()
+		if loopCtx == nil {
+			return fmt.Errorf("perintah 'lanjut' (continue) hanya dapat digunakan di dalam perulangan")
+		}
+		for i := len(c.locals) - 1; i >= 0 && c.locals[i].Depth > loopCtx.scopeDepth; i-- {
+			c.emitOp(bytecode.OpPop, line)
+		}
+		c.emitLoop(loopCtx.startPos, line)
 		return nil
 
 	case *uast.BlockStatement:

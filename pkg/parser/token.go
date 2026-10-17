@@ -66,6 +66,8 @@ const (
 	IN          TokenType = "IN"          // dalam, in
 	FUNC        TokenType = "FUNC"        // fungsi, def, fn, function
 	RETURN      TokenType = "RETURN"      // kembalikan, return
+	BREAK       TokenType = "BREAK"       // berhenti, break, eureun
+	CONTINUE    TokenType = "CONTINUE"    // lanjut, continue, teraskeun
 	ASYNC       TokenType = "ASYNC"       // sambil, async
 	PARALLEL    TokenType = "PARALLEL"    // bersamaan, parallel
 	TRUE        TokenType = "TRUE"        // benar, true, True

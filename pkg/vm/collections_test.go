@@ -36,3 +36,26 @@ func TestVM_MapMethods(t *testing.T) {
 		t.Fatalf("expected b,c:2:99, got %s", res.Inspect())
 	}
 }
+
+func TestVM_BreakAndContinue(t *testing.T) {
+	code := `
+	"use universal"
+	let count = 0
+	let i = 0
+	while true {
+		i = i + 1
+		if i == 2 {
+			continue
+		}
+		if i > 5 {
+			break
+		}
+		count = count + i
+	}
+	count
+	`
+	res, _, _ := runVM(t, code)
+	if res.Inspect() != "13" {
+		t.Fatalf("expected 13, got %s", res.Inspect())
+	}
+}
