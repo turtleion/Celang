@@ -183,6 +183,10 @@
         {
           "name": "support.function.method.channel.celang",
           "match": "(?<=\\.)(kirim|terima|tutup|send|receive|recv|close|selesai|hasil|done|result)\\b"
+        },
+        {
+          "name": "support.function.method.collections.celang",
+          "match": "(?<=\\.)(push|tambah|pop|ambil_terakhir|shift|geser|unshift|sisip_depan|insert|sisip|remove_at|delete_at|hapus_indeks|reverse|balik|sort|urut|join|gabung|contains|includes|berisi|index_of|indeks_dari|clear|bersihkan|slice|potong|concat|gabungkan|size|ukuran|keys|kunci|values|nilai|entries|entri|has|memiliki|get|ambil|set|atur|delete|remove|hapus|merge)\\b"
         }
       ]
     },

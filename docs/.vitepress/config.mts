@@ -102,6 +102,7 @@ export default defineConfig({
         collapsed: false,
         items: [
           { text: 'Bentuk Data Kustom (bentuk / struct)', link: '/fitur-khas/bentuk-struct' },
+          { text: 'Manipulasi Array & Map', link: '/fitur-khas/koleksi-array-map' },
           { text: 'Tipe Generik (Generic Types)', link: '/fitur-khas/generik' },
           { text: 'Destrukturisasi Array & Map', link: '/fitur-khas/destrukturisasi' }
         ]

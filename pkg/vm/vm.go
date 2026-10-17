@@ -608,13 +608,11 @@ func (vm *VM) evalIndex(targetObj, indexObj evaluator.Object) (evaluator.Object,
 	switch obj := targetObj.(type) {
 	case *evaluator.Array:
 		if sVal, ok := indexObj.(*evaluator.String); ok {
-			if sVal.Value == "tambah" || sVal.Value == "push" {
-				return &evaluator.Builtin{
-					Fn: func(args ...evaluator.Object) evaluator.Object {
-						obj.Elements = append(obj.Elements, args...)
-						return obj
-					},
-				}, nil
+			if methodObj, ok := evaluator.EvalArrayMethod(obj, sVal.Value, vm.env, nil); ok {
+				if errObj, isErr := methodObj.(*evaluator.Error); isErr {
+					return nil, fmt.Errorf("%s", errObj.Inspect())
+				}
+				return methodObj, nil
 			}
 		}
 		var idx int = -1
@@ -670,8 +668,17 @@ func (vm *VM) evalIndex(targetObj, indexObj evaluator.Object) (evaluator.Object,
 
 	case *evaluator.Map:
 		key := indexObj.Inspect()
+		if s, ok := indexObj.(*evaluator.String); ok {
+			key = s.Value
+		}
 		if val, exists := obj.Pairs[key]; exists {
 			return val, nil
+		}
+		if methodObj, ok := evaluator.EvalMapMethod(obj, key, vm.env, nil); ok {
+			if errObj, isErr := methodObj.(*evaluator.Error); isErr {
+				return nil, fmt.Errorf("%s", errObj.Inspect())
+			}
+			return methodObj, nil
 		}
 		if sVal, ok := indexObj.(*evaluator.String); ok {
 			varObj, exists := vm.globals[sVal.Value]

@@ -964,18 +964,19 @@ func Eval(node uast.Node, env *Environment) Object {
 			return NULL
 		}
 
-		// 1. Array index access, slicing, or built-in methods (arr.tambah, arr.push)
+		// 1. Array index access, slicing, or built-in methods (arr.push, arr.pop, arr.insert, etc.)
 		if arr, ok := obj.(*Array); ok {
-			if env.IsUniversal && n.Property == "tambah" {
-				return newError(n.GetMetadata(), "Indonesian method 'tambah' is not allowed in Universal Mode.", "Use '.push(...)' instead.")
-			}
-			if n.Property == "tambah" || n.Property == "push" {
-				return &Builtin{
-					Fn: func(args ...Object) Object {
-						arr.Elements = append(arr.Elements, args...)
-						return arr
-					},
+			propName := n.Property
+			if n.Computed && n.PropertyExpr != nil {
+				pObj := Eval(n.PropertyExpr, env)
+				if !isError(pObj) {
+					if s, ok := pObj.(*String); ok {
+						propName = s.Value
+					}
 				}
+			}
+			if methodObj, ok := EvalArrayMethod(arr, propName, env, n.GetMetadata()); ok {
+				return methodObj
 			}
 			if rng, isRng := n.PropertyExpr.(*uast.RangeExpression); isRng {
 				return evalArraySlice(arr, rng, env, n.GetMetadata())
@@ -1073,7 +1074,7 @@ func Eval(node uast.Node, env *Environment) Object {
 			}
 		}
 
-		// 3. Map property access
+		// 3. Map property access and built-in methods (mp.keys, mp.values, mp.get, etc.)
 		if mp, ok := obj.(*Map); ok {
 			key := n.Property
 			if n.Computed && n.PropertyExpr != nil {
@@ -1089,6 +1090,9 @@ func Eval(node uast.Node, env *Environment) Object {
 			}
 			if val, exists := mp.Pairs[key]; exists {
 				return val
+			}
+			if methodObj, ok := EvalMapMethod(mp, key, env, n.GetMetadata()); ok {
+				return methodObj
 			}
 		}
 

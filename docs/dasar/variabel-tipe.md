@@ -92,6 +92,12 @@ cetak("Total buah  :", panjang(buah)) // 4
 
 // Mengambil potongan tertentu:
 buat pilihan = buah[1..3] // ["Mangga", "Jeruk"]
+
+// Manipulasi array langsung:
+buah.push("Melon")        // menambah ke belakang
+buat akhir = buah.pop()   // mengambil elemen terakhir ("Melon")
+buah.reverse()            // membalik urutan
+buah.sort()               // mengurutkan elemen
 ```
 
 ### B. Kamus Data Bertanda Label (`{...}`)
@@ -111,7 +117,14 @@ cetak(pengguna["divisi"]) // "Teknologi"
 
 // Jika mencari kolom yang belum ada, hasilnya adalah 'kosong' tanpa membuat program macet:
 cetak(pengguna.alamat)    // kosong
+
+// Manipulasi kamus dengan metode bawaan:
+buat kunci = pengguna.keys()        // ["nama", "divisi", "gaji", "aktif"]
+buat adaGaji = pengguna.has("gaji") // benar
+pengguna.set("lokasi", "Jakarta")   // menambah atau mengubah data
 ```
+
+> 💡 **Panduan Lengkap Koleksi:** Pelajari seluruh metode manipulasi array dan map (seperti `.shift()`, `.unshift()`, `.insert()`, `.remove_at()`, `.join()`, `.contains()`, `.get()`, `.merge()`, dll) pada bab khusus [Manipulasi Koleksi (Array & Map)](/fitur-khas/koleksi-array-map).
 
 ---
 

@@ -2,7 +2,7 @@
   "name": "celang",
   "displayName": "Celang Language Support",
   "description": "Dukungan sintaks resmi, pelengkapan kode, dan cuplikan (snippets) untuk bahasa pemrograman Celang.",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "publisher": "celang-project",
   "license": "MIT",
   "repository": {
