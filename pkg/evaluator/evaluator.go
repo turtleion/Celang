@@ -516,6 +516,9 @@ func Eval(node uast.Node, env *Environment) Object {
 		if !matched && defaultCase != nil {
 			result = evalBlockStatement(defaultCase.Body, env)
 		}
+		if result != nil && result.Type() == BREAK_SIGNAL_OBJ {
+			result = NULL
+		}
 		return result
 
 	case *uast.WhileStatement:
@@ -625,8 +628,8 @@ func Eval(node uast.Node, env *Environment) Object {
 			forEnv := NewEnclosedEnvironment(env)
 			var result Object = NULL
 			for {
-				el := ch.Receive(0)
-				if el == nil || el.Type() == NULL_OBJ {
+				el, ok := ch.ReceiveWithStatus(0)
+				if !ok {
 					break
 				}
 				forEnv.Define(n.Item, el, true, "")
@@ -1825,11 +1828,13 @@ func castValueToType(val Object, targetType string, meta *uast.NodeMetadata, env
 		switch v := val.(type) {
 		case *String:
 			return v
+		case *Bytes:
+			return &String{Value: string(v.Elements)}
 		default:
 			return &String{Value: v.Inspect()}
 		}
 
-	case "Logika", "logika", "Bool", "bool", "Boolean":
+	case "Logika", "logika", "Kebenaran", "kebenaran", "Bool", "bool", "Boolean", "boolean":
 		return nativeBool(CoerceToBoolean(val))
 
 	case "Bita", "bita", "Bytes", "bytes":
@@ -1838,11 +1843,24 @@ func castValueToType(val Object, targetType string, meta *uast.NodeMetadata, env
 			return v
 		case *String:
 			return &Bytes{Elements: []byte(v.Value)}
+		case *Integer:
+			if v.Value < 0 {
+				return newError(meta, "Ukuran alokasi bita tidak boleh negatif", "Gunakan bilangan bulat positif untuk alokasi buffer bita.")
+			}
+			if v.Value > 100_000_000 {
+				return newError(meta, "Ukuran alokasi bita melebihi batas aman (100MB)", "")
+			}
+			return &Bytes{Elements: make([]byte, v.Value)}
 		case *Array:
 			elems := make([]byte, len(v.Elements))
 			for i, el := range v.Elements {
 				if iVal, _, isInt, ok := CoerceToNumeric(el); ok && isInt {
+					if iVal < 0 || iVal > 255 {
+						return newError(meta, fmt.Sprintf("Nilai elemen bita harus di antara 0 dan 255, menerima %d", iVal), "")
+					}
 					elems[i] = byte(iVal)
+				} else {
+					return newError(meta, fmt.Sprintf("Elemen array untuk bita harus berupa angka (0..255), menerima %s", el.Type()), "")
 				}
 			}
 			return &Bytes{Elements: elems}
@@ -1851,7 +1869,7 @@ func castValueToType(val Object, targetType string, meta *uast.NodeMetadata, env
 		}
 
 	default:
-		return newError(meta, fmt.Sprintf("Tipe tujuan casting '%s' tidak didukung", targetType), "Tipe yang didukung: Angka, Pecahan, Teks, Logika, Bita, atau alias yang terdaftar.")
+		return newError(meta, fmt.Sprintf("Tipe tujuan casting '%s' tidak didukung", targetType), "Tipe yang didukung: Angka, Pecahan, Teks, Kebenaran, Bita, atau alias yang terdaftar.")
 	}
 }
 

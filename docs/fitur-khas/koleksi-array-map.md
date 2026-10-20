@@ -23,7 +23,7 @@ Array di Celang merepresentasikan kumpulan data berurutan. Anda dapat memanipula
 | `.reverse()` | `.balik()` | *(tidak ada)* | Membalikkan urutan elemen array secara langsung (*in-place*) | Array (memungkinkan *chaining*) |
 | `.sort([pembanding])`| `.urut([pembanding])` | `[fungsi(a, b)]` | Mengurutkan elemen (alami atau menggunakan fungsi perbandingan kustom) | Array (memungkinkan *chaining*) |
 | `.join([pemisah])` | `.gabung([pemisah])` | `[pemisah]` | Menggabungkan seluruh elemen menjadi satu teks (bawaan: `", "`) | `Teks` (*String*) |
-| `.contains(el)` / `.includes(el)` | `.berisi(el)` | `elemen` | Memeriksa apakah suatu elemen ada di dalam array | `Logika` (`benar`/`salah`) |
+| `.contains(el)` / `.includes(el)` | `.berisi(el)` | `elemen` | Memeriksa apakah suatu elemen ada di dalam array | `Kebenaran` (`benar`/`salah`) |
 | `.index_of(el)` | `.indeks_dari(el)` | `elemen` | Mencari posisi indeks pertama dari elemen (mengembalikan `-1` jika tidak ada) | `Angka` (*Integer*) |
 | `.slice([mulai, [akhir]])` | `.potong([mulai, [akhir]])`| `[mulai, [akhir]]` | Mengambil salinan potongan array tanpa mengubah array asli | Salinan Array baru |
 | `.concat(...)` | `.gabungkan(...)` | `array_atau_elemen, ...`| Menggabungkan array dengan elemen atau array lain | Array baru |
@@ -104,10 +104,10 @@ Map di Celang menyimpan pasangan kunci dan nilai terurut berdasarkan urutan pena
 | `.keys()` | `.kunci()` | *(tidak ada)* | Mengambil seluruh kunci map dalam urutan penambahan | `Array` berisi teks kunci |
 | `.values()` | `.nilai()` | *(tidak ada)* | Mengambil seluruh nilai map dalam urutan penambahan | `Array` berisi nilai |
 | `.entries()` | `.entri()` | *(tidak ada)* | Mengambil seluruh pasangan sebagai array `[[kunci, nilai], ...]` | `Array` 2-dimensi |
-| `.has(kunci)` / `.contains(kunci)` | `.memiliki(kunci)` | `kunci` | Memeriksa apakah kunci tertentu ada di dalam map | `Logika` (`benar`/`salah`) |
+| `.has(kunci)` / `.contains(kunci)` | `.memiliki(kunci)` | `kunci` | Memeriksa apakah kunci tertentu ada di dalam map | `Kebenaran` (`benar`/`salah`) |
 | `.get(kunci, [bawaan])` | `.ambil(kunci, [bawaan])` | `kunci, [bawaan]`| Mengambil nilai berdasarkan kunci, dengan nilai cadangan opsional jika kunci tidak ditemukan | Nilai objek / `bawaan` / `kosong` |
 | `.set(kunci, nilai)` | `.atur(kunci, nilai)` | `kunci, nilai` | Menyimpan pasangan kunci-nilai ke dalam map | Map (memungkinkan *chaining*) |
-| `.delete(kunci)` / `.remove(kunci)` | `.hapus(kunci)` | `kunci` | Menghapus kunci dari map | `Logika` (`benar` jika dihapus, `salah` jika tidak ada) |
+| `.delete(kunci)` / `.remove(kunci)` | `.hapus(kunci)` | `kunci` | Menghapus kunci dari map | `Kebenaran` (`benar` jika dihapus, `salah` jika tidak ada) |
 | `.merge(mapLain)` | `.gabung(mapLain)` | `mapLain` | Menggabungkan seluruh pasangan dari map lain ke dalam map ini | Map saat ini |
 | `.clear()` | `.bersihkan()` | *(tidak ada)* | Mengosongkan seluruh isi map | Map saat ini (kosong `{}`) |
 | `.length` / `.len` | `.panjang` | *(properti)* | Jumlah kunci yang tersimpan | `Angka` (*Integer*) |

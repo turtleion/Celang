@@ -9,6 +9,9 @@ export default defineConfig({
     ['meta', { name: 'theme-color', content: '#3eaf7c' }]
   ],
   markdown: {
+    headers: {
+      level: [2, 3]
+    },
     languages: [
       {
         name: 'celang',
@@ -34,7 +37,7 @@ export default defineConfig({
           },
           {
             name: 'keyword.control.celang',
-            match: '\\b(jika|selain jika|selain|maka|cocok|kasus|lainnya|switch|case|default|selama|untuk|dalam|kembalikan|mengembalikan|berhenti|lanjut|sambil|bersamaan|mundur ke|coba|tangkap|akhirnya|lempar|try|catch|finally|throw|gaya|mungkin|saat_selesai|kalau|bila|defer|titip|jemput|harus|transaksi|batalkan|pulihkan|pantau|transaction|rollback|recover|watch|if|else|while|for|return|break|continue|async|parallel|lamun|salami|pikeun|balikkeun)\\b'
+            match: '\\b(jika|selain jika|selain|maka|pilih|bila|cocok|kasus|lainnya|switch|case|default|selama|untuk|dalam|kembalikan|mengembalikan|berhenti|lanjut|sambil|bersamaan|mundur ke|coba|tangkap|akhirnya|lempar|try|catch|finally|throw|gaya|mungkin|saat_selesai|kalau|defer|titip|jemput|harus|transaksi|batalkan|pulihkan|pantau|transaction|rollback|recover|watch|if|else|while|for|return|break|continue|async|parallel|lamun|salami|pikeun|balikkeun)\\b'
           },
           {
             name: 'keyword.declaration.celang',
@@ -46,7 +49,7 @@ export default defineConfig({
           },
           {
             name: 'support.function.celang',
-            match: '\\b(cetak|masukan|panjang|tipe|rentang|saring|petakan|potong_spasi|kapitalisasi|salin|clone|Saluran|jemput_semua|jemput_pertama|terbilang|rupiah|format_rupiah|Angka|Pecahan|Teks|Logika|Bita|bita|print|input|len|type|range|filter|map|trim|format_usd|format_currency|in_words|spelled_out|dollars_in_words|Channel|channel|await|await_all|await_race|Number|String|Boolean|Bytes|bytes)\\b'
+            match: '\\b(cetak|masukan|panjang|tipe|rentang|saring|petakan|potong_spasi|kapitalisasi|salin|clone|Saluran|jemput_semua|jemput_pertama|terbilang|rupiah|format_rupiah|Angka|Pecahan|Teks|Kebenaran|kebenaran|Logika|Bita|bita|print|input|len|type|range|filter|map|trim|format_usd|format_currency|in_words|spelled_out|dollars_in_words|Channel|channel|await|await_all|await_race|Number|String|Boolean|Bytes|bytes)\\b'
           },
           {
             name: 'constant.numeric.celang',
@@ -59,8 +62,13 @@ export default defineConfig({
   themeConfig: {
     logo: '🌟',
     siteTitle: 'Celang',
+    outline: {
+      level: [2, 3],
+      label: 'Daftar Isi Halaman'
+    },
     nav: [
       { text: 'Panduan', link: '/panduan/mulai-cepat' },
+      { text: 'Tur Celang ↗', link: '/tur/', target: '_blank' },
       { text: 'Dasar Bahasa', link: '/dasar/variabel-tipe' },
       { text: 'Pustaka Standar', link: '/pustaka-standar/matematika' },
       { text: 'Playground', link: '/playground' },
@@ -81,6 +89,7 @@ export default defineConfig({
         collapsed: false,
         items: [
           { text: 'Pengenalan & Filosofi', link: '/panduan/pengenalan' },
+          { text: 'Tur Interaktif Celang ↗', link: '/tur/', target: '_blank' },
           { text: 'Instalasi & Mulai Cepat', link: '/panduan/mulai-cepat' },
           { text: 'CLI & REPL Interaktif', link: '/panduan/cli-repl' }
         ]
@@ -91,8 +100,11 @@ export default defineConfig({
         items: [
           { text: 'Variabel & Tipe Data', link: '/dasar/variabel-tipe' },
           { text: 'Operator & Ekspresi', link: '/dasar/operator' },
-          { text: 'Kontrol Alur & Percabangan', link: '/dasar/kontrol-alur' },
+          { text: 'Percabangan & Kontrol Alur', link: '/dasar/kontrol-alur' },
+          { text: 'Perulangan & Iterasi (Looping)', link: '/dasar/perulangan' },
+          { text: 'Penanganan Galat (Try-Catch)', link: '/dasar/penanganan-galat' },
           { text: 'Fungsi & Ruang Lingkup', link: '/dasar/fungsi' },
+          { text: 'Referensi & Rujukan (rujuk & pointer)', link: '/dasar/rujuk' },
           { text: 'Sistem Modul & Impor', link: '/dasar/modul' },
           { text: 'Fungsi Bawaan Global', link: '/dasar/fungsi-bawaan' }
         ]
@@ -156,7 +168,8 @@ export default defineConfig({
           { text: 'Waktu, Tanggal & Durasi (waktu / time)', link: '/pustaka-standar/waktu' },
           { text: 'Pertukaran Data JSON (json)', link: '/pustaka-standar/json' },
           { text: 'Sistem Operasi & Proses (sistem / os)', link: '/pustaka-standar/sistem' },
-          { text: 'Jaringan & Protokol HTTP (http / jaringan)', link: '/pustaka-standar/http' }
+          { text: 'Jaringan & Protokol HTTP (http / jaringan)', link: '/pustaka-standar/http' },
+          { text: 'Antarmuka Fungsi Asing C (ffi)', link: '/pustaka-standar/ffi' }
         ]
       },
       {
@@ -178,5 +191,61 @@ export default defineConfig({
     search: {
       provider: 'local'
     }
+  },
+  vite: {
+    plugins: [
+      {
+        name: 'inject-page-toc',
+        enforce: 'pre',
+        transform(code, id) {
+          if (!id.endsWith('.md')) return null
+          const cleanId = id.replace(/\\/g, '/')
+          if (cleanId.endsWith('/docs/index.md')) return null
+          if (/^layout:\s*home/m.test(code)) return null
+          if (code.includes('<PageToc') || /^pageToc:\s*false/m.test(code) || /^toc:\s*false/m.test(code)) return null
+
+          const lines = code.split('\n')
+          let inCode = false
+          let firstH2LineIdx = -1
+          let h2Count = 0
+
+          for (let i = 0; i < lines.length; i++) {
+            const line = lines[i]
+            const trimmed = line.trim()
+            if (trimmed.startsWith('```') || trimmed.startsWith('~~~')) {
+              inCode = !inCode
+            } else if (!inCode) {
+              if (/^##\s+/.test(line)) {
+                h2Count++
+                if (firstH2LineIdx === -1) {
+                  firstH2LineIdx = i
+                }
+              }
+            }
+          }
+
+          if (firstH2LineIdx !== -1 && h2Count >= 2) {
+            lines.splice(firstH2LineIdx, 0, '\n<PageToc />\n')
+            return lines.join('\n')
+          }
+
+          return null
+        }
+      },
+      {
+        name: 'serve-tur-static',
+        configureServer(server) {
+          server.middlewares.use((req, res, next) => {
+            const url = req.url || '';
+            const pathname = url.split('?')[0].split('#')[0];
+            if (pathname === '/tur' || pathname === '/tur/') {
+              req.url = url.replace(/^\/tur\/?/, '/tur/index.html');
+            }
+            next();
+          });
+        }
+      }
+    ]
   }
 })
+

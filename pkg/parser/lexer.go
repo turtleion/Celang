@@ -18,9 +18,11 @@ var keywords = map[string]TokenType{
 	"selain":       ELSE,
 	"lain":         ELSE,
 	"else":         ELSE,
+	"pilih":        SWITCH,
 	"cocok":        SWITCH,
 	"switch":       SWITCH,
 	"match":        SWITCH,
+	"bila":         CASE,
 	"kasus":        CASE,
 	"case":         CASE,
 	"lainnya":      DEFAULT,
@@ -326,6 +328,15 @@ func (l *Lexer) NextToken() Token {
 		tok.Literal = ""
 		tok.Type = EOF
 		return tok
+	case 'f', 'F':
+		if l.peekChar() == '"' || l.peekChar() == '\'' || l.peekChar() == '`' {
+			quote := l.peekChar()
+			l.readChar() // Skip 'f' or 'F', l.ch becomes opening quote
+			tok.Type = STRING
+			tok.Literal = l.readString(quote)
+			return tok
+		}
+		fallthrough
 	default:
 		if isLetter(l.ch) {
 			tok.Literal = l.readIdentifier()

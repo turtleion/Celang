@@ -48,6 +48,7 @@ func runCelangWrapper(this js.Value, args []js.Value) any {
 	var outBuf bytes.Buffer
 	env := evaluator.NewEnvironment()
 	evaluator.RegisterBuiltinsWithIO(env, nil, &outBuf)
+	evaluator.RegisterStdlibGlobals(env)
 
 	var finalResult evaluator.Object
 

@@ -659,6 +659,12 @@ func EvalBytesMethod(b *Bytes, prop string, env *Environment, meta *uast.NodeMet
 			return newError(meta, "Indonesian method 'ke_base64' is not allowed in Universal Mode.", "Use '.to_base64()' instead."), true
 		case "tambah":
 			return newError(meta, "Indonesian method 'tambah' is not allowed in Universal Mode.", "Use '.append()' instead."), true
+		case "potong":
+			return newError(meta, "Indonesian method 'potong' is not allowed in Universal Mode.", "Use '.slice()' instead."), true
+		case "salin":
+			return newError(meta, "Indonesian method 'salin' is not allowed in Universal Mode.", "Use '.clone()' instead."), true
+		case "heks":
+			return newError(meta, "Indonesian method 'heks' is not allowed in Universal Mode.", "Use '.hex()' or '.to_hex()' instead."), true
 		case "panjang":
 			return newError(meta, "Indonesian property 'panjang' is not allowed in Universal Mode.", "Use '.length' or '.len' instead."), true
 		}

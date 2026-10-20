@@ -56,10 +56,10 @@ func TestParser_BasicSyntax(t *testing.T) {
 	buat ptr = &nilai_awal
 	*ptr = 200
 
-	// Switch
+	// Switch (pilih ... bila)
 	buat peran = "admin"
-	cocok peran {
-		kasus "admin":
+	pilih peran {
+		bila "admin":
 			cetak("Akses penuh")
 		lainnya:
 			cetak("Akses terbatas")
@@ -411,6 +411,7 @@ func TestParser_StringInterpolation(t *testing.T) {
 	buat pesan1 = "Halo {nama}, saldo: Rp {saldo}."
 	buat pesan2 = ` + "`" + `Total: ${harga * 2}` + "`" + `
 	buat pesan3 = "Teks tanpa kurung"
+	buat pesan4 = f"Halo ${nama}, sisa: Rp{saldo}"
 	`
 
 	l := parser.NewLexer(input)
@@ -420,8 +421,8 @@ func TestParser_StringInterpolation(t *testing.T) {
 		t.Fatalf("Parser error: %v", err)
 	}
 
-	if len(prog.Body) != 3 {
-		t.Fatalf("Expected 3 statements, got %d", len(prog.Body))
+	if len(prog.Body) != 4 {
+		t.Fatalf("Expected 4 statements, got %d", len(prog.Body))
 	}
 
 	decl1 := prog.Body[0].(*uast.VariableDeclaration)
@@ -445,6 +446,15 @@ func TestParser_StringInterpolation(t *testing.T) {
 	decl3 := prog.Body[2].(*uast.VariableDeclaration)
 	if _, ok := decl3.Value.(*uast.Literal); !ok {
 		t.Fatalf("Expected plain Literal for pesan3, got %T", decl3.Value)
+	}
+
+	decl4 := prog.Body[3].(*uast.VariableDeclaration)
+	templ4, ok := decl4.Value.(*uast.TemplateLiteral)
+	if !ok {
+		t.Fatalf("Expected TemplateLiteral for pesan4, got %T", decl4.Value)
+	}
+	if len(templ4.Parts) != 4 {
+		t.Fatalf("Expected 4 parts in templ4, got %d", len(templ4.Parts))
 	}
 }
 

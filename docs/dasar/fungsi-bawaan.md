@@ -10,7 +10,7 @@ Seluruh fungsi bawaan mendukung **nama Bahasa Indonesia yang ramah** serta **nam
 
 Pilih kategori fungsi bawaan berdasarkan jenis data yang ingin Anda kelola:
 
-- [1. Konversi Tipe Data & Meta-Objek](#1-konversi-tipe-data--meta-objek) (`tipe`, `Angka`, `Teks`, `Logika`, `Bita` / `bita`, `salin`)
+- [1. Konversi Tipe Data & Meta-Objek](#1-konversi-tipe-data--meta-objek) (`tipe`, `Angka`, `Teks`, `Kebenaran`, `Bita` / `bita`, `salin`)
 - [2. Manipulasi Teks / String](#2-manipulasi-teks--string) (`panjang`, `potong_spasi`, `kapitalisasi`)
 - [3. Format Mata Uang & Angka Terbilang](#3-format-mata-uang--angka-terbilang) (`rupiah`, `terbilang`, `format_usd`, `in_words`, `dollars_in_words`)
 - [4. Koleksi & Larik (Array & Iterasi)](#4-koleksi--larik-array--iterasi) (`rentang`, `saring`, `petakan`, `panjang`)
@@ -26,7 +26,7 @@ Pilih kategori fungsi bawaan berdasarkan jenis data yang ingin Anda kelola:
 | **Meta & Tipe** | `tipe(x)` | `type` | `x: ApaPun` | `Teks` | Mengetahui jenis data suatu nilai |
 | **Meta & Tipe** | `Angka(x)` | `Number`, `number` | `x: ApaPun` | `Angka`/`Pecahan` | Mengubah teks atau nilai lain menjadi angka |
 | **Meta & Tipe** | `Teks(x)` | `String`, `string` | `x: ApaPun` | `Teks` | Mengubah nilai apa pun menjadi tulisan teks |
-| **Meta & Tipe** | `Logika(x)` | `Boolean`, `boolean` | `x: ApaPun` | `Logika` | Mengevaluasi status kebenaran boolean |
+| **Meta & Tipe** | `Kebenaran(x)` | `Boolean`, `boolean` | `x: ApaPun` | `Kebenaran` | Mengevaluasi status kebenaran boolean |
 | **Meta & Tipe** | `Bita(x)` / `bita(x)` | `Bytes`, `bytes` | `x: Teks/Angka/Array` | `Bita` | Membuat atau mengonversi data ke koleksi bita biner |
 | **Meta & Tipe** | `salin(x)` | `clone` | `x: ApaPun` | Objek Baru | Membuat salinan utuh (*deep copy*) mandiri |
 | **Teks & Bita** | `panjang(s)` | `len`, `length` | `s: Teks / Bita` | `Angka` | Menghitung jumlah karakter teks (Unicode) atau bita |
@@ -61,7 +61,7 @@ Mengembalikan nama jenis data asli dari objek yang diberikan dalam bentuk `Teks`
 cetak(tipe(42))            // "Angka"
 cetak(tipe(3.14))          // "Pecahan"
 cetak(tipe("Halo"))        // "Teks"
-cetak(tipe(benar))         // "Logika"
+cetak(tipe(benar))         // "Kebenaran"
 cetak(tipe([1, 2, 3]))     // "Array"
 cetak(tipe({"a": 1}))      // "Map"
 cetak(tipe(Saluran(5)))    // "Saluran"
@@ -90,17 +90,17 @@ buat t2 = Teks(benar)      // "benar"
 buat t3 = Teks([1, 2, 3])  // "[1, 2, 3]"
 ```
 
-### `Logika(nilai)` / `Boolean`
+### `Kebenaran(nilai)` / `Boolean`
 Mengevaluasi status nilai kebenaran (*truthiness*):
-- Bernilai `salah` (*falsy*): angka `0`, teks kosong `""`, array kosong `[]`, atau nilai `kosong`.
+- Bernilai `salah` (*falsy*): angka `0`, teks kosong `""`, array kosong `[]`, byte kosong `bita([])`, map kosong `{}`, atau nilai `kosong`.
 - Bernilai `benar` (*truthy*): semua nilai lainnya yang memiliki isi.
 
 ```celang
-cetak(Logika(1))          // benar
-cetak(Logika(0))          // salah
-cetak(Logika("Celang"))   // benar
-cetak(Logika(""))         // salah
-cetak(Logika([]))         // salah
+cetak(Kebenaran(1))          // benar
+cetak(Kebenaran(0))          // salah
+cetak(Kebenaran("Celang"))   // benar
+cetak(Kebenaran(""))         // salah
+cetak(Kebenaran([]))         // salah
 ```
 
 ### `Bita(nilai)` / `bita` / `Bytes` / `bytes`

@@ -1,6 +1,7 @@
 package vm
 
 import (
+	"bytes"
 	"fmt"
 	"math"
 	"os"
@@ -979,6 +980,18 @@ func (vm *VM) evalSub(a, b evaluator.Object) (evaluator.Object, error) {
 }
 
 func (vm *VM) evalMul(a, b evaluator.Object) (evaluator.Object, error) {
+	if leftB, ok := a.(*evaluator.Bytes); ok {
+		if cnt, _, isInt, ok := evaluator.CoerceToNumeric(b); ok && isInt {
+			if cnt <= 0 {
+				return &evaluator.Bytes{Elements: []byte{}}, nil
+			}
+			if cnt > 1_000_000 || int64(len(leftB.Elements))*cnt > 50_000_000 {
+				return nil, fmt.Errorf("hasil pengulangan bita melebihi batas aman (50MB)")
+			}
+			return &evaluator.Bytes{Elements: bytes.Repeat(leftB.Elements, int(cnt))}, nil
+		}
+	}
+
 	aInt, aFloat, aIsInt, aOk := evaluator.CoerceToNumeric(a)
 	bInt, bFloat, bIsInt, bOk := evaluator.CoerceToNumeric(b)
 	if !aOk || !bOk {

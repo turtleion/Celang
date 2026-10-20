@@ -582,6 +582,35 @@ func TestEvaluator_StringInterpolation(t *testing.T) {
 			`,
 			expected: "Teks biasa tanpa kurung",
 		},
+		{
+			input: `
+			buat nama = "Rani"
+			buat tabungan = 50000
+			f"Halo, ${nama}! Tabunganmu adalah Rp${tabungan}."
+			`,
+			expected: "Halo, Rani! Tabunganmu adalah Rp50000.",
+		},
+		{
+			input: `
+			buat tabungan = 50000
+			f"Jika ditambah 10000: Rp${tabungan + 10000}"
+			`,
+			expected: "Jika ditambah 10000: Rp60000",
+		},
+		{
+			input: `
+			buat tabungan = 50000
+			f"Jika ditambah 10000: Rp{tabungan + 10000}"
+			`,
+			expected: "Jika ditambah 10000: Rp60000",
+		},
+		{
+			input: `
+			buat nama = "Dedi"
+			f'Nama: {nama}'
+			`,
+			expected: "Nama: Dedi",
+		},
 	}
 
 	for _, tt := range tests {

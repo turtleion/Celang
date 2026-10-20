@@ -122,11 +122,8 @@ func RegisterBuiltinsWithIO(env *Environment, in io.Reader, out io.Writer) {
 				start = s
 				end = e
 			}
-			diff := end - start
-			if diff < 0 {
-				diff = -diff
-			}
-			if diff > 1_000_000 {
+			if (start <= end && (end-start > 1_000_000 || end-start < 0)) ||
+				(start > end && (start-end > 1_000_000 || start-end < 0)) {
 				return &Error{Message: "ukuran rentang terlalu besar (maksimal 1.000.000 elemen)"}
 			}
 			var elems []Object
@@ -260,11 +257,13 @@ func RegisterBuiltinsWithIO(env *Environment, in io.Reader, out io.Writer) {
 	logikaFn := &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) != 1 {
-				return &Error{Message: fmt.Sprintf("Logika mengharapkan 1 argumen, menerima %d", len(args))}
+				return &Error{Message: fmt.Sprintf("Kebenaran mengharapkan 1 argumen, menerima %d", len(args))}
 			}
-			return castValueToType(args[0], "Logika", nil, env)
+			return castValueToType(args[0], "Kebenaran", nil, env)
 		},
 	}
+	env.Define("Kebenaran", logikaFn, false, "function")
+	env.Define("kebenaran", logikaFn, false, "function")
 	env.Define("Logika", logikaFn, false, "function")
 	env.Define("logika", logikaFn, false, "function")
 	env.Define("Boolean", logikaFn, false, "function")

@@ -995,11 +995,12 @@ func (s *celangHttpServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// req.json()
 	jsonReqFn := &Builtin{
 		Fn: func(args ...Object) Object {
-			if len(bodyBytes) == 0 {
+			trimmed := bytes.TrimSpace(bodyBytes)
+			if len(trimmed) == 0 {
 				return &Map{Pairs: make(map[string]Object)}
 			}
 			var raw any
-			decoder := json.NewDecoder(bytes.NewReader(bodyBytes))
+			decoder := json.NewDecoder(bytes.NewReader(trimmed))
 			decoder.UseNumber()
 			if err := decoder.Decode(&raw); err != nil {
 				return newError(nil, fmt.Sprintf("Gagal mengurai JSON body request: %v", err), "Pastikan body request berformat JSON yang valid.")
@@ -1031,14 +1032,42 @@ func (s *celangHttpServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		for idx < len(mws) {
 			mw := mws[idx]
 			idx++
-			if mw.prefix == "" || mw.prefix == "/" || strings.HasPrefix(r.URL.Path, mw.prefix) {
+			matched := false
+			if mw.prefix == "" || mw.prefix == "/" || r.URL.Path == mw.prefix {
+				matched = true
+			} else {
+				pref := strings.TrimRight(mw.prefix, "/") + "/"
+				if strings.HasPrefix(r.URL.Path, pref) {
+					matched = true
+				}
+			}
+			if matched {
 				nextFn := &Builtin{
 					Fn: func(args ...Object) Object {
 						dispatchNext()
 						return NULL
 					},
 				}
-				_ = applyFunction(mw.handler, []Object{reqMap, resMap, nextFn}, nil)
+				ret := applyFunction(mw.handler, []Object{reqMap, resMap, nextFn}, nil)
+				resMu.Lock()
+				if !sent {
+					val := ret
+					if rv, ok := ret.(*ReturnValue); ok {
+						val = rv.Value
+					}
+					if errObj, ok := val.(*Error); ok {
+						sent = true
+						for k, vals := range resHeaders {
+							for _, v := range vals {
+								w.Header().Add(k, v)
+							}
+						}
+						w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+						w.WriteHeader(http.StatusInternalServerError)
+						_, _ = w.Write([]byte(fmt.Sprintf("500 Internal Server Error: %s", errObj.Message)))
+					}
+				}
+				resMu.Unlock()
 				return
 			}
 		}
@@ -1060,7 +1089,79 @@ func (s *celangHttpServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				setReqProp("params", paramsMap)
 				setReqProp("parameter", paramsMap)
 
-				_ = applyFunction(rt.handler, []Object{reqMap, resMap}, nil)
+				ret := applyFunction(rt.handler, []Object{reqMap, resMap}, nil)
+				resMu.Lock()
+				defer resMu.Unlock()
+				if !sent {
+					val := ret
+					if rv, ok := ret.(*ReturnValue); ok {
+						val = rv.Value
+					}
+					if errObj, ok := val.(*Error); ok {
+						sent = true
+						for k, vals := range resHeaders {
+							for _, v := range vals {
+								w.Header().Add(k, v)
+							}
+						}
+						w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+						w.WriteHeader(http.StatusInternalServerError)
+						_, _ = w.Write([]byte(fmt.Sprintf("500 Internal Server Error: %s", errObj.Message)))
+						return
+					}
+
+					if val != nil && val != NULL {
+						sent = true
+						for k, vals := range resHeaders {
+							for _, v := range vals {
+								w.Header().Add(k, v)
+							}
+						}
+						switch d := val.(type) {
+						case *Bytes:
+							if w.Header().Get("Content-Type") == "" {
+								w.Header().Set("Content-Type", "application/octet-stream")
+							}
+							w.WriteHeader(statusCode)
+							_, _ = w.Write(d.Elements)
+						case *String:
+							if w.Header().Get("Content-Type") == "" {
+								w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+							}
+							w.WriteHeader(statusCode)
+							_, _ = w.Write([]byte(d.Value))
+						case *Map, *Array:
+							if w.Header().Get("Content-Type") == "" {
+								w.Header().Set("Content-Type", "application/json; charset=utf-8")
+							}
+							w.WriteHeader(statusCode)
+							nativeVal, err := convertCelangToJSONNative(d)
+							if err == nil {
+								jsonBytes, err2 := json.Marshal(nativeVal)
+								if err2 == nil {
+									_, _ = w.Write(jsonBytes)
+									return
+								}
+							}
+							_, _ = w.Write([]byte(d.Inspect()))
+						default:
+							if w.Header().Get("Content-Type") == "" {
+								w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+							}
+							w.WriteHeader(statusCode)
+							_, _ = w.Write([]byte(d.Inspect()))
+						}
+						return
+					}
+
+					sent = true
+					for k, vals := range resHeaders {
+						for _, v := range vals {
+							w.Header().Add(k, v)
+						}
+					}
+					w.WriteHeader(statusCode)
+				}
 				return
 			}
 		}

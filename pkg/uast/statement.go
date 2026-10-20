@@ -241,7 +241,7 @@ func (c *CaseClause) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// SwitchStatement represents value matching (cocok ... kasus ... lainnya).
+// SwitchStatement represents value matching (pilih ... bila ... lainnya).
 type SwitchStatement struct {
 	NodeType     NodeType      `json:"type"`
 	Metadata     *NodeMetadata `json:"metadata,omitempty"`

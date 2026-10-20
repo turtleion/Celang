@@ -65,7 +65,7 @@ func IsPurelyNumericString(s string) bool {
 }
 
 // CoerceToBoolean evaluates truthiness in human-centric terms.
-// Falsy values: null, false, 0, 0.0, ""
+// Falsy values: null, false, 0, 0.0, "", empty array, empty bytes, empty map
 func CoerceToBoolean(obj Object) bool {
 	switch o := obj.(type) {
 	case *Boolean:
@@ -80,6 +80,10 @@ func CoerceToBoolean(obj Object) bool {
 		return len(o.Value) > 0
 	case *Array:
 		return len(o.Elements) > 0
+	case *Bytes:
+		return len(o.Elements) > 0
+	case *Map:
+		return len(o.Pairs) > 0
 	case *Error:
 		return false
 	case *ReturnValue:

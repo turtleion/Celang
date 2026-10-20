@@ -1,49 +1,190 @@
-# Variabel & Jenis Data
+# Tipe Data & Variabel
 
-Di Celang, menyimpan dan mengelola data dibuat sealami mungkin, seperti Anda mencatat hal-hal penting di buku catatan.
+Setiap informasi yang Anda olah di dalam Celang memiliki jenis atau **tipe data**. Halaman ini menyajikan seluruh tipe data bawaan Celang terlebih dahulu agar Anda dapat langsung mengenali dan menggunakannya, diikuti cara menyimpan data ke dalam variabel dan konstanta.
 
 ---
 
-## 1. Membuat Catatan Nilai (`buat`)
+## 1. Ikhtisar Tipe Data
 
-Gunakan kata kunci `buat` untuk menyiapkan sebuah wadah catatan nilai yang isinya bisa diubah di kemudian hari:
+Celang menyediakan tipe data lengkap untuk kebutuhan komputasi sehari-hari hingga pengolahan data biner tingkat lanjut:
+
+| Tipe Data | Nama Tipe | Contoh Nilai | Keterangan |
+| :--- | :--- | :--- | :--- |
+| **Bilangan Bulat** | `Angka` | `42`, `-10`, `1_000_000` | Bilangan bulat utuh tanpa koma (garis bawah `_` sebagai pemisah ribuan) |
+| **Bilangan Desimal** | `Pecahan` / `Desimal` | `3.14`, `-0.05` | Bilangan desimal dengan tanda titik |
+| **Tulisan / Teks** | `Teks` | `"Halo"`, `'Dunia'`, `"${nama}"` | Tulisan huruf, kata, kalimat, atau teks Unicode |
+| **Nilai Kebenaran** | `Kebenaran` | `benar`, `salah` | Nilai logika kebenaran (*boolean*: ya atau tidak) |
+| **Koleksi Bita Biner** | `Bita` / `Bytes` | `bita("Halo")`, `bita(8)` | Deretan byte mentah (0–255) untuk berkas, gambar, dan jaringan |
+| **Daftar / Larik** | `Array` | `["Apel", "Mangga", "Jeruk"]` | Kumpulan data berurutan dalam satu wadah |
+| **Kamus Data** | `Map` | `{"nama": "Budi", "umur": 24}` | Pasangan label (kunci) dan nilai |
+| **Nilai Kosong** | `kosong` | `kosong` | Menandakan nilai nihil atau ketiadaan data |
+
+---
+
+## 2. Mengenal Masing-Masing Tipe Data
+
+### A. Bilangan Bulat (`Angka`) & Desimal (`Pecahan`)
+
+Celang membedakan angka bulat dan angka berkoma secara otomatis:
 
 ```celang
-buat nama = "Budi Santoso"
-buat umur = 24
-buat aktif = benar
+buat jumlah = 42
+buat jarak = -10
+buat populasi = 275_000_000 // Tanda '_' memudahkan pembacaan angka besar
 
-// Mengubah isi variabel dengan nilai baru:
-umur = 25
-cetak("Umur sekarang:", umur) // 25
+buat pi = 3.14159
+buat suhu = -0.5
 ```
 
-> **Nilai Awal Kosong:** Jika Anda membuat variabel tanpa langsung mengisinya, Celang secara otomatis mengisinya dengan nilai `kosong` (null):
+Celang juga mendukung penulisan bilangan heksadesimal (`0xFF`), biner (`0b1010`), dan oktal (`0o77`).
+
+### B. Tulisan Teks (`Teks`)
+
+Teks dapat diapit tanda kutip ganda (`"..."`) atau kutip tunggal (`'...'`). Anda juga dapat menyisipkan variabel langsung ke dalam kalimat menggunakan *f-string* (awalan `f`) dengan notasi `${...}` atau `{...}`:
+
+```celang
+buat salam = "Halo Dunia!"
+buat kota = 'Jakarta'
+
+buat nama = "Budi"
+buat pesan = f"Selamat datang, ${nama}! Semoga harimu menyenangkan."
+cetak(pesan) // "Selamat datang, Budi! Semoga harimu menyenangkan."
+```
+
+### C. Nilai Kebenaran (`Kebenaran`)
+
+Tipe `Kebenaran` hanya memiliki dua nilai: `benar` (*true*) atau `salah` (*false*). Tipe ini dihasilkan oleh operasi perbandingan atau kondisi logika:
+
+```celang
+buat aktif = benar
+buat lulus = salah
+
+buat nilai = 85
+buat memenuhiSyarat = nilai >= 75 // bernilai benar
+```
+
+### D. Koleksi Bita Biner (`Bita` / `Bytes`)
+
+`Bita` menyimpan deretan bita mentah (angka `0` hingga `255`). Berbeda dengan `Teks` yang memproses karakter Unicode, `Bita` dirancang khusus untuk memanipulasi berkas biner (gambar, berkas ZIP, audio), protokol jaringan, dan enkripsi:
+
+```celang
+// 1. Membuat Bita:
+buat b1 = bita("Halo")             // dari teks: bita([72, 97, 108, 111])
+buat b2 = bita(4)                  // alokasi 4 byte nol: bita([0, 0, 0, 0])
+buat b3 = bita([0x43, 0x65, 0x6C]) // dari daftar kode byte ASCII: bita([67, 101, 108])
+
+// 2. Baca dan ubah byte langsung berdasarkan indeks:
+cetak(b1[0])       // 72 (kode ASCII huruf 'H')
+b1[0] = 74         // Ubah 'H' menjadi 'J' (ASCII 74)
+cetak(b1.ke_teks()) // "Jalo"
+
+// 3. Konversi format biner:
+cetak(b1.ke_heks())   // "4a616c6f"
+cetak(b1.ke_base64()) // "SmFsbw=="
+```
+
+### E. Kumpulan Data: Daftar (`Array`) & Kamus (`Map`)
+
+#### 1. Daftar / Array (`[...]`)
+Daftar digunakan untuk menyimpan banyak nilai berurutan. Indeks nomor urut selalu dimulai dari `0`:
+
+```celang
+buat buah = ["Apel", "Mangga", "Jeruk", "Pisang"]
+
+cetak(buah[0])       // "Apel" (elemen pertama)
+cetak(panjang(buah)) // 4 (jumlah elemen)
+
+// Mengambil potongan tertentu (rentang):
+buat pilihan = buah[1..3] // ["Mangga", "Jeruk"]
+
+// Manipulasi daftar bawaan:
+buah.push("Melon")        // Menambah di belakang
+buat akhir = buah.pop()   // Mengambil elemen terakhir ("Melon")
+buah.reverse()            // Membalikkan urutan
+```
+
+#### 2. Kamus Data / Map (`{...}`)
+Kamus digunakan ketika setiap data memiliki nama label tersendiri (seperti data formulir atau profil):
+
+```celang
+buat pengguna = {
+    "nama": "Siti Rahma",
+    "divisi": "Teknologi",
+    "gaji": 15000000,
+    "aktif": benar
+}
+
+// Membaca data dengan titik atau kurung siku:
+cetak(pengguna.nama)      // "Siti Rahma"
+cetak(pengguna["divisi"]) // "Teknologi"
+
+// Jika mencari kunci yang belum ada, hasilnya adalah 'kosong':
+cetak(pengguna.alamat)    // kosong
+
+// Manipulasi kamus:
+buat daftarKunci = pengguna.keys() // ["nama", "divisi", "gaji", "aktif"]
+pengguna.set("lokasi", "Jakarta")  // Menambah atau mengubah nilai
+```
+
+> 💡 **Panduan Lengkap Koleksi:** Pelajari seluruh metode manipulasi array dan map pada bab [Manipulasi Koleksi (Array & Map)](/fitur-khas/koleksi-array-map).
+
+### F. Nilai Kosong (`kosong`)
+
+`kosong` (*null* / *nil*) menandakan ketiadaan nilai atau data yang belum diisi. Operasi aman (*null-safety*) didukung penuh di Celang agar aplikasi tidak mogok saat membaca data kosong.
+
+---
+
+## 3. Deklarasi Variabel & Nilai Tetap
+
+Setelah memahami jenis-jenis data di atas, Anda dapat menyimpannya ke dalam wadah menggunakan kata kunci berikut:
+
+### A. Variabel yang Bisa Diubah (`buat`)
+
+Gunakan `buat` untuk membuat wadah variabel yang nilainya dapat diperbarui di kemudian hari:
+
+```celang
+buat skor = 10
+cetak(skor) // 10
+
+// Memperbarui nilai:
+skor = 25
+cetak(skor) // 25
+```
+
+> **Nilai Awal Otomatis Kosong:** Jika Anda membuat variabel tanpa langsung mengisinya, Celang secara otomatis mengisinya dengan nilai `kosong`:
 > ```celang
 > buat alamat
 > cetak(alamat) // kosong
 > ```
 
----
+### B. Nilai Tetap yang Tidak Boleh Berubah (`konstanta`)
 
-## 2. Nilai Tetap yang Tidak Boleh Berubah (`konstanta`)
-
-Jika ada nilai yang harus selalu tetap dan tidak boleh diubah secara tidak sengaja oleh bagian program lain, gunakan kata kunci `konstanta`:
+Jika ada nilai patokan yang harus selalu tetap dan tidak boleh diubah oleh bagian program lain, gunakan kata kunci `konstanta`:
 
 ```celang
 konstanta PAJAK = 0.11
 konstanta NAMA_APLIKASI = "TokoKita"
 
-// Jika Anda mencoba mengubah nilai konstanta:
+// Jika mencoba mengubah nilai konstanta:
 // PAJAK = 0.15 
 // ❌ Celang akan menolak dengan ramah: nilai konstanta tidak boleh diubah!
 ```
 
----
+### C. Anotasi Tipe Statis Opsional (Type Hinting)
 
-## 3. Batas Lingkup Catatan (`{ ... }`)
+Celang mendukung penentuan tipe secara eksplisit untuk menjaga kejelasan kode Anda:
 
-Variabel yang Anda buat di dalam kurung kurawal `{ ... }` hanya akan berlaku di dalam ruangan tersebut. Hal ini menjaga agar nama variabel tidak saling bertabrakan:
+```celang
+buat nama: Teks = "Budi Santoso"
+buat umur: Angka = 25
+buat saldo: Pecahan = 175000.50
+buat aktif: Kebenaran = benar
+buat buffer: Bita = bita(16)
+```
+
+### D. Batas Lingkup Catatan / Ruang Lingkup (`{ ... }`)
+
+Variabel yang dibuat di dalam kurung kurawal `{ ... }` hanya berlaku di dalam blok tersebut:
 
 ```celang
 buat judul = "Buku Utama"
@@ -51,7 +192,7 @@ buat judul = "Buku Utama"
 {
     // Catatan di dalam kurung kurawal hanya dikenal di sini:
     buat catatanKecil = "Catatan Bab 1"
-    cetak(judul)        // "Buku Utama" (bisa membaca dari luar)
+    cetak(judul)        // "Buku Utama" (dapat membaca variabel luar)
     cetak(catatanKecil) // "Catatan Bab 1"
 }
 
@@ -62,109 +203,46 @@ cetak(judul) // "Buku Utama" (tetap aman)
 
 ---
 
-## 4. Jenis-Jenis Nilai Dasar
+## 4. Konversi Tipe Data (Casting) & Pemeriksaan Tipe
 
-Celang menyediakan beberapa jenis nilai yang sering kita jumpai dalam kehidupan sehari-hari:
+### A. Memeriksa Jenis Data (`tipe`)
 
-| Jenis Nilai | Nama Jenis | Contoh | Keterangan |
-| :--- | :--- | :--- | :--- |
-| **Bilangan Bulat** | `Angka` | `42`, `-10`, `1_000_000` | Angka utuh tanpa koma (tanda garis bawah `_` boleh dipakai sebagai pemisah ribuan agar mudah dibaca) |
-| **Bilangan Desimal** | `Angka` / `Pecahan` | `3.14`, `-0.05` | Angka dengan tanda titik sebagai koma desimal |
-| **Tulisan / Teks** | `Teks` | `"Halo"`, `'Dunia'` | Tulisan huruf, kata, atau kalimat |
-| **Pilihan Logika** | `Logika` | `benar`, `salah` | Jawaban ya atau tidak |
-| **Koleksi Bita Biner** | `Bita` / `Bytes` | `bita("Halo")`, `bita(8)` | Kumpulan byte mentah (0–255) untuk data biner (gambar, berkas, jaringan) |
-| **Nilai Kosong** | - | `kosong` (nihil) | Menandakan belum ada data atau tidak ada nilai |
-
----
-
-## 5. Kumpulan Data: Daftar dan Kamus
-
-### A. Daftar / Kumpulan Berurutan (`[...]`)
-Daftar digunakan untuk menyimpan banyak barang secara berurutan dalam satu wadah:
+Gunakan fungsi bawaan `tipe(nilai)` untuk mengetahui jenis data dari suatu nilai:
 
 ```celang
-buat buah = ["Apel", "Mangga", "Jeruk", "Pisang"]
-
-// Mengambil barang berdasarkan urutan nomor (dimulai dari nomor 0):
-cetak("Buah pertama:", buah[0]) // "Apel"
-
-// Menghitung berapa banyak buah di dalam keranjang:
-cetak("Total buah  :", panjang(buah)) // 4
-
-// Mengambil potongan tertentu:
-buat pilihan = buah[1..3] // ["Mangga", "Jeruk"]
-
-// Manipulasi array langsung:
-buah.push("Melon")        // menambah ke belakang
-buat akhir = buah.pop()   // mengambil elemen terakhir ("Melon")
-buah.reverse()            // membalik urutan
-buah.sort()               // mengurutkan elemen
+cetak(tipe(42))            // "INTEGER"
+cetak(tipe(3.14))          // "FLOAT"
+cetak(tipe("Halo"))        // "STRING"
+cetak(tipe(benar))         // "BOOLEAN"
+cetak(tipe(bita("data")))  // "BITA"
+cetak(tipe([1, 2, 3]))     // "ARRAY"
+cetak(tipe({"a": 1}))      // "MAP"
+cetak(tipe(kosong))        // "NULL"
 ```
 
-### B. Kamus Data Bertanda Label (`{...}`)
-Kamus digunakan ketika setiap data memiliki nama label tersendiri (seperti data formulir):
+### B. Fungsi Pengubah Jenis Data (Casting)
+
+Celang menyediakan fungsi konversi eksplisit yang ramah dan konsisten:
 
 ```celang
-buat pengguna = {
-    "nama": "Siti Rahma",
-    "divisi": "Teknologi",
-    "gaji": 15000000,
-    "aktif": benar
-}
+// 1. Mengubah teks ke Angka atau Pecahan:
+buat angka1 = Angka("25000")       // 25000
+buat desimal1 = Pecahan("3.14")    // 3.14
 
-// Membaca data menggunakan tanda titik atau kurung siku:
-cetak(pengguna.nama)      // "Siti Rahma"
-cetak(pengguna["divisi"]) // "Teknologi"
+// 2. Mengubah nilai ke Teks:
+buat teksAngka = Teks(1000)        // "1000"
+buat teksBool = Teks(benar)        // "benar"
 
-// Jika mencari kolom yang belum ada, hasilnya adalah 'kosong' tanpa membuat program macet:
-cetak(pengguna.alamat)    // kosong
+// 3. Konversi nilai ke Kebenaran (Boolean):
+buat b1 = Kebenaran(1)             // benar
+buat b2 = Kebenaran(0)             // salah
+buat b3 = Kebenaran("")            // salah (teks kosong adalah falsy)
+buat b4 = Kebenaran("Celang")      // benar
+buat b5 = Kebenaran([])            // salah (daftar kosong adalah falsy)
 
-// Manipulasi kamus dengan metode bawaan:
-buat kunci = pengguna.keys()        // ["nama", "divisi", "gaji", "aktif"]
-buat adaGaji = pengguna.has("gaji") // benar
-pengguna.set("lokasi", "Jakarta")   // menambah atau mengubah data
+// 4. Konversi antara Teks dan Bita:
+buat dataBiner = Bita("Celang")    // Bita([67, 101, 108, 97, 110, 103])
+buat teksBalik = Teks(dataBiner)   // "Celang" (langsung diterjemahkan ke UTF-8)
 ```
 
-### C. Koleksi Bita Biner (`Bita` / `Bytes`)
-`Bita` adalah wadah koleksi biner efisien yang menyimpan deretan bita mentah (angka bulat `0` hingga `255`). Berbeda dengan `Teks` yang memproses karakter Unicode, `Bita` dirancang khusus untuk memanipulasi berkas biner (gambar, audio, ZIP, PDF), protokol jaringan, dan data heksadesimal/base64:
-
-```celang
-// 1. Berbagai cara membuat Bita:
-buat b1 = bita("Halo")              // dari string: bita([72, 97, 108, 111])
-buat b2 = bita(4)                   // alokasi 4 byte nol: bita([0, 0, 0, 0])
-buat b3 = bita([0x43, 0x65, 0x6C])  // dari array kode ASCII/byte
-
-// 2. Akses indeks dan pengubahan nilai byte secara langsung:
-cetak(b1[0])       // 72 (kode ASCII huruf 'H')
-b1[0] = 74         // Ubah 'H' menjadi 'J' (ASCII 74)
-cetak(b1.ke_teks()) // "Jalo"
-
-// 3. Pemotongan rentang (slicing) & replikasi:
-buat cuplikan = b1[0..2] // bita([74, 97])
-buat ganda = b1 * 2      // bita([74, 97, 108, 111, 74, 97, 108, 111])
-
-// 4. Konversi format data biner:
-cetak(b1.ke_heks())   // "4a616c6f"
-cetak(b1.ke_base64()) // "SmFsbw=="
-```
-
-> 💡 **Panduan Lengkap Koleksi:** Pelajari seluruh metode manipulasi array, map, dan bita (seperti `.shift()`, `.unshift()`, `.insert()`, `.remove_at()`, `.join()`, `.contains()`, `.ke_heks()`, `.ke_base64()`, dll) pada bab khusus [Manipulasi Koleksi (Array & Map)](/fitur-khas/koleksi-array-map).
-
----
-
-## 6. Mengubah Jenis Data (Konversi)
-
-Jika Anda ingin mengubah tulisan angka `"150"` menjadi angka sungguhan, atau sebaliknya, Celang menyediakan alat pengubah jenis yang sangat mudah:
-
-```celang
-buat teksAngka = "25000"
-buat angkaMurni = Angka(teksAngka) // Mengubah teks menjadi angka 25000
-
-buat total = 1000
-buat kalimat = Teks(total)         // Mengubah angka 1000 menjadi teks "1000"
-
-// Konversi data biner (Bita) dan teks:
-buat dataBiner = Bita("Celang")     // Mengubah teks ke objek Bita
-buat teksBalik = Teks(dataBiner)     // Mengubah Bita kembali ke teks "Celang"
-```
-Celang juga secara cerdas mengenali tulisan berformat mata uang (misalnya `"Rp 150000" - 25000` akan otomatis menghasilkan angka `125000`).
+Celang juga secara cerdas mengenali format mata uang saat operasi matematika berlangsung (misalnya `"Rp 150000" - 25000` akan otomatis menghasilkan angka `125000`).

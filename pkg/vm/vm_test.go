@@ -126,6 +126,19 @@ func TestVM_DataStructures(t *testing.T) {
 	}
 }
 
+func TestVM_StringInterpolation(t *testing.T) {
+	input := `
+	buat nama = "Rani"
+	buat tabungan = 50000
+	buat hasil = f"Halo, ${nama}! Tabunganmu: Rp${tabungan + 10000}."
+	hasil
+	`
+	res, _, _ := runVM(t, input)
+	if res.Inspect() != "Halo, Rani! Tabunganmu: Rp60000." {
+		t.Errorf("expected 'Halo, Rani! Tabunganmu: Rp60000.', got %s", res.Inspect())
+	}
+}
+
 func TestVM_Functions(t *testing.T) {
 	input := `
 	fungsi faktorial(n) {
@@ -803,6 +816,14 @@ func TestAudit_VM_OpEvalAST_FunctionLocals(t *testing.T) {
 	}
 }
 
-
-
-
+func TestVM_BytesMultiplication(t *testing.T) {
+	code := `
+	buat b = bita([65, 66]) * 3
+	b.ke_teks()
+	`
+	res, _, _ := runVM(t, code)
+	strVal, ok := res.(*evaluator.String)
+	if !ok || strVal.Value != "ABABAB" {
+		t.Fatalf("expected 'ABABAB', got %s", res.Inspect())
+	}
+}

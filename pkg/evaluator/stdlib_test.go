@@ -1647,5 +1647,276 @@ func TestStdlib_HTTP_ClientAndServer(t *testing.T) {
 	}
 }
 
+func TestRegression_TenBugFixes(t *testing.T) {
+	// 1. Bug 1: Teks(bita) casting and Bita(angka) allocation
+	t.Run("Bug1_TeksCastingAndBitaAllocation", func(t *testing.T) {
+		code := `
+		buat b = bita([67, 101, 108, 97, 110, 103])
+		buat str = Teks(b)
+		buat buf = Bita(6)
+		[str == "Celang", buf.panjang == 6]
+		`
+		res := runCelangTestCode(t, code)
+		arr, ok := res.(*Array)
+		if !ok || len(arr.Elements) != 2 {
+			t.Fatalf("expected 2 elements array, got %s", res.Inspect())
+		}
+		if arr.Elements[0].(*Boolean).Value != true || arr.Elements[1].(*Boolean).Value != true {
+			t.Errorf("Bug 1 test failed: got %s", res.Inspect())
+		}
+	})
+
+	// 2. Bug 2: Channel for-in loop with kosong
+	t.Run("Bug2_ChannelForInLoopWithKosong", func(t *testing.T) {
+		code := `
+		buat ch = Saluran(5)
+		ch.kirim(1)
+		ch.kirim(kosong)
+		ch.kirim(2)
+		ch.tutup()
+
+		buat items = []
+		untuk item dalam ch {
+			items.tambah(item)
+		}
+		[items.panjang == 3, items[0] == 1, items[1] == kosong, items[2] == 2]
+		`
+		res := runCelangTestCode(t, code)
+		arr, ok := res.(*Array)
+		if !ok || len(arr.Elements) != 4 {
+			t.Fatalf("expected 4 elements array, got %s", res.Inspect())
+		}
+		for i, el := range arr.Elements {
+			if b, ok := el.(*Boolean); !ok || !b.Value {
+				t.Errorf("Bug 2 assertion %d failed: got %s", i, el.Inspect())
+			}
+		}
+	})
+
+	// 3. Bug 3: SwitchStatement break signal consumption
+	t.Run("Bug3_SwitchStatementBreakSignal", func(t *testing.T) {
+		// Top-level break inside switch
+		codeTopLevel := `
+		buat x = 10
+		pilih x {
+			bila 10:
+				berhenti
+		}
+		"sukses"
+		`
+		resTop := runCelangTestCode(t, codeTopLevel)
+		if strVal, ok := resTop.(*String); !ok || strVal.Value != "sukses" {
+			t.Fatalf("top-level switch break failed: got %s", resTop.Inspect())
+		}
+
+		// Loop containing switch with break
+		codeLoop := `
+		buat dikumpulkan = []
+		untuk i dalam [1, 2, 3] {
+			pilih i {
+				bila 2:
+					berhenti
+			}
+			dikumpulkan.tambah(i)
+		}
+		[dikumpulkan.panjang == 3, dikumpulkan[0] == 1, dikumpulkan[1] == 2, dikumpulkan[2] == 3]
+		`
+		resLoop := runCelangTestCode(t, codeLoop)
+		arr, ok := resLoop.(*Array)
+		if !ok || len(arr.Elements) != 4 {
+			t.Fatalf("loop switch break failed: got %s", resLoop.Inspect())
+		}
+		for i, el := range arr.Elements {
+			if b, ok := el.(*Boolean); !ok || !b.Value {
+				t.Errorf("Bug 3 loop assertion %d failed: got %s", i, el.Inspect())
+			}
+		}
+	})
+
+	// 4. Bug 4: Rentang overflow protection
+	t.Run("Bug4_RentangOverflowProtection", func(t *testing.T) {
+		codeOverflowMax := `rentang(0, 9223372036854775807)`
+		res1 := runCelangTestCode(t, codeOverflowMax)
+		if _, ok := res1.(*Error); !ok {
+			t.Fatalf("expected overflow error for max rentang, got %s", res1.Inspect())
+		}
+
+		codeOverflowMin := `rentang(-9223372036854775807, 0)`
+		res2 := runCelangTestCode(t, codeOverflowMin)
+		if _, ok := res2.(*Error); !ok {
+			t.Fatalf("expected overflow error for min rentang, got %s", res2.Inspect())
+		}
+
+		codeValid := `rentang(1, 3)`
+		res3 := runCelangTestCode(t, codeValid)
+		arr, ok := res3.(*Array)
+		if !ok || len(arr.Elements) != 3 {
+			t.Fatalf("expected 3 elements for valid rentang, got %s", res3.Inspect())
+		}
+	})
+
+	// 5. Bug 5: Bytes multiplication in AST Evaluator
+	t.Run("Bug5_BytesMultiplication", func(t *testing.T) {
+		code := `
+		buat b = bita([65, 66]) * 3
+		b.ke_teks()
+		`
+		res := runCelangTestCode(t, code)
+		strVal, ok := res.(*String)
+		if !ok || strVal.Value != "ABABAB" {
+			t.Fatalf("expected 'ABABAB', got %s", res.Inspect())
+		}
+	})
+
+	// 6. Bug 6 & Bug 7 & Bug 9: HTTP Server Middleware prefix, handler error/auto-response, and JSON whitespace
+	t.Run("Bug6_7_9_HTTPServerFixes", func(t *testing.T) {
+		serverCode := `
+		buat s = http.server()
+		buat mwTriggered = salah
+
+		s.use("/api", fungsi(req, res, next) {
+			mwTriggered = benar
+			next()
+		})
+
+		s.get("/api/data", fungsi(req, res) {
+			res.send("ok-data")
+		})
+
+		s.get("/api-docs", fungsi(req, res) {
+			res.send("ok-docs")
+		})
+
+		s.get("/auto-string", fungsi(req, res) {
+			kembalikan "auto-string-response"
+		})
+
+		s.get("/auto-json", fungsi(req, res) {
+			kembalikan {"nama": "Celang"}
+		})
+
+		s.get("/error-route", fungsi(req, res) {
+			lempar "kesalahan fatal server"
+		})
+
+		s.post("/json-whitespace", fungsi(req, res) {
+			buat data = req.json()
+			res.json(data)
+		})
+
+		s.start(0)
+		buat port = Teks(s.port)
+
+		// Test 1: /api-docs should not trigger middleware
+		mwTriggered = salah
+		buat rDocs = http.get("http://127.0.0.1:" + port + "/api-docs")
+		buat mwNotTriggeredForDocs = (mwTriggered == salah)
+
+		// Test 2: /api/data should trigger middleware
+		mwTriggered = salah
+		buat rData = http.get("http://127.0.0.1:" + port + "/api/data")
+		buat mwTriggeredForData = (mwTriggered == benar)
+
+		// Test 3: Auto string return
+		buat rAutoStr = http.get("http://127.0.0.1:" + port + "/auto-string")
+
+		// Test 4: Auto json return
+		buat rAutoJson = http.get("http://127.0.0.1:" + port + "/auto-json")
+
+		// Test 5: Route error returns 500
+		buat rErr = http.get("http://127.0.0.1:" + port + "/error-route")
+
+		// Test 6: req.json() with whitespace body
+		buat rWs = http.post("http://127.0.0.1:" + port + "/json-whitespace", "   \n\t  ")
+
+		s.close()
+
+		[
+			rDocs.status == 200,
+			rDocs.teks() == "ok-docs",
+			mwNotTriggeredForDocs,
+			rData.status == 200,
+			mwTriggeredForData,
+			rAutoStr.status == 200,
+			rAutoStr.teks() == "auto-string-response",
+			rAutoJson.status == 200,
+			rAutoJson.json().nama == "Celang",
+			rErr.status == 500,
+			rWs.status == 200
+		]
+		`
+		res := runCelangTestCode(t, serverCode)
+		arr, ok := res.(*Array)
+		if !ok {
+			t.Fatalf("expected array, got %s", res.Inspect())
+		}
+		for i, el := range arr.Elements {
+			if b, ok := el.(*Boolean); !ok || !b.Value {
+				t.Errorf("HTTP Server assertion %d failed: got %s", i, el.Inspect())
+			}
+		}
+	})
+
+	// 8. Bug 8: Truthiness of empty Bytes and Map
+	t.Run("Bug8_TruthinessEmptyBytesAndMap", func(t *testing.T) {
+		code := `
+		fungsi isTruthy(x) {
+			jika x {
+				kembalikan benar
+			} selain {
+				kembalikan salah
+			}
+		}
+		buat bEmpty = isTruthy(bita([]))
+		buat bNonEmpty = isTruthy(bita([1]))
+		buat mEmpty = isTruthy({})
+		buat mNonEmpty = isTruthy({"k": 1})
+		[bEmpty == salah, bNonEmpty == benar, mEmpty == salah, mNonEmpty == benar]
+		`
+		res := runCelangTestCode(t, code)
+		arr, ok := res.(*Array)
+		if !ok || len(arr.Elements) != 4 {
+			t.Fatalf("expected 4 elements, got %s", res.Inspect())
+		}
+		for i, el := range arr.Elements {
+			if b, ok := el.(*Boolean); !ok || !b.Value {
+				t.Errorf("Bug 8 assertion %d failed: got %s", i, el.Inspect())
+			}
+		}
+	})
+
+	// 10. Bug 10: Universal Mode guards on Bytes methods
+	t.Run("Bug10_UniversalModeGuardsOnBytes", func(t *testing.T) {
+		env := NewEnvironment()
+		env.IsUniversal = true
+		var out bytes.Buffer
+		RegisterBuiltins(env, &out)
+
+		bObj := &Bytes{Elements: []byte("test")}
+
+		// potong guard
+		_, okPotong := EvalBytesMethod(bObj, "potong", env, nil)
+		if !okPotong {
+			t.Errorf("expected guard to catch 'potong'")
+		}
+		resPotong, _ := EvalBytesMethod(bObj, "potong", env, nil)
+		if errObj, ok := resPotong.(*Error); !ok || !strings.Contains(errObj.Message, "potong") {
+			t.Errorf("expected error mentioning potong, got %s", resPotong.Inspect())
+		}
+
+		// salin guard
+		resSalin, _ := EvalBytesMethod(bObj, "salin", env, nil)
+		if errObj, ok := resSalin.(*Error); !ok || !strings.Contains(errObj.Message, "salin") {
+			t.Errorf("expected error mentioning salin, got %s", resSalin.Inspect())
+		}
+
+		// heks guard
+		resHeks, _ := EvalBytesMethod(bObj, "heks", env, nil)
+		if errObj, ok := resHeks.(*Error); !ok || !strings.Contains(errObj.Message, "heks") {
+			t.Errorf("expected error mentioning heks, got %s", resHeks.Inspect())
+		}
+	})
+}
+
 
 

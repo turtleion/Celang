@@ -1,14 +1,12 @@
-# Kontrol Alur & Penanganan Galat
+# Percabangan & Kontrol Alur
 
-Sebuah program komputer menjadi pintar karena ia mampu **mengambil keputusan** berdasarkan situasi yang terjadi, **mengulangi pekerjaan** yang sama berkali-kali tanpa lelah, dan **menangani kendala** jika ada sesuatu yang tidak terduga.
-
-Di Celang, seluruh alur logika ini ditulis menggunakan kalimat bahasa Indonesia yang mengalir alami.
+Sebuah program komputer dapat merespons situasi yang berbeda-beda karena ia mampu **mengambil keputusan**. Di Celang, Anda dapat mengarahkan jalannya program menggunakan pernyataan kondisional berbahasa Indonesia yang mengalir alami dan mudah dipahami.
 
 ---
 
-## 1. Mengambil Keputusan (`jika`, `selain jika`, `selain`)
+## 1. Percabangan Bersyarat (`jika`, `selain jika`, `selain`)
 
-Gunakan kata kunci `jika` untuk menjalankan perintah hanya ketika syarat tertentu terpenuhi:
+Gunakan kata kunci `jika` untuk menjalankan blok kode hanya ketika kondisi tertentu terpenuhi (`benar`):
 
 ```celang
 buat nilaiUjian = 85
@@ -25,7 +23,9 @@ jika nilaiUjian >= 90 {
 ```
 
 ### Menggunakan Kata `maka` agar Lebih Alami
-Anda boleh menyisipkan kata `maka` sebelum kurung kurawal agar kalimatnya terbaca lebih mantap:
+
+Untuk meningkatkan keterbacaan, Anda dapat menyisipkan kata `maka` sebelum kurung kurawal pembuka `{`:
+
 ```celang
 buat usia = 18
 
@@ -36,108 +36,50 @@ jika usia >= 17 maka {
 }
 ```
 
+### Merangkai Banyak Syarat (`dan`, `atau`, `bukan`)
+
+Anda dapat memadukan beberapa kondisi menggunakan operator logika:
+
+```celang
+buat punyaTiket = benar
+buat usia = 20
+
+jika punyaTiket dan usia >= 18 maka {
+    cetak("Silakan masuk ke area bioskop.")
+} selain {
+    cetak("Akses ditolak.")
+}
+```
+
 ---
 
-## 2. Memilih Berdasarkan Kasus (`cocok ... kasus ... lainnya`)
+## 2. Percabangan Multi-Pilihan (`pilih ... bila ... lainnya`)
 
-Ketika Anda memiliki banyak pilihan yang pasti (misalnya menu pilihan, peran pengguna, atau nomor kode), pernyataan `cocok` jauh lebih rapi dibanding menulis banyak `selain jika`:
+Ketika Anda perlu mencocokkan suatu nilai terhadap banyak kemungkinan tetap (seperti menu pilihan, peran pengguna, kode status, atau tipe data), pernyataan `pilih ... bila` jauh lebih rapi, ekspresif, dan enak dibaca dibandingkan menulis banyak `selain jika`:
 
 ```celang
 buat peranPengguna = "editor"
 
-cocok peranPengguna {
-    kasus "admin":
+pilih peranPengguna {
+    bila "admin":
         cetak("Akses penuh: Semua menu terbuka.")
-    kasus "editor":
+    bila "editor":
         cetak("Akses penyunting: Boleh menyunting artikel.")
-    kasus "penulis":
+    bila "penulis":
         cetak("Akses pembuat: Boleh menulis draf baru.")
     lainnya:
         cetak("Peran tidak dikenali. Akses hanya untuk membaca.")
 }
 ```
 
----
-
-## 3. Mengulangi Selama Syarat Terpenuhi (`selama`)
-
-Gunakan kata kunci `selama` jika Anda ingin mengulangi suatu tindakan selama kondisinya masih bernilai `benar`:
-
-```celang
-buat hitungan = 1
-
-selama hitungan <= 4 {
-    cetak("Langkah ke-", hitungan)
-    hitungan += 1 // Menambah hitungan agar tidak berputar selamanya
-}
-
-cetak("Perulangan selesai!")
-```
-
-> **Perhatian:** Pastikan angka hitungan selalu ditambah di dalam perulangan agar syaratnya bisa tercapai dan program tidak berputar tanpa henti.
+### Karakteristik `pilih ... bila` di Celang:
+- **Otomatis Berhenti:** Celang tidak memerlukan pernyataan `break` manual di setiap cabang (*no fallthrough*). Setelah satu cabang `bila` yang cocok dieksekusi, evaluasi blok `pilih` langsung selesai.
+- **Cabang Bawaan (`lainnya`):** Menangani seluruh kemungkinan yang tidak tercakup oleh cabang-cabang `bila` sebelumnya.
+- **Dukungan Berhenti Awal (`berhenti`):** Jika Anda ingin keluar dari blok `bila` lebih cepat, Anda dapat menggunakan kata kunci `berhenti`.
 
 ---
 
-## 4. Membaca Seluruh Isi Daftar (`untuk ... dalam`)
+## 🧭 Langkah Selanjutnya
 
-Jika Anda memiliki sebuah daftar barang dan ingin memeriksa isinya satu per satu:
-
-```celang
-buat daftarKota = ["Bandung", "Surabaya", "Medan"]
-
-untuk kota dalam daftarKota {
-    cetak("Mengunjungi kota:", kota)
-}
-```
-
-Bisa juga dipadukan dengan rentang angka cepat:
-```celang
-untuk nomor dalam 1..5 {
-    cetak("Antrean nomor:", nomor)
-}
-```
-
-### Mengatur Alur: `berhenti` dan `lanjut`
-- **`berhenti`**: Langsung menghentikan perulangan saat itu juga.
-- **`lanjut`**: Melompati putaran saat ini dan langsung maju ke putaran berikutnya.
-
-```celang
-untuk angka dalam 1..10 {
-    jika angka == 3 {
-        lanjut // Lewati angka 3, jangan cetak
-    }
-    jika angka == 7 {
-        berhenti // Berhenti total saat mencapai angka 7
-    }
-    cetak("Angka:", angka)
-}
-```
-
----
-
-## 5. Menangani Kendala (`coba`, `tangkap`, `akhirnya`, `lempar`)
-
-Terkadang program kita menghadapi situasi yang tidak terduga, misalnya pembagian dengan angka nol atau sambungan yang putus. Daripada membiarkan program langsung macet, Anda dapat menangkap kendala tersebut dengan tenang:
-
-```celang
-fungsi bagiUang(total, orang) {
-    jika orang <= 0 {
-        lempar "Jumlah orang tidak boleh nol atau minus!"
-    }
-    kembalikan total / orang
-}
-
-coba {
-    buat hasil = bagiUang(100000, 0)
-    cetak("Masing-masing mendapat:", hasil)
-} tangkap (kendala) {
-    cetak("Terjadi kendala perhitungan:", kendala)
-} akhirnya {
-    cetak("Pemeriksaan selesai dikerjakan.")
-}
-```
-
-- **`coba`**: Mencoba menjalankan perintah yang rawan masalah.
-- **`tangkap`**: Menangkap pesan masalah jika terjadi kesalahan, sehingga program tetap bisa berjalan normal.
-- **`akhirnya`**: Bagian yang dijamin **pasti dijalankan**, baik perhitungannya berhasil maupun gagal.
-- **`lempar`**: Sengaja mengeluarkan peringatan masalah jika ada data yang tidak masuk akal.
+- Ingin mengulangi pekerjaan berkali-kali? Pelajari [**Perulangan & Iterasi (Looping)**](/dasar/perulangan).
+- Ingin mengamankan program dari kesalahan tak terduga? Pelajari [**Penanganan Galat (Try-Catch)**](/dasar/penanganan-galat).

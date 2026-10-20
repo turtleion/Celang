@@ -14,13 +14,100 @@ Celang bekerja dengan **Cara Kedua**:
 1. Pohon logika program Anda diringkas menjadi deretan instruksi kecil dan padat.
 2. Mesin virtual Celang mengeksekusi instruksi kecil tersebut satu per satu dengan sangat cepat.
 
-```mermaid
-flowchart LR
-    A[Pohon Logika Program] --> B[Penyusun Instruksi / Compiler]
-    B --> C[Daftar Instruksi Ringkas]
-    C --> D[Mesin Virtual Celang / VM]
-    D --> E[Hasil Muncul di Layar]
-```
+<div class="vm-flow-container">
+  <div class="vm-flow-step">
+    <div class="vm-step-icon">🌳</div>
+    <div class="vm-step-title">Pohon Logika (U-AST)</div>
+    <div class="vm-step-desc">Struktur data program hasil parsing</div>
+  </div>
+  <div class="vm-flow-arrow">➔</div>
+  <div class="vm-flow-step">
+    <div class="vm-step-icon">⚙️</div>
+    <div class="vm-step-title">Kompiler Bytecode</div>
+    <div class="vm-step-desc">Menyusun instruksi kecil & padat</div>
+  </div>
+  <div class="vm-flow-arrow">➔</div>
+  <div class="vm-flow-step">
+    <div class="vm-step-icon">📜</div>
+    <div class="vm-step-title">Instruksi Chunk</div>
+    <div class="vm-step-desc">Deretan opcode ringkas di memori</div>
+  </div>
+  <div class="vm-flow-arrow">➔</div>
+  <div class="vm-flow-step">
+    <div class="vm-step-icon">⚡</div>
+    <div class="vm-step-title">Mesin Virtual (VM)</div>
+    <div class="vm-step-desc">Eksekusi stack super cepat</div>
+  </div>
+  <div class="vm-flow-arrow">➔</div>
+  <div class="vm-flow-step">
+    <div class="vm-step-icon">🖥️</div>
+    <div class="vm-step-title">Hasil Output</div>
+    <div class="vm-step-desc">Tampil langsung di terminal</div>
+  </div>
+</div>
+
+<style>
+.vm-flow-container {
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 20px 0;
+  padding: 16px;
+  background: var(--vp-c-bg-soft);
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 12px;
+  overflow-x: auto;
+}
+.vm-flow-step {
+  flex: 1;
+  min-width: 130px;
+  background: var(--vp-c-bg);
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  padding: 12px 10px;
+  text-align: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+}
+.vm-step-icon {
+  font-size: 22px;
+  margin-bottom: 4px;
+}
+.vm-step-title {
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--vp-c-text-1);
+  margin-bottom: 4px;
+}
+.vm-step-desc {
+  font-size: 11px;
+  color: var(--vp-c-text-2);
+  line-height: 1.3;
+}
+.vm-flow-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  color: var(--vp-c-brand-1);
+  font-weight: 700;
+  opacity: 0.7;
+}
+@media (max-width: 768px) {
+  .vm-flow-container {
+    flex-direction: column;
+    align-items: center;
+  }
+  .vm-flow-step {
+    width: 100%;
+    min-width: 0;
+  }
+  .vm-flow-arrow {
+    transform: rotate(90deg);
+    padding: 4px 0;
+  }
+}
+</style>
 
 ---
 
