@@ -9,6 +9,8 @@ import (
 	"sync"
 	"time"
 	"unicode/utf8"
+
+	"celang/pkg/uast"
 )
 
 func RegisterBuiltins(env *Environment, out io.Writer) {
@@ -497,8 +499,382 @@ func RegisterBuiltinsWithIO(env *Environment, in io.Reader, out io.Writer) {
 	env.Define("await_race", jemputPertamaFn, false, "function")
 	env.Define("await_first", jemputPertamaFn, false, "function")
 
+	// Register testing assertions & callbacks
+	registerTestingBuiltins(env)
+
 	// Register Standard Library global objects (berkas, fs, matematika, math, teks, strings, waktu, time, json)
 	RegisterStdlibGlobals(env)
+}
+
+func registerTestingBuiltins(env *Environment) {
+	// 1. harus / assert / must
+	harusFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) < 1 {
+				return &AssertionError{Message: "harus() membutuhkan minimal 1 argumen (kondisi)"}
+			}
+			msg := "Kondisi tidak terpenuhi (diharapkan bernilai benar)"
+			if len(args) >= 2 {
+				if s, ok := args[1].(*String); ok {
+					msg = s.Value
+				} else {
+					msg = args[1].Inspect()
+				}
+			}
+			if !CoerceToBoolean(args[0]) {
+				return &AssertionError{
+					Message:  msg,
+					Expected: "benar (true)",
+					Actual:   args[0].Inspect(),
+				}
+			}
+			return NULL
+		},
+	}
+	env.Define("harus", harusFn, false, "function")
+	env.Define("assert", harusFn, false, "function")
+	env.Define("must", harusFn, false, "function")
+
+	// 2. harus_sama / assert_eq / assert_equal
+	harusSamaFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) < 2 {
+				return &AssertionError{Message: "harus_sama() membutuhkan minimal 2 argumen: (aktual, ekspektasi)"}
+			}
+			actual := args[0]
+			expected := args[1]
+			msg := "Nilai aktual tidak sama dengan ekspektasi"
+			if len(args) >= 3 {
+				if s, ok := args[2].(*String); ok {
+					msg = s.Value
+				} else {
+					msg = args[2].Inspect()
+				}
+			}
+			if !ObjectsEqual(actual, expected) {
+				return &AssertionError{
+					Message:  msg,
+					Expected: expected.Inspect(),
+					Actual:   actual.Inspect(),
+				}
+			}
+			return NULL
+		},
+	}
+	env.Define("harus_sama", harusSamaFn, false, "function")
+	env.Define("assert_eq", harusSamaFn, false, "function")
+	env.Define("assert_equal", harusSamaFn, false, "function")
+
+	// 3. harus_beda / assert_ne / assert_not_equal
+	harusBedaFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) < 2 {
+				return &AssertionError{Message: "harus_beda() membutuhkan minimal 2 argumen: (aktual, ekspektasi)"}
+			}
+			actual := args[0]
+			expected := args[1]
+			msg := "Nilai diharapkan berbeda, tetapi bernilai sama"
+			if len(args) >= 3 {
+				if s, ok := args[2].(*String); ok {
+					msg = s.Value
+				} else {
+					msg = args[2].Inspect()
+				}
+			}
+			if ObjectsEqual(actual, expected) {
+				return &AssertionError{
+					Message:  msg,
+					Expected: "berbeda dari " + expected.Inspect(),
+					Actual:   actual.Inspect(),
+				}
+			}
+			return NULL
+		},
+	}
+	env.Define("harus_beda", harusBedaFn, false, "function")
+	env.Define("assert_ne", harusBedaFn, false, "function")
+	env.Define("assert_not_equal", harusBedaFn, false, "function")
+
+	// 4. harus_benar / assert_true
+	harusBenarFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) < 1 {
+				return &AssertionError{Message: "harus_benar() membutuhkan 1 argumen"}
+			}
+			msg := "Diharapkan bernilai benar (true)"
+			if len(args) >= 2 {
+				if s, ok := args[1].(*String); ok {
+					msg = s.Value
+				}
+			}
+			if b, ok := args[0].(*Boolean); !ok || !b.Value {
+				return &AssertionError{
+					Message:  msg,
+					Expected: "benar (true)",
+					Actual:   args[0].Inspect(),
+				}
+			}
+			return NULL
+		},
+	}
+	env.Define("harus_benar", harusBenarFn, false, "function")
+	env.Define("assert_true", harusBenarFn, false, "function")
+
+	// 5. harus_salah / assert_false
+	harusSalahFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) < 1 {
+				return &AssertionError{Message: "harus_salah() membutuhkan 1 argumen"}
+			}
+			msg := "Diharapkan bernilai salah (false)"
+			if len(args) >= 2 {
+				if s, ok := args[1].(*String); ok {
+					msg = s.Value
+				}
+			}
+			if b, ok := args[0].(*Boolean); !ok || b.Value {
+				return &AssertionError{
+					Message:  msg,
+					Expected: "salah (false)",
+					Actual:   args[0].Inspect(),
+				}
+			}
+			return NULL
+		},
+	}
+	env.Define("harus_salah", harusSalahFn, false, "function")
+	env.Define("assert_false", harusSalahFn, false, "function")
+
+	// 6. harus_kosong / assert_null
+	harusKosongFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) < 1 {
+				return &AssertionError{Message: "harus_kosong() membutuhkan 1 argumen"}
+			}
+			msg := "Diharapkan bernilai kosong (null)"
+			if len(args) >= 2 {
+				if s, ok := args[1].(*String); ok {
+					msg = s.Value
+				}
+			}
+			if args[0] != nil && args[0].Type() != NULL_OBJ {
+				return &AssertionError{
+					Message:  msg,
+					Expected: "kosong (null)",
+					Actual:   args[0].Inspect(),
+				}
+			}
+			return NULL
+		},
+	}
+	env.Define("harus_kosong", harusKosongFn, false, "function")
+	env.Define("assert_null", harusKosongFn, false, "function")
+
+	// 7. harus_tidak_kosong / assert_not_null
+	harusTidakKosongFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) < 1 {
+				return &AssertionError{Message: "harus_tidak_kosong() membutuhkan 1 argumen"}
+			}
+			msg := "Diharapkan tidak bernilai kosong (bukan null)"
+			if len(args) >= 2 {
+				if s, ok := args[1].(*String); ok {
+					msg = s.Value
+				}
+			}
+			if args[0] == nil || args[0].Type() == NULL_OBJ {
+				return &AssertionError{
+					Message:  msg,
+					Expected: "bukan kosong",
+					Actual:   "kosong (null)",
+				}
+			}
+			return NULL
+		},
+	}
+	env.Define("harus_tidak_kosong", harusTidakKosongFn, false, "function")
+	env.Define("assert_not_null", harusTidakKosongFn, false, "function")
+
+	// 8. harus_berisi / assert_contains
+	harusBerisiFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) < 2 {
+				return &AssertionError{Message: "harus_berisi() membutuhkan minimal 2 argumen: (kontainer, elemen)"}
+			}
+			container := args[0]
+			item := args[1]
+			msg := "Kontainer tidak memuat elemen yang diharapkan"
+			if len(args) >= 3 {
+				if s, ok := args[2].(*String); ok {
+					msg = s.Value
+				}
+			}
+			found := false
+			switch c := container.(type) {
+			case *String:
+				if itemStr, ok := item.(*String); ok {
+					found = strings.Contains(c.Value, itemStr.Value)
+				} else {
+					found = strings.Contains(c.Value, item.Inspect())
+				}
+			case *Array:
+				for _, el := range c.Elements {
+					if ObjectsEqual(el, item) {
+						found = true
+						break
+					}
+				}
+			case *Map:
+				if itemStr, ok := item.(*String); ok {
+					_, found = c.Pairs[itemStr.Value]
+				}
+			case *Bytes:
+				if itemInt, ok := item.(*Integer); ok {
+					targetByte := byte(itemInt.Value)
+					for _, b := range c.Elements {
+						if b == targetByte {
+							found = true
+							break
+						}
+					}
+				}
+			default:
+				return &AssertionError{
+					Message:  fmt.Sprintf("harus_berisi tidak mendukung tipe kontainer '%s'", container.Type()),
+					Expected: "teks, larik, atau peta",
+					Actual:   string(container.Type()),
+				}
+			}
+			if !found {
+				return &AssertionError{
+					Message:  msg,
+					Expected: "memuat " + item.Inspect(),
+					Actual:   container.Inspect(),
+				}
+			}
+			return NULL
+		},
+	}
+	env.Define("harus_berisi", harusBerisiFn, false, "function")
+	env.Define("assert_contains", harusBerisiFn, false, "function")
+
+	// 9. harus_galat / assert_throws
+	harusGalatFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) < 1 {
+				return &AssertionError{Message: "harus_galat() membutuhkan minimal 1 argumen: fungsi/closure yang diuji"}
+			}
+			fnObj := args[0]
+			var expectedErrMsg string
+			if len(args) >= 2 {
+				if s, ok := args[1].(*String); ok {
+					expectedErrMsg = s.Value
+				}
+			}
+
+			res := applyFunction(fnObj, []Object{}, nil)
+			if !isError(res) {
+				return &AssertionError{
+					Message:  "Diharapkan menghasilkan galat (error), namun fungsi berjalan sukses tanpa galat",
+					Expected: "galat/error",
+					Actual:   res.Inspect(),
+				}
+			}
+
+			if expectedErrMsg != "" {
+				actualMsg := res.Inspect()
+				if errObj, ok := res.(*Error); ok {
+					actualMsg = errObj.Message
+				} else if aErr, ok := res.(*AssertionError); ok {
+					actualMsg = aErr.Message
+				}
+				if !strings.Contains(strings.ToLower(actualMsg), strings.ToLower(expectedErrMsg)) {
+					return &AssertionError{
+						Message:  fmt.Sprintf("Galat terjadi tetapi pesannya tidak memuat '%s'", expectedErrMsg),
+						Expected: "pesan memuat: " + expectedErrMsg,
+						Actual:   actualMsg,
+					}
+				}
+			}
+
+			return NULL
+		},
+	}
+	env.Define("harus_galat", harusGalatFn, false, "function")
+	env.Define("assert_throws", harusGalatFn, false, "function")
+
+	// 10. uji / test callback
+	ujiCallbackFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) < 1 {
+				return &AssertionError{Message: "uji() membutuhkan minimal 1 argumen (fungsi pengujian)"}
+			}
+			testName := "unnamed test"
+			var fnObj Object
+			if len(args) >= 2 {
+				if s, ok := args[0].(*String); ok {
+					testName = s.Value
+				} else {
+					testName = args[0].Inspect()
+				}
+				fnObj = args[1]
+			} else {
+				fnObj = args[0]
+			}
+
+			tc := env.GetTestContext()
+			if tc != nil && tc.Filter != "" {
+				if !strings.Contains(strings.ToLower(testName), strings.ToLower(tc.Filter)) {
+					return NULL
+				}
+			}
+
+			start := time.Now()
+			res := applyFunction(fnObj, []Object{}, nil)
+			dur := time.Since(start)
+
+			if isError(res) {
+				errMsg := res.Inspect()
+				expected := ""
+				actual := ""
+				var pos *uast.Position
+				if aErr, ok := res.(*AssertionError); ok {
+					errMsg = aErr.Message
+					expected = aErr.Expected
+					actual = aErr.Actual
+					pos = aErr.Pos
+				} else if errObj, ok := res.(*Error); ok {
+					errMsg = errObj.Message
+					pos = errObj.Pos
+				}
+
+				if tc != nil {
+					tc.RecordResult(TestCaseResult{
+						Name:     testName,
+						Passed:   false,
+						Duration: dur,
+						Error:    errMsg,
+						Expected: expected,
+						Actual:   actual,
+						Pos:      pos,
+					})
+					return NULL
+				}
+				return res
+			}
+
+			if tc != nil {
+				tc.RecordResult(TestCaseResult{
+					Name:     testName,
+					Passed:   true,
+					Duration: dur,
+				})
+			}
+			return NULL
+		},
+	}
+	env.Define("uji", ujiCallbackFn, false, "function")
+	env.Define("test", ujiCallbackFn, false, "function")
 }
 
 func deepClone(obj Object) Object {

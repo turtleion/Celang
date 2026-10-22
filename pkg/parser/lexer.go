@@ -157,6 +157,10 @@ var keywords = map[string]TokenType{
 	"pantau":      WATCH,
 	"watch":       WATCH,
 	"awaskeun":    WATCH,
+
+	// Testing Framework
+	"uji":  TEST,
+	"test": TEST,
 }
 
 type Lexer struct {

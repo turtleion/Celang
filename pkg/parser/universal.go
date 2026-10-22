@@ -75,6 +75,7 @@ var IndonesianToEnglishKeywords = map[string]string{
 	"bentuk":        "struct / class",
 	"rujuk":         "ref",
 	"sebagai":       "as",
+	"uji":           "test",
 }
 
 // IsIndonesianKeyword checks if a word is an Indonesian-specific keyword and returns its English replacement.

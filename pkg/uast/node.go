@@ -39,6 +39,7 @@ const (
 	NodeTypeRollbackStatement      NodeType = "RollbackStatement"
 	NodeTypeReactiveDeclaration    NodeType = "ReactiveDeclaration"
 	NodeTypeWatchStatement         NodeType = "WatchStatement"
+	NodeTypeTestStatement          NodeType = "TestStatement"
 
 	// Expressions
 	NodeTypeLiteral          NodeType = "Literal"

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"celang/pkg/uast"
 )
@@ -106,9 +107,34 @@ func NewModuleRegistry() *ModuleRegistry {
 	}
 }
 
+// TestCaseResult represents the outcome of a single test case.
+type TestCaseResult struct {
+	Name     string
+	Passed   bool
+	Duration time.Duration
+	Error    string
+	Expected string
+	Actual   string
+	Pos      *uast.Position
+}
+
+// TestContext collects results from all tests executed in a run.
+type TestContext struct {
+	mu      sync.Mutex
+	Results []TestCaseResult
+	Filter  string
+}
+
+// RecordResult safely appends a test result to the context.
+func (tc *TestContext) RecordResult(res TestCaseResult) {
+	tc.mu.Lock()
+	defer tc.mu.Unlock()
+	tc.Results = append(tc.Results, res)
+}
+
 // Environment manages variable bindings across lexical scopes with thread-safety for goroutines.
 type Environment struct {
-	mu             sync.RWMutex
+	mu              sync.RWMutex
 	store           map[string]*VariableEntry
 	typeAliases     map[string]string
 	outer           *Environment
@@ -120,6 +146,7 @@ type Environment struct {
 	reactivityDepth int64
 	activeTracker   *VariableEntry
 	IsUniversal     bool
+	testContext     *TestContext
 }
 
 func NewEnvironment() *Environment {
@@ -139,8 +166,26 @@ func NewEnclosedEnvironment(outer *Environment) *Environment {
 		env.ModuleRoot = outer.ModuleRoot
 		env.ModuleRegistry = outer.ModuleRegistry
 		env.IsUniversal = outer.IsUniversal
+		env.testContext = outer.testContext
 	}
 	return env
+}
+
+// GetTestContext traverses the environment chain to find the active TestContext, if any.
+func (e *Environment) GetTestContext() *TestContext {
+	curr := e
+	for curr != nil {
+		if curr.testContext != nil {
+			return curr.testContext
+		}
+		curr = curr.outer
+	}
+	return nil
+}
+
+// SetTestContext assigns the active TestContext for this environment tree.
+func (e *Environment) SetTestContext(tc *TestContext) {
+	e.testContext = tc
 }
 
 // PushDefer adds a statement to be executed at scope exit (LIFO).

@@ -37,7 +37,7 @@ export default defineConfig({
           },
           {
             name: 'keyword.control.celang',
-            match: '\\b(jika|selain jika|selain|maka|pilih|bila|cocok|kasus|lainnya|switch|case|default|selama|untuk|dalam|kembalikan|mengembalikan|berhenti|lanjut|sambil|bersamaan|mundur ke|coba|tangkap|akhirnya|lempar|try|catch|finally|throw|gaya|mungkin|saat_selesai|kalau|defer|titip|jemput|harus|transaksi|batalkan|pulihkan|pantau|transaction|rollback|recover|watch|if|else|while|for|return|break|continue|async|parallel|lamun|salami|pikeun|balikkeun)\\b'
+            match: '\\b(jika|selain jika|selain|maka|pilih|bila|cocok|kasus|lainnya|switch|case|default|selama|untuk|dalam|kembalikan|mengembalikan|berhenti|lanjut|sambil|bersamaan|mundur ke|coba|tangkap|akhirnya|lempar|try|catch|finally|throw|gaya|mungkin|saat_selesai|kalau|defer|titip|jemput|harus|transaksi|batalkan|pulihkan|pantau|transaction|rollback|recover|watch|if|else|while|for|return|break|continue|async|parallel|lamun|salami|pikeun|balikkeun|uji|test)\\b'
           },
           {
             name: 'keyword.declaration.celang',
@@ -49,7 +49,7 @@ export default defineConfig({
           },
           {
             name: 'support.function.celang',
-            match: '\\b(cetak|masukan|panjang|tipe|rentang|saring|petakan|potong_spasi|kapitalisasi|salin|clone|Saluran|jemput_semua|jemput_pertama|terbilang|rupiah|format_rupiah|Angka|Pecahan|Teks|Kebenaran|kebenaran|Logika|Bita|bita|print|input|len|type|range|filter|map|trim|format_usd|format_currency|in_words|spelled_out|dollars_in_words|Channel|channel|await|await_all|await_race|Number|String|Boolean|Bytes|bytes)\\b'
+            match: '\\b(harus|harus_sama|harus_beda|harus_benar|harus_salah|harus_kosong|harus_tidak_kosong|harus_berisi|harus_galat|assert|assert_eq|assert_ne|assert_true|assert_false|assert_null|assert_not_null|assert_contains|assert_throws|cetak|masukan|panjang|tipe|rentang|saring|petakan|potong_spasi|kapitalisasi|salin|clone|Saluran|jemput_semua|jemput_pertama|terbilang|rupiah|format_rupiah|Angka|Pecahan|Teks|Kebenaran|kebenaran|Logika|Bita|bita|print|input|len|type|range|filter|map|trim|format_usd|format_currency|in_words|spelled_out|dollars_in_words|Channel|channel|await|await_all|await_race|Number|String|Boolean|Bytes|bytes)\\b'
           },
           {
             name: 'constant.numeric.celang',
@@ -91,7 +91,8 @@ export default defineConfig({
           { text: 'Pengenalan & Filosofi', link: '/panduan/pengenalan' },
           { text: 'Tur Interaktif Celang ↗', link: '/tur/', target: '_blank' },
           { text: 'Instalasi & Mulai Cepat', link: '/panduan/mulai-cepat' },
-          { text: 'CLI & REPL Interaktif', link: '/panduan/cli-repl' }
+          { text: 'CLI & REPL Interaktif', link: '/panduan/cli-repl' },
+          { text: 'Pengujian Unit (celang uji)', link: '/panduan/pengujian' }
         ]
       },
       {

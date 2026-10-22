@@ -124,6 +124,9 @@ const (
 	RECOVER       TokenType = "RECOVER"       // pulihkan, recover
 	REACTIVE_DECL TokenType = "REACTIVE_DECL" // reaktif, reactive
 	WATCH         TokenType = "WATCH"         // pantau, watch
+
+	// Testing Framework
+	TEST TokenType = "TEST" // uji, test
 )
 
 type Token struct {

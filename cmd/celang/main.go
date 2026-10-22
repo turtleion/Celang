@@ -18,6 +18,7 @@ import (
 	"celang/pkg/parser"
 	"celang/pkg/repl"
 	"celang/pkg/syntax"
+	"celang/pkg/tester"
 	"celang/pkg/uast"
 	"celang/pkg/vm"
 )
@@ -186,6 +187,44 @@ func main() {
 		}
 		dumpAST(os.Args[2])
 
+	case "uji", "test":
+		var targets []string
+		filter := ""
+		verbose := false
+		noColor := false
+
+		for i := 2; i < len(os.Args); i++ {
+			arg := os.Args[i]
+			if (arg == "-f" || arg == "--filter" || arg == "--saring") && i+1 < len(os.Args) {
+				filter = os.Args[i+1]
+				i++
+			} else if strings.HasPrefix(arg, "--filter=") {
+				filter = strings.TrimPrefix(arg, "--filter=")
+			} else if strings.HasPrefix(arg, "--saring=") {
+				filter = strings.TrimPrefix(arg, "--saring=")
+			} else if arg == "-v" || arg == "--verbose" {
+				verbose = true
+			} else if arg == "--no-color" {
+				noColor = true
+			} else if !strings.HasPrefix(arg, "-") {
+				targets = append(targets, arg)
+			}
+		}
+
+		summary, err := tester.Run(targets, tester.Options{
+			Filter:  filter,
+			Verbose: verbose,
+			NoColor: noColor,
+			Out:     os.Stdout,
+		})
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Kesalahan menjalankan pengujian: %v\n", err)
+			os.Exit(1)
+		}
+		if summary.Failed > 0 {
+			os.Exit(1)
+		}
+
 	case "versi", "version", "--version", "-v":
 		printVersion()
 
@@ -216,6 +255,8 @@ func printHelp() {
 	fmt.Println("  celang build  <file> [-o out] [--ast]   Alias internasional untuk 'bangun'")
 	fmt.Println("  celang disasm <file.ce>                 Membongkar kode menjadi instruksi rakitan Bytecode")
 	fmt.Println("  celang format [-w] <file> [--style=...] Memformat kode (-w untuk langsung menimpa file)")
+	fmt.Println("  celang uji [target...] [-f filter]      Menjalankan pengujian otomatis (test runner)")
+	fmt.Println("  celang test [target...] [-f filter]     Alias internasional untuk 'uji'")
 	fmt.Println("  celang compile <file.ce> [-o out.ast]   Mengompilasi kode teks menjadi berkas U-AST JSON")
 	fmt.Println("  celang ast <file.ce>                    Mencetak pohon struktur U-AST JSON ke terminal")
 	fmt.Println("  celang init [nama_proyek]               Menginisialisasi proyek baru (celang.mod & utama.ce)")

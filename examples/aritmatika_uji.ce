@@ -1,0 +1,41 @@
+// Contoh Pengujian Unit Bawaan Celang (celang uji / celang test)
+
+fungsi tambah(a, b) {
+    kembalikan a + b
+}
+
+fungsi bagi(a, b) {
+    jika b == 0 {
+        lempar "pembagian dengan nol tidak diizinkan"
+    }
+    kembalikan a / b
+}
+
+uji "operasi aritmatika dasar" {
+    buat hasil = tambah(15, 27)
+    harus_sama(hasil, 42, "15 + 27 harus menghasilkan 42")
+    harus_beda(hasil, 0)
+    harus_benar(hasil > 40)
+}
+
+uji "validasi pembagian dan penanganan galat" {
+    buat hasilBagi = bagi(100, 4)
+    harus_sama(hasilBagi, 25)
+
+    // Memverifikasi fungsi melempar galat yang diharapkan
+    harus_galat(() => {
+        bagi(10, 0)
+    }, "pembagian dengan nol")
+}
+
+uji "pengujian koleksi larik dan teks" {
+    buat bahasa = ["Celang", "Go", "Python"]
+    harus_berisi(bahasa, "Celang")
+
+    buat kalimat = "Halo Dunia Pemrograman Celang"
+    harus_berisi(kalimat, "Dunia")
+
+    buat dataKosong = kosong
+    harus_kosong(dataKosong)
+    harus_tidak_kosong(bahasa)
+}

@@ -560,7 +560,8 @@ func (c *Compiler) compileStatement(stmt uast.Statement) error {
 	case *uast.ImportDeclaration, *uast.StructDeclaration, *uast.ConcurrencyStatement,
 		*uast.DestructureDeclaration, *uast.DestructureAssignment, *uast.TryCatchStatement, *uast.ThrowStatement,
 		*uast.ReferenceDeclaration, *uast.TypeAliasDeclaration, *uast.DeferStatement, *uast.SwitchStatement,
-		*uast.TransactionStatement, *uast.RollbackStatement, *uast.ReactiveDeclaration, *uast.WatchStatement:
+		*uast.TransactionStatement, *uast.RollbackStatement, *uast.ReactiveDeclaration, *uast.WatchStatement,
+		*uast.TestStatement:
 		wrapper := &evaluator.ASTNodeWrapper{Node: s}
 		constIdx := c.chunk.AddConstant(wrapper)
 		c.emitOp(bytecode.OpEvalAST, line)

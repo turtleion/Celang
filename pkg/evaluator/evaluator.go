@@ -37,7 +37,13 @@ func Eval(node uast.Node, env *Environment) Object {
 		return evalBlockStatement(n.Statements, env)
 
 	case *uast.ExpressionStatement:
-		return Eval(n.Expression, env)
+		res := Eval(n.Expression, env)
+		if isError(res) {
+			if aErr, ok := res.(*AssertionError); ok && aErr.Pos == nil && n.GetMetadata() != nil {
+				aErr.Pos = n.GetMetadata().Pos
+			}
+		}
+		return res
 
 	// Statements
 	case *uast.VariableDeclaration:
@@ -965,6 +971,9 @@ func Eval(node uast.Node, env *Environment) Object {
 		root.Watchers = append(root.Watchers, watcher)
 		return NULL
 
+	case *uast.TestStatement:
+		return evalTestStatement(n, env)
+
 	// Expressions
 	case *uast.Literal:
 		switch n.Kind {
@@ -1318,7 +1327,7 @@ func evalProgram(stmts []uast.Statement, env *Environment) Object {
 			if result.Type() == RETURN_VALUE_OBJ {
 				return result.(*ReturnValue).Value
 			}
-			if result.Type() == ERROR_OBJ {
+			if result.Type() == ERROR_OBJ || result.Type() == ASSERTION_ERROR_OBJ {
 				return result
 			}
 			if result.Type() == ROLLBACK_SIGNAL_OBJ {
@@ -1340,7 +1349,7 @@ func evalBlockStatement(stmts []uast.Statement, env *Environment) Object {
 	for _, stmt := range stmts {
 		result = Eval(stmt, env)
 		if result != nil {
-			if result.Type() == RETURN_VALUE_OBJ || result.Type() == ERROR_OBJ || result.Type() == ROLLBACK_SIGNAL_OBJ || result.Type() == BREAK_SIGNAL_OBJ || result.Type() == CONTINUE_SIGNAL_OBJ {
+			if result.Type() == RETURN_VALUE_OBJ || result.Type() == ERROR_OBJ || result.Type() == ASSERTION_ERROR_OBJ || result.Type() == ROLLBACK_SIGNAL_OBJ || result.Type() == BREAK_SIGNAL_OBJ || result.Type() == CONTINUE_SIGNAL_OBJ {
 				return result
 			}
 		}
@@ -1738,7 +1747,7 @@ func nativeBool(b bool) *Boolean {
 }
 
 func isError(obj Object) bool {
-	return obj != nil && obj.Type() == ERROR_OBJ
+	return obj != nil && (obj.Type() == ERROR_OBJ || obj.Type() == ASSERTION_ERROR_OBJ)
 }
 
 func newError(meta *uast.NodeMetadata, msg, hint string) *Error {
@@ -2595,5 +2604,68 @@ func findRootIdentifier(expr uast.Expression) string {
 	}
 	return ""
 }
+
+func evalTestStatement(stmt *uast.TestStatement, env *Environment) Object {
+	tc := env.GetTestContext()
+	if tc != nil && tc.Filter != "" {
+		if !strings.Contains(strings.ToLower(stmt.Name), strings.ToLower(tc.Filter)) {
+			return NULL
+		}
+	}
+
+	start := time.Now()
+	testEnv := NewEnclosedEnvironment(env)
+	res := Eval(stmt.Body, testEnv)
+	dur := time.Since(start)
+
+	var pos *uast.Position
+	if stmt.Metadata != nil {
+		pos = stmt.Metadata.Pos
+	}
+
+	if isError(res) {
+		errMsg := res.Inspect()
+		expected := ""
+		actual := ""
+		if aErr, ok := res.(*AssertionError); ok {
+			errMsg = aErr.Message
+			expected = aErr.Expected
+			actual = aErr.Actual
+			if aErr.Pos != nil {
+				pos = aErr.Pos
+			}
+		} else if errObj, ok := res.(*Error); ok {
+			errMsg = errObj.Message
+			if errObj.Pos != nil {
+				pos = errObj.Pos
+			}
+		}
+
+		if tc != nil {
+			tc.RecordResult(TestCaseResult{
+				Name:     stmt.Name,
+				Passed:   false,
+				Duration: dur,
+				Error:    errMsg,
+				Expected: expected,
+				Actual:   actual,
+				Pos:      pos,
+			})
+			return NULL
+		}
+		return res
+	}
+
+	if tc != nil {
+		tc.RecordResult(TestCaseResult{
+			Name:     stmt.Name,
+			Passed:   true,
+			Duration: dur,
+			Pos:      pos,
+		})
+	}
+	return NULL
+}
+
 
 

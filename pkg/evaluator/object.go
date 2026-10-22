@@ -19,6 +19,7 @@ const (
 	NULL_OBJ         ObjectType = "NULL"
 	RETURN_VALUE_OBJ ObjectType = "RETURN_VALUE"
 	ERROR_OBJ        ObjectType = "ERROR"
+	ASSERTION_ERROR_OBJ ObjectType = "ASSERTION_ERROR"
 	FUNCTION_OBJ     ObjectType = "FUNCTION"
 	BUILTIN_OBJ      ObjectType = "BUILTIN"
 	ARRAY_OBJ        ObjectType = "ARRAY"
@@ -136,6 +137,32 @@ func (e *Error) Inspect() string {
 	}
 	if e.FriendlyHint != "" {
 		sb.WriteString(fmt.Sprintf("\n💡 Saran: %s", e.FriendlyHint))
+	}
+	return sb.String()
+}
+
+// AssertionError represents a failed test assertion.
+type AssertionError struct {
+	Message      string
+	Expected     string
+	Actual       string
+	Pos          *uast.Position
+	FriendlyHint string
+}
+
+func (a *AssertionError) Type() ObjectType { return ASSERTION_ERROR_OBJ }
+func (a *AssertionError) Inspect() string {
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("Gagal Uji: %s", a.Message))
+	if a.Expected != "" || a.Actual != "" {
+		sb.WriteString(fmt.Sprintf("\n  Ekspektasi: %s", a.Expected))
+		sb.WriteString(fmt.Sprintf("\n  Aktual:     %s", a.Actual))
+	}
+	if a.Pos != nil {
+		sb.WriteString(fmt.Sprintf(" [baris %d, kolom %d]", a.Pos.Line, a.Pos.Column))
+	}
+	if a.FriendlyHint != "" {
+		sb.WriteString(fmt.Sprintf("\n💡 Saran: %s", a.FriendlyHint))
 	}
 	return sb.String()
 }

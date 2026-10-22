@@ -401,6 +401,14 @@ func UnmarshalStatementJSON(data []byte) (Statement, error) {
 		ws.NodeType = NodeTypeWatchStatement
 		return &ws, nil
 
+	case NodeTypeTestStatement:
+		var ts TestStatement
+		if err := json.Unmarshal(data, &ts); err != nil {
+			return nil, err
+		}
+		ts.NodeType = NodeTypeTestStatement
+		return &ts, nil
+
 	default:
 		return nil, fmt.Errorf("unrecognized statement type: '%s'", detector.Type)
 	}
