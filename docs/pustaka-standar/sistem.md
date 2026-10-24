@@ -84,7 +84,7 @@ Struktur Map yang dikembalikan oleh `sistem.jalankan` mendukung properti dwibaha
 - `hasil.keluaran` / `hasil.stdout` (*Teks*): Teks keluaran standar.
 - `hasil.galat` / `hasil.stderr` (*Teks*): Pesan kesalahan standar.
 - `hasil.kode_keluar` / `hasil.exit_code` (*Angka*): Kode keluar proses (0 jika berhasil).
-- `hasil.sukses` / `hasil.success` (*Logika*): `benar` jika `kode_keluar == 0`.
+- `hasil.sukses` / `hasil.success` (*Kebenaran*): `benar` jika `kode_keluar == 0`.
 - `hasil.durasi` / `hasil.duration` (*Angka*): Waktu eksekusi dalam milidetik.
 
 ### 2. Menjalankan Daftar Argumen Langsung (*Direct Execution*)

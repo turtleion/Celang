@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tur Celang (A Tour of Celang) - Belajar Interaktif</title>
+  <link rel="icon" href="/favicon.ico">
+  <link rel="stylesheet" href="./style.css">
+  <script src="/wasm_exec.js"></script>
+</head>
+<body class="dark-theme">
+  <!-- App Container -->
+  <div id="app">
+    <!-- Header Navbar -->
+    <header class="navbar">
+      <div class="nav-brand">
+        <a href="/" class="brand-link" title="Ke Beranda Celang">
+          <span class="brand-logo">🌟</span>
+          <span class="brand-name">Tur Celang</span>
+        </a>
+        <span class="brand-subtitle">A Tour of Celang</span>
+      </div>
+
+      <!-- Center Slide Controls -->
+      <div class="nav-controls">
+        <button id="btn-prev" class="control-btn" title="Langkah Sebelumnya (Panah Kiri)">
+          ◀
+        </button>
+        <span id="slide-indicator" class="slide-indicator">1 / 33</span>
+        <button id="btn-next" class="control-btn" title="Langkah Berikutnya (Panah Kanan)">
+          ▶
+        </button>
+        <button id="btn-toc" class="toc-btn" title="Buka Daftar Isi">
+          ☰ <span class="toc-btn-text">Daftar Isi</span>
+        </button>
+      </div>
+
+      <!-- Right Navigation Links -->
+      <div class="nav-actions">
+        <button id="btn-lang" class="lang-btn" title="Ganti Bahasa / Switch Language">
+          <span id="lang-flag">🇮🇩</span> <span id="lang-text">ID</span>
+        </button>
+        <div class="engine-picker">
+          <label class="engine-radio" title="Eksekusi via Bytecode VM (Cepat)">
+            <input type="radio" name="engine" value="vm" checked>
+            <span>⚡ VM</span>
+          </label>
+          <label class="engine-radio" title="Eksekusi via AST Evaluator">
+            <input type="radio" name="engine" value="ast">
+            <span>🌳 AST</span>
+          </label>
+        </div>
+        <button id="btn-theme" class="icon-btn" title="Ganti Tema">
+          🌙
+        </button>
+        <a href="/" class="back-link" title="Kembali ke Dokumentasi Celang">
+          <span id="label-docs-link">📚 Dokumentasi</span>
+        </a>
+      </div>
+    </header>
+
+    <!-- Main Workspace (Go-Tour Split Layout) -->
+    <main class="workspace">
+      <!-- Left Panel: Lesson Explanation -->
+      <section class="lesson-panel" id="lesson-panel">
+        <div class="lesson-header">
+          <span id="lesson-badge" class="lesson-badge">Pengantar</span>
+          <h1 id="lesson-title" class="lesson-title">[1/33] Pengantar Tur Celang</h1>
+        </div>
+
+        <div id="lesson-content" class="lesson-content">
+          <p>Selamat datang di <strong>Tur Celang</strong> (<em>A Tour of Celang</em>)! Modul ini dirancang agar Anda dapat mempelajari konsep, sintaks, dan keistimewaan bahasa pemrograman Celang langkah demi langkah secara interaktif.</p>
+          <p>Setiap langkah terdiri dari dua bagian utama:</p>
+          <ul>
+            <li><strong>Panel Kiri:</strong> Penjelasan konsep ringkas, panduan teori, serta tantangan praktik.</li>
+            <li><strong>Panel Kanan:</strong> Editor interaktif untuk langsung mengubah dan mengeksekusi kode Celang di peramban web tanpa perlu memasang aplikasi apa pun.</li>
+          </ul>
+          <p>Seluruh komputasi dijalankan secara aman dan privat di perangkat Anda ditenagai oleh mesin <strong>Celang WebAssembly</strong>.</p>
+        </div>
+
+        <div class="challenge-box">
+          <div class="challenge-header">
+            <span class="challenge-icon">🎯</span>
+            <strong>Tantangan Praktik:</strong>
+          </div>
+          <div id="lesson-task" class="challenge-body">Tekan tombol <strong>▶ Jalankan Kode</strong> atau tekan pintasan <code>Ctrl + Enter</code> (<code>Cmd + Enter</code> di macOS) untuk menjalankan program perdana Anda!</div>
+        </div>
+
+        <div class="doc-link-box" id="doc-link-box">
+          <a id="doc-link" href="/panduan/pengenalan" target="_blank" class="doc-link" rel="noopener">
+            <span class="doc-link-icon">📖</span>
+            <span id="doc-link-text">Baca dokumentasi lengkap materi ini &rarr;</span>
+          </a>
+        </div>
+
+        <div class="expected-box">
+          <button id="btn-toggle-expected" class="expected-toggle" type="button">
+            <span>📋 Ekspektasi Output Terminal</span>
+            <span id="expected-arrow" class="arrow-icon">▼</span>
+          </button>
+          <div id="expected-container" class="expected-container">
+            <pre id="expected-output" class="expected-pre">🌟 Selamat datang di Tur Celang!
+Jalankan kode ini langsung di peramban Anda.</pre>
+          </div>
+        </div>
+
+        <div class="lesson-footer">
+          <button id="footer-btn-prev" class="footer-btn">
+            ◀ Sebelumnya
+          </button>
+          <button id="footer-btn-next" class="footer-btn footer-btn-primary">
+            Selanjutnya ▶
+          </button>
+        </div>
+      </section>
+
+      <!-- Resizer Divider -->
+      <div class="resizer" id="resizer"></div>
+
+      <!-- Right Panel: Interactive Playground & Terminal -->
+      <section class="editor-panel">
+        <!-- Editor Header -->
+        <div class="editor-toolbar">
+          <div class="toolbar-left">
+            <span class="editor-label">KODE CELANG</span>
+            <button id="btn-reset" class="action-btn" title="Kembalikan kode awal langkah ini">
+              ↺ Reset
+            </button>
+          </div>
+          <div class="toolbar-right">
+            <span id="wasm-status-badge" class="wasm-badge">
+              ⏳ Memuat WASM...
+            </span>
+            <button id="btn-run" class="run-btn" title="Jalankan kode (Ctrl+Enter)">
+              ▶ Jalankan Kode
+            </button>
+          </div>
+        </div>
+
+        <!-- Editor Area -->
+        <div class="editor-container">
+          <textarea
+            id="code-editor"
+            class="code-editor"
+            spellcheck="false"
+            autocomplete="off"
+            autocorrect="off"
+            autocapitalize="off"
+            placeholder="Tulis kode Celang di sini..."
+          >cetak("🌟 Selamat datang di Tur Celang!")
+cetak("Jalankan kode ini langsung di peramban Anda.")</textarea>
+        </div>
+
+        <!-- Terminal Output -->
+        <div class="terminal-wrapper">
+          <div class="terminal-toolbar">
+            <div class="terminal-left">
+              <span class="terminal-title">TERMINAL OUTPUT</span>
+              <span id="execution-time" class="exec-time"></span>
+            </div>
+            <div class="terminal-right">
+              <button id="btn-clear-term" class="mini-btn" title="Bersihkan terminal">
+                Bersihkan
+              </button>
+            </div>
+          </div>
+          <div class="terminal-body" id="terminal-body">
+            <pre id="terminal-output" class="terminal-pre placeholder">// Tekan '▶ Jalankan Kode' atau Ctrl+Enter untuk melihat output...</pre>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Table of Contents Modal / Drawer -->
+    <div id="toc-modal" class="modal-backdrop hidden">
+      <div class="modal-dialog">
+        <div class="modal-header">
+          <div class="modal-title-group">
+            <h2 id="toc-modal-title">Daftar Isi Tur Celang</h2>
+            <span class="toc-progress-text" id="toc-progress-text">Langkah 1 dari 33 (3%)</span>
+          </div>
+          <button id="btn-close-toc" class="close-btn" title="Tutup">&times;</button>
+        </div>
+        <div class="toc-progress-bar-container">
+          <div class="toc-progress-bar" id="toc-progress-bar" style="width: 3%;"></div>
+        </div>
+        <div class="toc-search-wrapper">
+          <span class="toc-search-icon">🔍</span>
+          <input type="text" id="toc-search-input" class="toc-search-input" placeholder="Cari materi tur (misal: variabel, transaksi, reaktif, fungsi)..." autocomplete="off">
+        </div>
+        <div class="modal-body" id="toc-modal-body">
+          <div class="toc-section" id="toc-section-pengantar">
+            <div class="toc-section-header">
+              <h3 class="toc-section-title">🚀 Pengantar & Konsep Bahasa</h3>
+              <span class="toc-section-count" id="toc-count-pengantar">2 Langkah</span>
+            </div>
+            <div id="toc-list-pengantar" class="toc-grid"></div>
+          </div>
+          <div class="toc-section" id="toc-section-dasar">
+            <div class="toc-section-header">
+              <h3 class="toc-section-title">📘 Bagian 1: Dasar Bahasa</h3>
+              <span class="toc-section-count" id="toc-count-dasar">18 Langkah</span>
+            </div>
+            <div id="toc-list-dasar" class="toc-grid"></div>
+          </div>
+          <div class="toc-section" id="toc-section-spesial">
+            <div class="toc-section-header">
+              <h3 class="toc-section-title">✨ Bagian 2: Fitur Khas & Eksklusif</h3>
+              <span class="toc-section-count" id="toc-count-spesial">13 Langkah</span>
+            </div>
+            <div id="toc-list-spesial" class="toc-grid"></div>
+          </div>
+          <div id="toc-no-results" class="toc-no-results hidden">
+            <span>🔎 Tidak ada materi tur yang cocok dengan pencarian.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="./app.js"></script>
+</body>
+</html>

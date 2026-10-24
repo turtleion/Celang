@@ -27,8 +27,8 @@ func TestFormatter_StyleTransformations(t *testing.T) {
 		cetak(item)
 	}
 
-	cocok harga {
-		kasus 75000:
+	pilih harga {
+		bila 75000:
 			cetak("Cocok")
 		lainnya:
 			cetak("Lainnya")
@@ -56,8 +56,8 @@ func TestFormatter_StyleTransformations(t *testing.T) {
 	if !strings.Contains(indoText, "buat harga = 50000") ||
 		!strings.Contains(indoText, "fungsi cek_diskon") ||
 		!strings.Contains(indoText, "kembalikan \"Diskon\"") ||
-		!strings.Contains(indoText, "cocok harga {") ||
-		!strings.Contains(indoText, "kasus 75000:") ||
+		!strings.Contains(indoText, "pilih harga {") ||
+		!strings.Contains(indoText, "bila 75000:") ||
 		!strings.Contains(indoText, "sambil {") {
 		t.Fatalf("Indonesian formatted code missing expected keywords:\n%s", indoText)
 	}

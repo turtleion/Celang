@@ -75,6 +75,61 @@ func initStdlibBerkas(env *Environment) {
 	definePublicFunction(env, "tulis", tulisFn)
 	definePublicFunction(env, "write", tulisFn)
 
+	// baca_bita / read_bytes
+	bacaBitaFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 {
+				return newError(nil, "berkas.baca_bita mengharapkan 1 argumen: path berkas", "Contoh: berkas.baca_bita(\"./gambar.png\")")
+			}
+			pathStr, ok := args[0].(*String)
+			if !ok {
+				return newError(nil, fmt.Sprintf("argumen path berkas.baca_bita harus teks, menerima %s", args[0].Type()), "")
+			}
+			data, err := os.ReadFile(pathStr.Value)
+			if err != nil {
+				return newError(nil, fmt.Sprintf("Gagal membaca berkas '%s': %v", pathStr.Value, err), "")
+			}
+			return &Bytes{Elements: data}
+		},
+	}
+	definePublicFunction(env, "baca_bita", bacaBitaFn)
+	definePublicFunction(env, "read_bytes", bacaBitaFn)
+
+	// tulis_bita / write_bytes
+	tulisBitaFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 2 {
+				return newError(nil, "berkas.tulis_bita mengharapkan 2 argumen: path berkas dan data bita", "Contoh: berkas.tulis_bita(\"./out.bin\", data_bita)")
+			}
+			pathStr, ok := args[0].(*String)
+			if !ok {
+				return newError(nil, fmt.Sprintf("argumen path berkas.tulis_bita harus teks, menerima %s", args[0].Type()), "")
+			}
+			var byteData []byte
+			if b, ok := args[1].(*Bytes); ok {
+				byteData = b.Elements
+			} else if s, ok := args[1].(*String); ok {
+				byteData = []byte(s.Value)
+			} else if arr, ok := args[1].(*Array); ok {
+				byteData = make([]byte, len(arr.Elements))
+				for i, el := range arr.Elements {
+					if iVal, _, isInt, ok := CoerceToNumeric(el); ok && isInt {
+						byteData[i] = byte(iVal)
+					}
+				}
+			} else {
+				return newError(nil, fmt.Sprintf("argumen kedua berkas.tulis_bita harus Bita, menerima %s", args[1].Type()), "")
+			}
+
+			if err := atomicWriteFile(pathStr.Value, byteData, 0644); err != nil {
+				return newError(nil, fmt.Sprintf("Gagal menulis berkas '%s': %v", pathStr.Value, err), "")
+			}
+			return TRUE
+		},
+	}
+	definePublicFunction(env, "tulis_bita", tulisBitaFn)
+	definePublicFunction(env, "write_bytes", tulisBitaFn)
+
 	// tambah / append
 	tambahFn := &Builtin{
 		Fn: func(args ...Object) Object {

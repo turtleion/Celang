@@ -2,6 +2,7 @@ package evaluator
 
 import (
 	"bufio"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"sort"
@@ -847,6 +848,8 @@ func convertCelangToJSONNativeWithVisited(obj Object, visited map[any]bool) (any
 			res[k] = c
 		}
 		return res, nil
+	case *Bytes:
+		return base64.StdEncoding.EncodeToString(o.Elements), nil
 	case *ReturnValue:
 		return convertCelangToJSONNativeWithVisited(o.Value, visited)
 	default:

@@ -33,13 +33,14 @@ var IndonesianToEnglishKeywords = map[string]string{
 	"tetap":         "const",
 	"jika":          "if",
 	"kalau":         "if",
-	"bila":          "if",
 	"selain jika":   "else if",
 	"lain jika":     "else if",
 	"selain":        "else",
 	"lain":          "else",
 	"maka":          "then (or omit)",
+	"pilih":         "switch",
 	"cocok":         "switch",
+	"bila":          "case",
 	"kasus":         "case",
 	"lainnya":       "default",
 	"selama":        "while",
@@ -74,6 +75,7 @@ var IndonesianToEnglishKeywords = map[string]string{
 	"bentuk":        "struct / class",
 	"rujuk":         "ref",
 	"sebagai":       "as",
+	"uji":           "test",
 }
 
 // IsIndonesianKeyword checks if a word is an Indonesian-specific keyword and returns its English replacement.

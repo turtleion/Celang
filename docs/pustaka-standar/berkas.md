@@ -12,6 +12,7 @@ Selain fungsi baca-tulis standar, modul `berkas` di Celang dirancang dengan **fi
 - Penghitung sidik jari berkas (*checksum / hash*) (`berkas.hash`).
 - Penelusur folder rekursif (*tree walker*) (`berkas.telusuri`).
 - Penyimpanan atomik anti-rusak (*atomic write*).
+- Pembacaan & penulisan data biner atomik (`Bita`) (`berkas.baca_bita` & `berkas.tulis_bita`).
 - Diagnostik ramah salah ketik nama berkas (*typo detector*).
 
 ---
@@ -162,6 +163,27 @@ Jika Anda salah mengetikkan nama berkas, Celang memeriksa direktori sekitar meng
 
 ---
 
+### 11. Pengelolaan Data Biner (`baca_bita` / `read_bytes` & `tulis_bita` / `write_bytes`)
+Membaca dan menulis data biner mentah (gambar, audio, arsip ZIP, PDF, atau protokol biner) tanpa risiko kerusakan akibat konversi string teks UTF-8:
+- **`baca_bita(path)`**: Mengembalikan objek koleksi bita biner [**`Bita`**](/dasar/variabel-tipe#c-koleksi-bita-biner-bita--bytes).
+- **`tulis_bita(path, data)`**: Menulis data biner (`Bita`, teks biasa, atau array integer byte `0..255`) ke disk secara atomik anti-rusak.
+
+```celang
+// 1. Membaca berkas biner:
+buat dataFoto = berkas.baca_bita("./avatar.png")
+cetak("Ukuran bita:", dataFoto.panjang)
+
+// 2. Manipulasi bita mentah atau enkoding:
+buat heks = dataFoto.ke_heks()
+cetak("Header heks:", dataFoto[0..4].ke_heks()) // Header tanda berkas PNG (89504e47)
+
+// 3. Menulis data biner ke berkas baru:
+berkas.tulis_bita("./avatar_salinan.png", dataFoto)
+cetak("Berkas biner berhasil ditulis secara atomik!")
+```
+
+---
+
 ## Ringkasan Daftar Fungsi
 
 ### Operasi Berkas & Folder
@@ -169,6 +191,8 @@ Jika Anda salah mengetikkan nama berkas, Celang memeriksa direktori sekitar meng
 | :--- | :--- | :--- |
 | `baca(path)` | `read` | Baca seluruh isi teks berkas |
 | `tulis(path, teks)` | `write` | Tulis berkas (otomatis buat folder & atomik) |
+| `baca_bita(path)` | `read_bytes` | Baca isi berkas sebagai bita biner (`Bita`) tanpa konversi UTF-8 |
+| `tulis_bita(path, data)` | `write_bytes` | Tulis bita biner (`Bita`, teks, atau daftar byte) secara atomik |
 | `tambah(path, teks)` | `append` | Tambah teks di akhir berkas |
 | `buat_folder(path)` | `mkdir` | Buat folder secara rekursif |
 | `daftar(path?)` | `list` / `ls` | Ambil daftar nama isi folder |

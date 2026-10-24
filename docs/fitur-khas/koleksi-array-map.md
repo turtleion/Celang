@@ -23,7 +23,7 @@ Array di Celang merepresentasikan kumpulan data berurutan. Anda dapat memanipula
 | `.reverse()` | `.balik()` | *(tidak ada)* | Membalikkan urutan elemen array secara langsung (*in-place*) | Array (memungkinkan *chaining*) |
 | `.sort([pembanding])`| `.urut([pembanding])` | `[fungsi(a, b)]` | Mengurutkan elemen (alami atau menggunakan fungsi perbandingan kustom) | Array (memungkinkan *chaining*) |
 | `.join([pemisah])` | `.gabung([pemisah])` | `[pemisah]` | Menggabungkan seluruh elemen menjadi satu teks (bawaan: `", "`) | `Teks` (*String*) |
-| `.contains(el)` / `.includes(el)` | `.berisi(el)` | `elemen` | Memeriksa apakah suatu elemen ada di dalam array | `Logika` (`benar`/`salah`) |
+| `.contains(el)` / `.includes(el)` | `.berisi(el)` | `elemen` | Memeriksa apakah suatu elemen ada di dalam array | `Kebenaran` (`benar`/`salah`) |
 | `.index_of(el)` | `.indeks_dari(el)` | `elemen` | Mencari posisi indeks pertama dari elemen (mengembalikan `-1` jika tidak ada) | `Angka` (*Integer*) |
 | `.slice([mulai, [akhir]])` | `.potong([mulai, [akhir]])`| `[mulai, [akhir]]` | Mengambil salinan potongan array tanpa mengubah array asli | Salinan Array baru |
 | `.concat(...)` | `.gabungkan(...)` | `array_atau_elemen, ...`| Menggabungkan array dengan elemen atau array lain | Array baru |
@@ -104,10 +104,10 @@ Map di Celang menyimpan pasangan kunci dan nilai terurut berdasarkan urutan pena
 | `.keys()` | `.kunci()` | *(tidak ada)* | Mengambil seluruh kunci map dalam urutan penambahan | `Array` berisi teks kunci |
 | `.values()` | `.nilai()` | *(tidak ada)* | Mengambil seluruh nilai map dalam urutan penambahan | `Array` berisi nilai |
 | `.entries()` | `.entri()` | *(tidak ada)* | Mengambil seluruh pasangan sebagai array `[[kunci, nilai], ...]` | `Array` 2-dimensi |
-| `.has(kunci)` / `.contains(kunci)` | `.memiliki(kunci)` | `kunci` | Memeriksa apakah kunci tertentu ada di dalam map | `Logika` (`benar`/`salah`) |
+| `.has(kunci)` / `.contains(kunci)` | `.memiliki(kunci)` | `kunci` | Memeriksa apakah kunci tertentu ada di dalam map | `Kebenaran` (`benar`/`salah`) |
 | `.get(kunci, [bawaan])` | `.ambil(kunci, [bawaan])` | `kunci, [bawaan]`| Mengambil nilai berdasarkan kunci, dengan nilai cadangan opsional jika kunci tidak ditemukan | Nilai objek / `bawaan` / `kosong` |
 | `.set(kunci, nilai)` | `.atur(kunci, nilai)` | `kunci, nilai` | Menyimpan pasangan kunci-nilai ke dalam map | Map (memungkinkan *chaining*) |
-| `.delete(kunci)` / `.remove(kunci)` | `.hapus(kunci)` | `kunci` | Menghapus kunci dari map | `Logika` (`benar` jika dihapus, `salah` jika tidak ada) |
+| `.delete(kunci)` / `.remove(kunci)` | `.hapus(kunci)` | `kunci` | Menghapus kunci dari map | `Kebenaran` (`benar` jika dihapus, `salah` jika tidak ada) |
 | `.merge(mapLain)` | `.gabung(mapLain)` | `mapLain` | Menggabungkan seluruh pasangan dari map lain ke dalam map ini | Map saat ini |
 | `.clear()` | `.bersihkan()` | *(tidak ada)* | Mengosongkan seluruh isi map | Map saat ini (kosong `{}`) |
 | `.length` / `.len` | `.panjang` | *(properti)* | Jumlah kunci yang tersimpan | `Angka` (*Integer*) |
@@ -179,7 +179,56 @@ cetak("Jumlah setelah dibersihkan:", akun.length) // 0
 
 ---
 
-## 3. Dukungan Mode Universal (`"use universal"`)
+## 3. Manipulasi Koleksi Bita Biner (`Bita` / `Bytes`)
+
+Koleksi bita biner `Bita` di Celang dirancang sebagai wadah byte efisien (`[]byte`) untuk memanipulasi berkas biner, soket jaringan, dan enkripsi. Objek `Bita` memiliki serangkaian metode bawaan yang mendukung nama Bahasa Indonesia dan nama internasional (Universal).
+
+### Ringkasan Metode Bita
+
+| Metode (Universal) | Metode (Indonesia) | Argumen | Keterangan | Nilai Kembali |
+| :--- | :--- | :--- | :--- | :--- |
+| `.to_string()` | `.ke_teks()` | *(tidak ada)* | Mengonversi isi bita menjadi tulisan string teks UTF-8 | `Teks` |
+| `.to_hex()` | `.ke_heks()` | *(tidak ada)* | Mengonversi deretan bita menjadi string heksadesimal | `Teks` |
+| `.to_base64()` | `.ke_base64()` | *(tidak ada)* | Mengonversi deretan bita menjadi string Base64 | `Teks` |
+| `.to_array()` | `.ke_daftar()` | *(tidak ada)* | Mengonversi bita menjadi array berisi angka bulat `0..255` | `Array` |
+| `.append(...)` | `.tambah(...)` | `data_bita` | Menambahkan bita, teks, atau array integer ke akhir bita | Bita (memungkinkan *chaining*) |
+| `.slice(mulai, [akhir])` | `.potong(mulai, [akhir])` | `mulai, [akhir]` | Mengambil cuplikan rentang bita | Objek `Bita` baru |
+| `.clone()` | `.salin()` | *(tidak ada)* | Membuat salinan utuh (*deep copy*) mandiri | Objek `Bita` baru |
+| `.length` / `.len` | `.panjang` | *(properti)* | Mengambil ukuran total bita | `Angka` (*Integer*) |
+
+---
+
+### Contoh Penggunaan Bita
+
+```celang
+// Membuat bita dari teks
+buat b = bita("Celang")
+
+// Menambah bita secara fluent chaining
+b.tambah(" v2").tambah([33]) // kode ASCII 33 adalah '!'
+cetak(b.ke_teks())           // "Celang v2!"
+
+// Mengakses dan mengubah nilai byte langsung
+cetak(b[0])                  // 67 (huruf 'C')
+b[0] = 71                    // ganti dengan 'G' (ASCII 71)
+cetak(b.ke_teks())           // "Gelang v2!"
+
+// Enkoding heksadesimal dan Base64
+cetak(b.ke_heks())           // "47656c616e6720763221"
+cetak(b.ke_base64())         // "R2VsYW5nIHYyIQ=="
+
+// Operasi potong (slice)
+buat potong = b[0..6]        // bita([71, 101, 108, 97, 110, 103])
+cetak(potong.ke_teks())      // "Gelang"
+
+// Menggandakan bita (operator perkalian)
+buat ulang = bita("ABC") * 3
+cetak(ulang.ke_teks())       // "ABCABCABC"
+```
+
+---
+
+## 4. Dukungan Mode Universal (`"use universal"`)
 
 Di bawah direktif `"use universal"` pada baris pertama file program, Celang memberlakukan standar metode internasional dalam Bahasa Inggris.
 

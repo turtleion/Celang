@@ -19,6 +19,7 @@ const (
 	NULL_OBJ         ObjectType = "NULL"
 	RETURN_VALUE_OBJ ObjectType = "RETURN_VALUE"
 	ERROR_OBJ        ObjectType = "ERROR"
+	ASSERTION_ERROR_OBJ ObjectType = "ASSERTION_ERROR"
 	FUNCTION_OBJ     ObjectType = "FUNCTION"
 	BUILTIN_OBJ      ObjectType = "BUILTIN"
 	ARRAY_OBJ        ObjectType = "ARRAY"
@@ -28,6 +29,7 @@ const (
 	STRUCT_INSTANCE_OBJ ObjectType = "STRUCT_INSTANCE"
 	TICKET_OBJ          ObjectType = "TIKET"
 	CHANNEL_OBJ         ObjectType = "SALURAN"
+	BYTES_OBJ           ObjectType = "BITA"
 	ITERATOR_OBJ        ObjectType = "ITERATOR"
 	ROLLBACK_SIGNAL_OBJ ObjectType = "ROLLBACK_SIGNAL"
 	BREAK_SIGNAL_OBJ    ObjectType = "BREAK_SIGNAL"
@@ -85,6 +87,26 @@ type String struct {
 func (s *String) Type() ObjectType { return STRING_OBJ }
 func (s *String) Inspect() string  { return s.Value }
 
+// Bytes represents an arbitrary binary collection ([]byte).
+type Bytes struct {
+	Elements []byte
+}
+
+func (b *Bytes) Type() ObjectType { return BYTES_OBJ }
+func (b *Bytes) Inspect() string {
+	if len(b.Elements) == 0 {
+		return "bita([])"
+	}
+	if len(b.Elements) <= 20 {
+		var parts []string
+		for _, by := range b.Elements {
+			parts = append(parts, strconv.Itoa(int(by)))
+		}
+		return fmt.Sprintf("bita([%s])", strings.Join(parts, ", "))
+	}
+	return fmt.Sprintf("<bita: %d bita>", len(b.Elements))
+}
+
 // Null represents absence of value.
 type Null struct{}
 
@@ -115,6 +137,32 @@ func (e *Error) Inspect() string {
 	}
 	if e.FriendlyHint != "" {
 		sb.WriteString(fmt.Sprintf("\n💡 Saran: %s", e.FriendlyHint))
+	}
+	return sb.String()
+}
+
+// AssertionError represents a failed test assertion.
+type AssertionError struct {
+	Message      string
+	Expected     string
+	Actual       string
+	Pos          *uast.Position
+	FriendlyHint string
+}
+
+func (a *AssertionError) Type() ObjectType { return ASSERTION_ERROR_OBJ }
+func (a *AssertionError) Inspect() string {
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("Gagal Uji: %s", a.Message))
+	if a.Expected != "" || a.Actual != "" {
+		sb.WriteString(fmt.Sprintf("\n  Ekspektasi: %s", a.Expected))
+		sb.WriteString(fmt.Sprintf("\n  Aktual:     %s", a.Actual))
+	}
+	if a.Pos != nil {
+		sb.WriteString(fmt.Sprintf(" [baris %d, kolom %d]", a.Pos.Line, a.Pos.Column))
+	}
+	if a.FriendlyHint != "" {
+		sb.WriteString(fmt.Sprintf("\n💡 Saran: %s", a.FriendlyHint))
 	}
 	return sb.String()
 }
@@ -376,6 +424,18 @@ func NewIterator(obj Object) (*IteratorObject, error) {
 				if val == nil || val.Type() == NULL_OBJ {
 					return nil, false
 				}
+				return val, true
+			},
+		}, nil
+	case *Bytes:
+		idx := 0
+		return &IteratorObject{
+			NextFunc: func() (Object, bool) {
+				if idx >= len(o.Elements) {
+					return nil, false
+				}
+				val := &Integer{Value: int64(o.Elements[idx])}
+				idx++
 				return val, true
 			},
 		}, nil

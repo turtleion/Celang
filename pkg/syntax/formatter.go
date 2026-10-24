@@ -649,6 +649,26 @@ func (f *Formatter) formatStatement(stmt uast.Statement, indent int) string {
 		sb.WriteString(deferKeyword + " ")
 		sb.WriteString(strings.TrimSpace(f.formatStatement(s.Body, indent)))
 		return sb.String()
+
+	case *uast.TestStatement:
+		var sb strings.Builder
+		sb.WriteString(prefix)
+		testKeyword := "uji"
+		if f.profile != nil && (f.profile.Name == "english" || f.profile.Name == "universal") {
+			testKeyword = "test"
+		}
+		sb.WriteString(testKeyword)
+		if s.Name != "" {
+			sb.WriteString(" " + strconv.Quote(s.Name))
+		}
+		sb.WriteString(" {\n")
+		if s.Body != nil {
+			for _, inner := range s.Body.Statements {
+				sb.WriteString(f.formatStatement(inner, indent+1) + "\n")
+			}
+		}
+		sb.WriteString(prefix + "}")
+		return sb.String()
 	}
 
 	return prefix

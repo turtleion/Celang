@@ -1,6 +1,7 @@
 package evaluator
 
 import (
+	"bytes"
 	"fmt"
 	"math"
 	"path/filepath"
@@ -36,7 +37,13 @@ func Eval(node uast.Node, env *Environment) Object {
 		return evalBlockStatement(n.Statements, env)
 
 	case *uast.ExpressionStatement:
-		return Eval(n.Expression, env)
+		res := Eval(n.Expression, env)
+		if isError(res) {
+			if aErr, ok := res.(*AssertionError); ok && aErr.Pos == nil && n.GetMetadata() != nil {
+				aErr.Pos = n.GetMetadata().Pos
+			}
+		}
+		return res
 
 	// Statements
 	case *uast.VariableDeclaration:
@@ -430,6 +437,44 @@ func Eval(node uast.Node, env *Environment) Object {
 					return newError(n.GetMetadata(), fmt.Sprintf("Indeks array %d di luar jangkauan (panjang: %d)", intIdx, len(arr.Elements)), "")
 				}
 			}
+			if b, ok := obj.(*Bytes); ok {
+				var intIdx int64
+				var hasInt bool
+				if computedIndexObj != nil {
+					if iVal, _, isInt, ok := CoerceToNumeric(computedIndexObj); ok && isInt {
+						intIdx = iVal
+						hasInt = true
+					}
+				} else if parsed, err := strconv.ParseInt(prop, 10, 64); err == nil {
+					intIdx = parsed
+					hasInt = true
+				} else if target.Computed && prop != "" {
+					idxObj := Eval(uast.NewIdentifier(prop), env)
+					if iVal, _, isInt, ok := CoerceToNumeric(idxObj); ok && isInt {
+						intIdx = iVal
+						hasInt = true
+					}
+				}
+				if hasInt {
+					if intIdx < 0 {
+						intIdx = int64(len(b.Elements)) + intIdx
+					}
+					if intIdx >= 0 && int(intIdx) < len(b.Elements) {
+						var byteVal byte
+						if iVal, _, isInt, ok := CoerceToNumeric(val); ok && isInt {
+							if iVal < 0 || iVal > 255 {
+								return newError(n.GetMetadata(), fmt.Sprintf("Nilai bita harus di antara 0 dan 255, menerima %d", iVal), "")
+							}
+							byteVal = byte(iVal)
+						} else {
+							return newError(n.GetMetadata(), fmt.Sprintf("Nilai bita harus berupa angka (0..255), menerima %s", val.Type()), "")
+						}
+						b.Elements[intIdx] = byteVal
+						return val
+					}
+					return newError(n.GetMetadata(), fmt.Sprintf("Indeks bita %d di luar jangkauan (panjang: %d)", intIdx, len(b.Elements)), "")
+				}
+			}
 			return newError(n.GetMetadata(), fmt.Sprintf("Target properti '%s' tidak dapat ditugaskan", prop), "")
 
 		default:
@@ -476,6 +521,9 @@ func Eval(node uast.Node, env *Environment) Object {
 
 		if !matched && defaultCase != nil {
 			result = evalBlockStatement(defaultCase.Body, env)
+		}
+		if result != nil && result.Type() == BREAK_SIGNAL_OBJ {
+			result = NULL
 		}
 		return result
 
@@ -568,6 +616,10 @@ func Eval(node uast.Node, env *Environment) Object {
 			for _, r := range str.Value {
 				elements = append(elements, &String{Value: string(r)})
 			}
+		} else if b, ok := iterVal.(*Bytes); ok {
+			for _, by := range b.Elements {
+				elements = append(elements, &Integer{Value: int64(by)})
+			}
 		} else if mp, ok := iterVal.(*Map); ok {
 			if len(mp.Order) > 0 {
 				for _, k := range mp.Order {
@@ -582,8 +634,8 @@ func Eval(node uast.Node, env *Environment) Object {
 			forEnv := NewEnclosedEnvironment(env)
 			var result Object = NULL
 			for {
-				el := ch.Receive(0)
-				if el == nil || el.Type() == NULL_OBJ {
+				el, ok := ch.ReceiveWithStatus(0)
+				if !ok {
 					break
 				}
 				forEnv.Define(n.Item, el, true, "")
@@ -918,6 +970,9 @@ func Eval(node uast.Node, env *Environment) Object {
 		root := targetEntry.Resolve()
 		root.Watchers = append(root.Watchers, watcher)
 		return NULL
+
+	case *uast.TestStatement:
+		return evalTestStatement(n, env)
 
 	// Expressions
 	case *uast.Literal:
@@ -1272,7 +1327,7 @@ func evalProgram(stmts []uast.Statement, env *Environment) Object {
 			if result.Type() == RETURN_VALUE_OBJ {
 				return result.(*ReturnValue).Value
 			}
-			if result.Type() == ERROR_OBJ {
+			if result.Type() == ERROR_OBJ || result.Type() == ASSERTION_ERROR_OBJ {
 				return result
 			}
 			if result.Type() == ROLLBACK_SIGNAL_OBJ {
@@ -1294,7 +1349,7 @@ func evalBlockStatement(stmts []uast.Statement, env *Environment) Object {
 	for _, stmt := range stmts {
 		result = Eval(stmt, env)
 		if result != nil {
-			if result.Type() == RETURN_VALUE_OBJ || result.Type() == ERROR_OBJ || result.Type() == ROLLBACK_SIGNAL_OBJ || result.Type() == BREAK_SIGNAL_OBJ || result.Type() == CONTINUE_SIGNAL_OBJ {
+			if result.Type() == RETURN_VALUE_OBJ || result.Type() == ERROR_OBJ || result.Type() == ASSERTION_ERROR_OBJ || result.Type() == ROLLBACK_SIGNAL_OBJ || result.Type() == BREAK_SIGNAL_OBJ || result.Type() == CONTINUE_SIGNAL_OBJ {
 				return result
 			}
 		}
@@ -1349,6 +1404,36 @@ func evalBinaryOp(op string, left, right Object, meta *uast.NodeMetadata) Object
 			copy(newElems, leftArr.Elements)
 			newElems[len(leftArr.Elements)] = right
 			return &Array{Elements: newElems}
+		}
+
+		// Bytes concatenation
+		if leftB, ok := left.(*Bytes); ok {
+			if rightB, ok := right.(*Bytes); ok {
+				newElems := make([]byte, len(leftB.Elements)+len(rightB.Elements))
+				copy(newElems, leftB.Elements)
+				copy(newElems[len(leftB.Elements):], rightB.Elements)
+				return &Bytes{Elements: newElems}
+			}
+			if rightStr, ok := right.(*String); ok {
+				newElems := make([]byte, len(leftB.Elements)+len(rightStr.Value))
+				copy(newElems, leftB.Elements)
+				copy(newElems[len(leftB.Elements):], []byte(rightStr.Value))
+				return &Bytes{Elements: newElems}
+			}
+		}
+	}
+
+	if op == "*" {
+		if leftB, ok := left.(*Bytes); ok {
+			if cnt, _, isInt, ok := CoerceToNumeric(right); ok && isInt {
+				if cnt <= 0 {
+					return &Bytes{Elements: []byte{}}
+				}
+				if cnt > 1_000_000 || int64(len(leftB.Elements))*cnt > 50_000_000 {
+					return newError(meta, "hasil pengulangan bita melebihi batas aman (50MB)", "")
+				}
+				return &Bytes{Elements: bytes.Repeat(leftB.Elements, int(cnt))}
+			}
 		}
 	}
 
@@ -1662,7 +1747,7 @@ func nativeBool(b bool) *Boolean {
 }
 
 func isError(obj Object) bool {
-	return obj != nil && obj.Type() == ERROR_OBJ
+	return obj != nil && (obj.Type() == ERROR_OBJ || obj.Type() == ASSERTION_ERROR_OBJ)
 }
 
 func newError(meta *uast.NodeMetadata, msg, hint string) *Error {
@@ -1752,15 +1837,48 @@ func castValueToType(val Object, targetType string, meta *uast.NodeMetadata, env
 		switch v := val.(type) {
 		case *String:
 			return v
+		case *Bytes:
+			return &String{Value: string(v.Elements)}
 		default:
 			return &String{Value: v.Inspect()}
 		}
 
-	case "Logika", "logika", "Bool", "bool", "Boolean":
+	case "Logika", "logika", "Kebenaran", "kebenaran", "Bool", "bool", "Boolean", "boolean":
 		return nativeBool(CoerceToBoolean(val))
 
+	case "Bita", "bita", "Bytes", "bytes":
+		switch v := val.(type) {
+		case *Bytes:
+			return v
+		case *String:
+			return &Bytes{Elements: []byte(v.Value)}
+		case *Integer:
+			if v.Value < 0 {
+				return newError(meta, "Ukuran alokasi bita tidak boleh negatif", "Gunakan bilangan bulat positif untuk alokasi buffer bita.")
+			}
+			if v.Value > 100_000_000 {
+				return newError(meta, "Ukuran alokasi bita melebihi batas aman (100MB)", "")
+			}
+			return &Bytes{Elements: make([]byte, v.Value)}
+		case *Array:
+			elems := make([]byte, len(v.Elements))
+			for i, el := range v.Elements {
+				if iVal, _, isInt, ok := CoerceToNumeric(el); ok && isInt {
+					if iVal < 0 || iVal > 255 {
+						return newError(meta, fmt.Sprintf("Nilai elemen bita harus di antara 0 dan 255, menerima %d", iVal), "")
+					}
+					elems[i] = byte(iVal)
+				} else {
+					return newError(meta, fmt.Sprintf("Elemen array untuk bita harus berupa angka (0..255), menerima %s", el.Type()), "")
+				}
+			}
+			return &Bytes{Elements: elems}
+		default:
+			return newError(meta, fmt.Sprintf("Tidak dapat mengubah tipe %s menjadi Bita", val.Type()), "")
+		}
+
 	default:
-		return newError(meta, fmt.Sprintf("Tipe tujuan casting '%s' tidak didukung", targetType), "Tipe yang didukung: Angka, Pecahan, Teks, Logika, atau alias yang terdaftar.")
+		return newError(meta, fmt.Sprintf("Tipe tujuan casting '%s' tidak didukung", targetType), "Tipe yang didukung: Angka, Pecahan, Teks, Kebenaran, Bita, atau alias yang terdaftar.")
 	}
 }
 
@@ -1920,6 +2038,52 @@ func evalMemberAccess(obj Object, n *uast.MemberExpression, env *Environment) Ob
 				return &String{Value: string(runes[intIdx])}
 			}
 			return newError(n.GetMetadata(), fmt.Sprintf("Indeks teks %d di luar jangkauan (panjang: %d)", intIdx, len(runes)), "")
+		}
+	}
+
+	// 1c. Bytes index access, slicing, and methods (e.g. b[0], b[0..2], b.ke_teks())
+	if b, ok := obj.(*Bytes); ok {
+		propName := n.Property
+		if n.Computed && n.PropertyExpr != nil {
+			pObj := Eval(n.PropertyExpr, env)
+			if !isError(pObj) {
+				if s, ok := pObj.(*String); ok {
+					propName = s.Value
+				}
+			}
+		}
+		if methodObj, ok := EvalBytesMethod(b, propName, env, n.GetMetadata()); ok {
+			return methodObj
+		}
+		if rng, isRng := n.PropertyExpr.(*uast.RangeExpression); isRng {
+			return evalBytesSlice(b, rng, env, n.GetMetadata())
+		}
+		var intIdx int64
+		var hasInt bool
+		if n.Computed && n.PropertyExpr != nil {
+			idxObj := Eval(n.PropertyExpr, env)
+			if iVal, _, isInt, ok := CoerceToNumeric(idxObj); ok && isInt {
+				intIdx = iVal
+				hasInt = true
+			}
+		} else if parsed, err := strconv.ParseInt(n.Property, 10, 64); err == nil {
+			intIdx = parsed
+			hasInt = true
+		} else if n.Computed {
+			idxObj := Eval(uast.NewIdentifier(n.Property), env)
+			if iVal, _, isInt, ok := CoerceToNumeric(idxObj); ok && isInt {
+				intIdx = iVal
+				hasInt = true
+			}
+		}
+		if hasInt {
+			if intIdx < 0 {
+				intIdx = int64(len(b.Elements)) + intIdx
+			}
+			if intIdx >= 0 && int(intIdx) < len(b.Elements) {
+				return &Integer{Value: int64(b.Elements[intIdx])}
+			}
+			return newError(n.GetMetadata(), fmt.Sprintf("Indeks bita %d di luar jangkauan (panjang: %d)", intIdx, len(b.Elements)), "")
 		}
 	}
 
@@ -2365,6 +2529,67 @@ func evalStringSlice(str *String, rng *uast.RangeExpression, env *Environment, m
 	return &String{Value: string(runes[start:end])}
 }
 
+func evalBytesSlice(b *Bytes, rng *uast.RangeExpression, env *Environment, meta *uast.NodeMetadata) Object {
+	n := len(b.Elements)
+	start := 0
+	end := n
+	if rng.Start != nil {
+		sVal := Eval(rng.Start, env)
+		if isError(sVal) {
+			return sVal
+		}
+		if iVal, _, isInt, ok := CoerceToNumeric(sVal); ok && isInt {
+			start = int(iVal)
+		} else {
+			msg := "Batas awal rentang slicing harus berupa bilangan bulat"
+			if env.IsUniversal {
+				msg = "Start index for slicing must be an integer"
+			}
+			return newError(rng.GetMetadata(), msg, "")
+		}
+	}
+	if rng.End != nil {
+		eVal := Eval(rng.End, env)
+		if isError(eVal) {
+			return eVal
+		}
+		if iVal, _, isInt, ok := CoerceToNumeric(eVal); ok && isInt {
+			end = int(iVal)
+		} else {
+			msg := "Batas akhir rentang slicing harus berupa bilangan bulat"
+			if env.IsUniversal {
+				msg = "End index for slicing must be an integer"
+			}
+			return newError(rng.GetMetadata(), msg, "")
+		}
+	}
+	if start < 0 {
+		start = n + start
+		if start < 0 {
+			start = 0
+		}
+	}
+	if start > n {
+		start = n
+	}
+	if end < 0 {
+		end = n + end
+		if end < 0 {
+			end = 0
+		}
+	}
+	if end < start {
+		end = start
+	}
+	if end > n {
+		end = n
+	}
+
+	sliced := make([]byte, end-start)
+	copy(sliced, b.Elements[start:end])
+	return &Bytes{Elements: sliced}
+}
+
 func findRootIdentifier(expr uast.Expression) string {
 	curr := expr
 	for curr != nil {
@@ -2379,5 +2604,68 @@ func findRootIdentifier(expr uast.Expression) string {
 	}
 	return ""
 }
+
+func evalTestStatement(stmt *uast.TestStatement, env *Environment) Object {
+	tc := env.GetTestContext()
+	if tc != nil && tc.Filter != "" {
+		if !strings.Contains(strings.ToLower(stmt.Name), strings.ToLower(tc.Filter)) {
+			return NULL
+		}
+	}
+
+	start := time.Now()
+	testEnv := NewEnclosedEnvironment(env)
+	res := Eval(stmt.Body, testEnv)
+	dur := time.Since(start)
+
+	var pos *uast.Position
+	if stmt.Metadata != nil {
+		pos = stmt.Metadata.Pos
+	}
+
+	if isError(res) {
+		errMsg := res.Inspect()
+		expected := ""
+		actual := ""
+		if aErr, ok := res.(*AssertionError); ok {
+			errMsg = aErr.Message
+			expected = aErr.Expected
+			actual = aErr.Actual
+			if aErr.Pos != nil {
+				pos = aErr.Pos
+			}
+		} else if errObj, ok := res.(*Error); ok {
+			errMsg = errObj.Message
+			if errObj.Pos != nil {
+				pos = errObj.Pos
+			}
+		}
+
+		if tc != nil {
+			tc.RecordResult(TestCaseResult{
+				Name:     stmt.Name,
+				Passed:   false,
+				Duration: dur,
+				Error:    errMsg,
+				Expected: expected,
+				Actual:   actual,
+				Pos:      pos,
+			})
+			return NULL
+		}
+		return res
+	}
+
+	if tc != nil {
+		tc.RecordResult(TestCaseResult{
+			Name:     stmt.Name,
+			Passed:   true,
+			Duration: dur,
+			Pos:      pos,
+		})
+	}
+	return NULL
+}
+
 
 

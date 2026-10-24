@@ -241,7 +241,7 @@ func (c *CaseClause) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// SwitchStatement represents value matching (cocok ... kasus ... lainnya).
+// SwitchStatement represents value matching (pilih ... bila ... lainnya).
 type SwitchStatement struct {
 	NodeType     NodeType      `json:"type"`
 	Metadata     *NodeMetadata `json:"metadata,omitempty"`
@@ -1046,6 +1046,35 @@ func (w *WatchStatement) UnmarshalJSON(data []byte) error {
 	w.NewValVar = raw.NewValVar
 	w.OldValVar = raw.OldValVar
 	w.Body = raw.Body
+	return nil
+}
+
+// TestStatement represents an inline unit test block: uji "name" { ... } or test "name" { ... }
+type TestStatement struct {
+	NodeType NodeType        `json:"type"`
+	Metadata *NodeMetadata   `json:"metadata,omitempty"`
+	Name     string          `json:"name"`
+	Body     *BlockStatement `json:"body"`
+}
+
+func (t *TestStatement) Type() NodeType          { return NodeTypeTestStatement }
+func (t *TestStatement) GetMetadata() *NodeMetadata { return t.Metadata }
+func (t *TestStatement) statementNode()          {}
+
+func (t *TestStatement) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		NodeType NodeType        `json:"type"`
+		Metadata *NodeMetadata   `json:"metadata,omitempty"`
+		Name     string          `json:"name"`
+		Body     *BlockStatement `json:"body"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	t.NodeType = NodeTypeTestStatement
+	t.Metadata = raw.Metadata
+	t.Name = raw.Name
+	t.Body = raw.Body
 	return nil
 }
 

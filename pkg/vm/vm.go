@@ -1,6 +1,7 @@
 package vm
 
 import (
+	"bytes"
 	"fmt"
 	"math"
 	"os"
@@ -676,6 +677,31 @@ func (vm *VM) evalIndex(targetObj, indexObj evaluator.Object) (evaluator.Object,
 		}
 		return nil, fmt.Errorf("indeks teks %d di luar jangkauan (panjang: %d)", idx, len(runes))
 
+	case *evaluator.Bytes:
+		if sVal, ok := indexObj.(*evaluator.String); ok {
+			if methodObj, ok := evaluator.EvalBytesMethod(obj, sVal.Value, vm.env, nil); ok {
+				if errObj, isErr := methodObj.(*evaluator.Error); isErr {
+					return nil, fmt.Errorf("%s", errObj.Inspect())
+				}
+				return methodObj, nil
+			}
+		}
+		var idx int = -1
+		if iVal, ok := indexObj.(*evaluator.Integer); ok {
+			idx = int(iVal.Value)
+		} else if sVal, ok := indexObj.(*evaluator.String); ok {
+			if parsed, err := strconv.Atoi(sVal.Value); err == nil {
+				idx = parsed
+			}
+		}
+		if idx < 0 {
+			idx = len(obj.Elements) + idx
+		}
+		if idx >= 0 && idx < len(obj.Elements) {
+			return &evaluator.Integer{Value: int64(obj.Elements[idx])}, nil
+		}
+		return nil, fmt.Errorf("indeks bita %d di luar jangkauan (panjang: %d)", idx, len(obj.Elements))
+
 	case *evaluator.Map:
 		key := indexObj.Inspect()
 		if s, ok := indexObj.(*evaluator.String); ok {
@@ -832,6 +858,30 @@ func (vm *VM) evalSetIndex(targetObj, indexObj, val evaluator.Object) error {
 		}
 		return fmt.Errorf("indeks array %d di luar jangkauan (panjang: %d)", idx, len(obj.Elements))
 
+	case *evaluator.Bytes:
+		var idx int = -1
+		if iVal, ok := indexObj.(*evaluator.Integer); ok {
+			idx = int(iVal.Value)
+		} else if sVal, ok := indexObj.(*evaluator.String); ok {
+			if parsed, err := strconv.Atoi(sVal.Value); err == nil {
+				idx = parsed
+			}
+		}
+		if idx < 0 {
+			idx = len(obj.Elements) + idx
+		}
+		if idx >= 0 && idx < len(obj.Elements) {
+			if iVal, _, isInt, ok := evaluator.CoerceToNumeric(val); ok && isInt {
+				if iVal < 0 || iVal > 255 {
+					return fmt.Errorf("nilai bita harus di antara 0 dan 255, menerima %d", iVal)
+				}
+				obj.Elements[idx] = byte(iVal)
+				return nil
+			}
+			return fmt.Errorf("nilai bita harus berupa angka (0..255), menerima %s", val.Type())
+		}
+		return fmt.Errorf("indeks bita %d di luar jangkauan (panjang: %d)", idx, len(obj.Elements))
+
 	case *evaluator.Map:
 		key := indexObj.Inspect()
 		if s, ok := indexObj.(*evaluator.String); ok {
@@ -864,7 +914,27 @@ func (vm *VM) evalSetIndex(targetObj, indexObj, val evaluator.Object) error {
 }
 
 func (vm *VM) evalAdd(a, b evaluator.Object) (evaluator.Object, error) {
+	if aBytes, ok := a.(*evaluator.Bytes); ok {
+		if bBytes, ok := b.(*evaluator.Bytes); ok {
+			newElems := make([]byte, len(aBytes.Elements)+len(bBytes.Elements))
+			copy(newElems, aBytes.Elements)
+			copy(newElems[len(aBytes.Elements):], bBytes.Elements)
+			return &evaluator.Bytes{Elements: newElems}, nil
+		}
+		if bStr, ok := b.(*evaluator.String); ok {
+			newElems := make([]byte, len(aBytes.Elements)+len(bStr.Value))
+			copy(newElems, aBytes.Elements)
+			copy(newElems[len(aBytes.Elements):], []byte(bStr.Value))
+			return &evaluator.Bytes{Elements: newElems}, nil
+		}
+	}
 	if aStr, ok := a.(*evaluator.String); ok {
+		if bBytes, ok := b.(*evaluator.Bytes); ok {
+			newElems := make([]byte, len(aStr.Value)+len(bBytes.Elements))
+			copy(newElems, []byte(aStr.Value))
+			copy(newElems[len(aStr.Value):], bBytes.Elements)
+			return &evaluator.Bytes{Elements: newElems}, nil
+		}
 		return &evaluator.String{Value: aStr.Value + b.Inspect()}, nil
 	}
 	if bStr, ok := b.(*evaluator.String); ok {
@@ -910,6 +980,18 @@ func (vm *VM) evalSub(a, b evaluator.Object) (evaluator.Object, error) {
 }
 
 func (vm *VM) evalMul(a, b evaluator.Object) (evaluator.Object, error) {
+	if leftB, ok := a.(*evaluator.Bytes); ok {
+		if cnt, _, isInt, ok := evaluator.CoerceToNumeric(b); ok && isInt {
+			if cnt <= 0 {
+				return &evaluator.Bytes{Elements: []byte{}}, nil
+			}
+			if cnt > 1_000_000 || int64(len(leftB.Elements))*cnt > 50_000_000 {
+				return nil, fmt.Errorf("hasil pengulangan bita melebihi batas aman (50MB)")
+			}
+			return &evaluator.Bytes{Elements: bytes.Repeat(leftB.Elements, int(cnt))}, nil
+		}
+	}
+
 	aInt, aFloat, aIsInt, aOk := evaluator.CoerceToNumeric(a)
 	bInt, bFloat, bIsInt, bOk := evaluator.CoerceToNumeric(b)
 	if !aOk || !bOk {

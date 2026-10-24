@@ -130,6 +130,8 @@ func NewParser(l *Lexer) *Parser {
 	p.registerPrefix(RANGE, p.parsePrefixRangeExpression)
 	p.registerPrefix(TITIP, p.parseTitipExpression)
 	p.registerPrefix(JEMPUT, p.parseJemputExpression)
+	p.registerPrefix(TEST, p.parseIdentifier)
+	p.registerPrefix(HARUS, p.parseIdentifier)
 
 	p.infixParseFns = make(map[TokenType]infixParseFn)
 	p.registerInfix(PIPE_ARROW, p.parsePipelineExpression)
@@ -327,6 +329,11 @@ func (p *Parser) parseStatement() uast.Statement {
 		return p.parseReactiveDeclaration()
 	case WATCH:
 		return p.parseWatchStatement()
+	case TEST:
+		if p.peekTokenIs(LPAREN) {
+			return p.parseExpressionStatement()
+		}
+		return p.parseTestStatement()
 	default:
 		return p.parseExpressionStatement()
 	}
@@ -842,6 +849,33 @@ func (p *Parser) parseWatchStatement() *uast.WatchStatement {
 	}
 }
 
+func (p *Parser) parseTestStatement() *uast.TestStatement {
+	meta := p.currentMetadata()
+	p.nextToken() // eat 'uji' / 'test'
+
+	testName := "unnamed test"
+	if p.curTokenIs(STRING) {
+		testName = p.curToken.Literal
+		p.nextToken()
+	} else if p.curTokenIs(IDENT) {
+		testName = p.curToken.Literal
+		p.nextToken()
+	}
+
+	if !p.curTokenIs(LBRACE) {
+		p.addError(fmt.Sprintf("Diharapkan '{' pada blok pengujian (uji/test), menerima '%s'", p.curToken.Literal))
+		return nil
+	}
+	body := p.parseBlockStatement()
+
+	return &uast.TestStatement{
+		NodeType: uast.NodeTypeTestStatement,
+		Metadata: meta,
+		Name:     testName,
+		Body:     body,
+	}
+}
+
 func (p *Parser) parseStyleBlockStatement() *uast.StyleBlockStatement {
 	meta := p.currentMetadata()
 	p.nextToken() // eat 'gaya' / 'style' / 'dialek'
@@ -939,7 +973,7 @@ func (p *Parser) parseVariableDeclaration(isMutable bool) uast.Statement {
 		}
 	}
 
-	if !p.curTokenIs(IDENT) {
+	if !p.curTokenIs(IDENT) && !p.isPropertyIdentifierToken(p.curToken.Type) {
 		p.addError(fmt.Sprintf("Diharapkan nama variabel (identifier), menerima '%s'", p.curToken.Literal))
 		return nil
 	}
@@ -1107,7 +1141,7 @@ func (p *Parser) parseStructBody(meta *uast.NodeMetadata, name string) *uast.Str
 func (p *Parser) parseStructMember(isPrivate bool, fields *[]uast.StructField, methods *[]uast.StructMethod, embeds *[]string) {
 	if p.curTokenIs(FUNC) {
 		p.nextToken() // eat 'fungsi'
-		if !p.curTokenIs(IDENT) {
+		if !p.curTokenIs(IDENT) && !p.isPropertyIdentifierToken(p.curToken.Type) {
 			p.addError("Diharapkan nama fungsi pada bentuk")
 			return
 		}
@@ -1479,7 +1513,7 @@ func (p *Parser) parseFunctionDeclaration() *uast.FunctionDeclaration {
 	meta := p.currentMetadata()
 	p.nextToken() // eat 'fungsi' or 'def'
 
-	if !p.curTokenIs(IDENT) {
+	if !p.curTokenIs(IDENT) && !p.isPropertyIdentifierToken(p.curToken.Type) {
 		p.addError("Diharapkan nama fungsi setelah keyword 'fungsi'")
 		return nil
 	}
@@ -2334,7 +2368,7 @@ func (p *Parser) isPropertyIdentifierToken(t TokenType) bool {
 		RETURN_TYPE, MAKA, SELESAI, VIS_PUBLIC, VIS_MODULE, VIS_PRIVATE, VIS_ALLOWLIST,
 		IMPORT, FROM, AS, TRY, CATCH, FINALLY, THROW, STYLE_BLOCK, STRUCT_DECL, PRIVATE,
 		REF_DECL, TYPE_DECL, NULL_COALESCE, MAYBE, DEFER, TITIP, JEMPUT, HARUS, SEMBARANG,
-		SALURAN, TRANSACTION, ROLLBACK, RECOVER, REACTIVE_DECL, WATCH:
+		SALURAN, TRANSACTION, ROLLBACK, RECOVER, REACTIVE_DECL, WATCH, TEST:
 		return true
 	default:
 		return false

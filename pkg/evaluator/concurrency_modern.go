@@ -187,67 +187,87 @@ func (c *Channel) Send(val Object, meta *uast.NodeMetadata) (res Object) {
 	return val
 }
 
-func (c *Channel) Receive(timeout time.Duration) Object {
+func (c *Channel) ReceiveWithStatus(timeout time.Duration) (Object, bool) {
 	c.mu.Lock()
 	stop := c.stop
 	c.mu.Unlock()
+
+	// Prioritize checking if an item is already queued in c.Ch before checking stop/timeout
+	select {
+	case val, ok := <-c.Ch:
+		if !ok {
+			return NULL, false
+		}
+		return val, true
+	default:
+	}
 
 	if timeout <= 0 {
 		if stop != nil {
 			select {
 			case val, ok := <-c.Ch:
 				if !ok {
-					return NULL
+					return NULL, false
 				}
-				return val
+				return val, true
 			case <-stop:
 				select {
 				case val, ok := <-c.Ch:
-					if ok {
-						return val
+					if !ok {
+						return NULL, false
 					}
+					return val, true
 				default:
+					return NULL, false
 				}
-				return NULL
 			}
 		}
 		val, ok := <-c.Ch
 		if !ok {
-			return NULL
+			return NULL, false
 		}
-		return val
+		return val, true
 	}
 
 	if stop != nil {
 		select {
 		case val, ok := <-c.Ch:
 			if !ok {
-				return NULL
+				return NULL, false
 			}
-			return val
+			return val, true
 		case <-stop:
 			select {
 			case val, ok := <-c.Ch:
-				if ok {
-					return val
+				if !ok {
+					return NULL, false
 				}
+				return val, true
 			default:
+				return NULL, false
 			}
-			return NULL
 		case <-time.After(timeout):
-			return NULL
+			return NULL, false
 		}
 	}
 
 	select {
 	case val, ok := <-c.Ch:
 		if !ok {
-			return NULL
+			return NULL, false
 		}
-		return val
+		return val, true
 	case <-time.After(timeout):
+		return NULL, false
+	}
+}
+
+func (c *Channel) Receive(timeout time.Duration) Object {
+	val, ok := c.ReceiveWithStatus(timeout)
+	if !ok {
 		return NULL
 	}
+	return val
 }
 
 func (c *Channel) Close() Object {
@@ -318,6 +338,9 @@ func checkValueMatchesType(val Object, expectedType string) bool {
 		return ok
 	case "kamus", "peta", "map":
 		_, ok := val.(*Map)
+		return ok
+	case "bita", "bytes", "byte":
+		_, ok := val.(*Bytes)
 		return ok
 	case "saluran", "channel":
 		_, ok := val.(*Channel)
