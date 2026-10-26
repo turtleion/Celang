@@ -1,0 +1,9 @@
+publik! fungsi tambah(a, b) {
+    kembalikan a + b
+}
+
+publik! fungsi kali(a, b) {
+    kembalikan a * b
+}
+
+buat rahasia_internal = 9999

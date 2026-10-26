@@ -1,0 +1,223 @@
+// ==============================================================================
+// Suite Pengujian Komprehensif Modul Arsip & Kompresi (arsip_uji.ce)
+// ==============================================================================
+
+// ------------------------------------------------------------------------------
+// BAGIAN 1: PENGUJIAN FORMAT ZIP
+// ------------------------------------------------------------------------------
+
+uji "ZIP: Buat, ekstrak, dan verifikasi berkas ZIP" {
+    // Siapkan berkas uji
+    berkas.tulis("./temp_arsip_zip/halo.txt", "Konten arsip ZIP Celang 2026")
+    berkas.tulis("./temp_arsip_zip/sub/konfig.json", "{\"nama\": \"Celang\"}")
+
+    buat zipPath = "./temp_arsip_zip/projek.zip"
+    buat targetDir = "./temp_arsip_zip/ekstrak"
+
+    // 1. Buat arsip ZIP
+    buat okBuat = arsip.buat_zip("./temp_arsip_zip", zipPath)
+    harus_benar(okBuat, "Pembuatan berkas ZIP harus berhasil")
+
+    // 2. Baca daftar isi ZIP
+    buat daftar = arsip.daftar_zip(zipPath)
+    harus_benar(daftar.panjang > 0, "Daftar isi ZIP tidak boleh kosong")
+
+    // 3. Baca langsung berkas tanpa ekstrak
+    buat isi = arsip.baca_berkas_zip(zipPath, "halo.txt")
+    harus_sama(isi.ke_teks(), "Konten arsip ZIP Celang 2026", "Pembacaan berkas tunggal dari ZIP harus cocok")
+
+    // 4. Ekstrak seluruh isi ZIP
+    buat total = arsip.ekstrak_zip(zipPath, targetDir)
+    harus_benar(total > 0, "Jumlah berkas yang diekstrak harus lebih dari 0")
+
+    // 5. Verifikasi isi hasil ekstraksi
+    buat hasilTeks = berkas.baca(targetDir + "/halo.txt")
+    harus_sama(hasilTeks, "Konten arsip ZIP Celang 2026", "Isi berkas hasil ekstraksi ZIP harus cocok persis")
+
+    // Bersihkan
+    berkas.hapus_semua("./temp_arsip_zip")
+}
+
+// ------------------------------------------------------------------------------
+// BAGIAN 2: PENGUJIAN FORMAT TAR.GZ
+// ------------------------------------------------------------------------------
+
+uji "TAR.GZ: Buat, ekstrak, dan verifikasi tarball gzip" {
+    berkas.tulis("./temp_arsip_targz/modul.ce", "publik! buat status = \"aktif\"")
+    berkas.tulis("./temp_arsip_targz/catatan.txt", "Arsip paket Celang")
+
+    buat tarGz = "./temp_arsip_targz/paket.tar.gz"
+    buat targetDir = "./temp_arsip_targz/hasil_ekstrak"
+
+    buat ok = arsip.buat_tar_gz("./temp_arsip_targz", tarGz)
+    harus_benar(ok, "Pembuatan tar.gz harus berhasil")
+
+    buat daftar = arsip.daftar_tar_gz(tarGz)
+    harus_benar(daftar.panjang > 0, "Daftar isi tar.gz tidak boleh kosong")
+
+    buat isiModul = arsip.baca_berkas_tar_gz(tarGz, "modul.ce")
+    harus_sama(isiModul.ke_teks(), "publik! buat status = \"aktif\"", "Baca langsung dari tar.gz harus cocok")
+
+    buat jumlah = arsip.ekstrak_tar_gz(tarGz, targetDir)
+    harus_benar(jumlah > 0, "Jumlah berkas terekstrak dari tar.gz harus > 0")
+
+    buat bacaan = berkas.baca(targetDir + "/modul.ce")
+    harus_sama(bacaan, "publik! buat status = \"aktif\"", "Isi berkas hasil ekstrak tar.gz harus sesuai")
+
+    berkas.hapus_semua("./temp_arsip_targz")
+}
+
+// ------------------------------------------------------------------------------
+// BAGIAN 3: PENGUJIAN KOMPRESI DALAM-MEMORI (GZIP & ZLIB)
+// ------------------------------------------------------------------------------
+
+uji "Memori: Gzip dan Gunzip round-trip" {
+    buat teksPanjang = "Celang Programming Language - High Performance Dynamic Scripting for Everyone. " +
+                       "Celang Programming Language - High Performance Dynamic Scripting for Everyone."
+    buat bitaGzip = arsip.gzip(teksPanjang)
+    harus_benar(bitaGzip.panjang > 0, "Ukuran hasil kompresi gzip harus > 0")
+
+    buat pulihBita = arsip.gunzip(bitaGzip)
+    buat pulihTeks = pulihBita.ke_teks()
+
+    harus_sama(pulihTeks, teksPanjang, "Data hasil dekompresi gzip harus kembali ke teks asli secara utuh")
+}
+
+uji "Memori: Zlib kompres dan dekompres round-trip" {
+    buat pesan = "Testing algoritma Zlib Deflate in-memory Celang 2026!"
+    buat comp = arsip.zlib_kompres(pesan)
+    harus_benar(comp.panjang > 0, "Hasil zlib_kompres harus > 0")
+
+    buat decomp = arsip.zlib_dekompres(comp)
+    harus_sama(decomp.ke_teks(), pesan, "Hasil zlib_dekompres harus memulihkan string asli")
+}
+
+// ------------------------------------------------------------------------------
+// BAGIAN 4: KETAHANAN GALAT (ERROR RESILIENCE)
+// ------------------------------------------------------------------------------
+
+uji "Ketahanan: Ekstraksi arsip rusak ditangani dengan aman" {
+    berkas.tulis("./temp_corrupt.zip", "bukan berkas zip sama sekali")
+
+    buat tertangkap = salah
+    coba {
+        arsip.ekstrak_zip("./temp_corrupt.zip", "./temp_dest")
+    } tangkap (e) {
+        tertangkap = benar
+    }
+
+    harus_benar(tertangkap, "Ekstraksi berkas rusak harus melempar galat yang dapat ditangkap")
+    berkas.hapus("./temp_corrupt.zip")
+}
+
+uji "Ketahanan: Dekompresi payload rusak ditangani dengan aman" {
+    buat bitaAcak = bita([1, 2, 3, 4, 5])
+    buat galat = salah
+    coba {
+        arsip.gunzip(bitaAcak)
+    } tangkap (e) {
+        galat = benar
+    }
+    harus_benar(galat, "gunzip bita acak harus menghasilkan galat aman")
+}
+
+// ------------------------------------------------------------------------------
+// BAGIAN 5: DETEKSI VALIDITAS ARSIP (IS_ZIP, IS_TAR, IS_TAR_GZ)
+// ------------------------------------------------------------------------------
+
+uji "Deteksi: Memeriksa validitas format berkas arsip" {
+    berkas.tulis("./temp_deteksi/teks.txt", "hanya teks biasa")
+    buat zipPath = "./temp_deteksi/uji.zip"
+    buat tarPath = "./temp_deteksi/uji.tar"
+    buat tarGzPath = "./temp_deteksi/uji.tar.gz"
+
+    arsip.buat_zip("./temp_deteksi/teks.txt", zipPath)
+    arsip.buat_tar("./temp_deteksi/teks.txt", tarPath)
+    arsip.buat_tar_gz("./temp_deteksi/teks.txt", tarGzPath)
+
+    // Cek ZIP
+    harus_benar(arsip.apakah_zip(zipPath), "uji.zip harus dikenali sebagai arsip ZIP")
+    harus_salah(arsip.apakah_zip("./temp_deteksi/teks.txt"), "teks biasa bukan ZIP")
+    harus_salah(arsip.apakah_zip(tarPath), "tar bukan ZIP")
+
+    // Cek TAR
+    harus_benar(arsip.apakah_tar(tarPath), "uji.tar harus dikenali sebagai arsip TAR")
+    buat tarGzBukanTar = arsip.apakah_tar(tarGzPath)
+    harus_salah(tarGzBukanTar, "tar.gz bukan TAR polos")
+    harus_salah(arsip.apakah_tar("./temp_deteksi/teks.txt"), "teks biasa bukan TAR")
+
+    // Cek TAR.GZ
+    harus_benar(arsip.apakah_tar_gz(tarGzPath), "uji.tar.gz harus dikenali sebagai arsip TAR.GZ")
+    harus_salah(arsip.apakah_tar_gz(tarPath), "tar polos bukan TAR.GZ")
+    harus_salah(arsip.apakah_tar_gz("./temp_deteksi/teks.txt"), "teks biasa bukan TAR.GZ")
+
+    berkas.hapus_semua("./temp_deteksi")
+}
+
+// ------------------------------------------------------------------------------
+// BAGIAN 6: EKSTRAKSI BERKAS TUNGGAL DAN BACA TAR POLOS
+// ------------------------------------------------------------------------------
+
+uji "Ekstraksi Tunggal: Ekstrak satu berkas spesifik langsung ke disk" {
+    berkas.tulis("./temp_single/berkas_a.txt", "Konten A")
+    berkas.tulis("./temp_single/berkas_b.txt", "Konten B")
+
+    buat zipPath = "./temp_single/paket.zip"
+    buat tarPath = "./temp_single/paket.tar"
+    buat tarGzPath = "./temp_single/paket.tar.gz"
+
+    arsip.buat_zip("./temp_single", zipPath)
+    arsip.buat_tar("./temp_single", tarPath)
+    arsip.buat_tar_gz("./temp_single", tarGzPath)
+
+    // 1. Ekstrak satu berkas dari ZIP ke folder
+    arsip.ekstrak_berkas_zip(zipPath, "berkas_a.txt", "./temp_single/out_zip/")
+    buat teksA = berkas.baca("./temp_single/out_zip/berkas_a.txt")
+    harus_sama(teksA, "Konten A", "Ekstraksi berkas tunggal dari ZIP harus cocok")
+
+    // 2. Ekstrak satu berkas dari TAR polos ke berkas spesifik
+    arsip.ekstrak_berkas_tar(tarPath, "berkas_b.txt", "./temp_single/out_tar/hasil_b.txt")
+    buat teksB = berkas.baca("./temp_single/out_tar/hasil_b.txt")
+    harus_sama(teksB, "Konten B", "Ekstraksi berkas tunggal dari TAR harus cocok")
+
+    // 3. Baca berkas TAR polos langsung ke memori
+    buat bitaB = arsip.baca_berkas_tar(tarPath, "berkas_b.txt")
+    harus_sama(bitaB.ke_teks(), "Konten B", "Baca berkas TAR polos ke memori harus cocok")
+
+    // 4. Ekstrak satu berkas dari TAR.GZ
+    arsip.ekstrak_berkas_tar_gz(tarGzPath, "berkas_a.txt", "./temp_single/out_targz/")
+    buat teksTargz = berkas.baca("./temp_single/out_targz/berkas_a.txt")
+    harus_sama(teksTargz, "Konten A", "Ekstraksi berkas tunggal dari TAR.GZ harus cocok")
+
+    berkas.hapus_semua("./temp_single")
+}
+
+// ------------------------------------------------------------------------------
+// BAGIAN 7: PENYARINGAN EKSTRAKSI (CALLBACK FILTER)
+// ------------------------------------------------------------------------------
+
+uji "Penyaringan: Ekstrak arsip dengan filter callback" {
+    berkas.tulis("./temp_saring/data.ce", "publik! buat angka = 42")
+    berkas.tulis("./temp_saring/sampah.tmp", "abaikan saya")
+    berkas.tulis("./temp_saring/log.txt", "pesan log")
+
+    buat tarGz = "./temp_saring/semua.tar.gz"
+    buat targetDir = "./temp_saring/hasil"
+
+    arsip.buat_tar_gz("./temp_saring", tarGz)
+
+    // Hanya ekstrak berkas yang diakhiri .ce
+    buat total = arsip.ekstrak_tar_gz(tarGz, targetDir, {
+        "saring": fungsi(info) {
+            kembalikan teks.diakhiri_dengan(info.nama, ".ce")
+        }
+    })
+
+    harus_sama(total, 1, "Jumlah berkas terekstrak harus 1 sesuai saringan filter")
+    harus_benar(berkas.ada(targetDir + "/data.ce"), "data.ce harus ada")
+    harus_salah(berkas.ada(targetDir + "/sampah.tmp"), "sampah.tmp harus dilewati oleh saringan filter")
+    harus_salah(berkas.ada(targetDir + "/log.txt"), "log.txt harus dilewati oleh saringan filter")
+
+    berkas.hapus_semua("./temp_saring")
+}
+

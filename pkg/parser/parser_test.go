@@ -852,6 +852,53 @@ func TestParser_TitipJemput(t *testing.T) {
 	}
 }
 
+func TestParser_BareReturnAndRollback(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{
+			name: "bare return before closing brace",
+			input: `fungsi f() {
+				kembalikan
+			}`,
+		},
+		{
+			name: "bare return on newline before another statement",
+			input: `fungsi f() {
+				kembalikan
+				buat x = 10
+			}`,
+		},
+		{
+			name: "bare rollback before closing brace",
+			input: `transaksi {
+				batalkan
+			}`,
+		},
+		{
+			name: "bare rollback on newline before another statement",
+			input: `transaksi {
+				batalkan
+				cetak("selesai")
+			}`,
+		},
+	}
 
-
-
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			l := parser.NewLexer(tc.input)
+			p := parser.NewParser(l)
+			prog, err := p.ParseProgram()
+			if err != nil {
+				t.Fatalf("Parser error for %s: %v", tc.name, err)
+			}
+			if len(p.Errors()) > 0 {
+				t.Fatalf("Parser had errors for %s: %v", tc.name, p.Errors())
+			}
+			if prog == nil || len(prog.Body) == 0 {
+				t.Fatalf("Expected non-empty program body for %s", tc.name)
+			}
+		})
+	}
+}

@@ -1020,6 +1020,51 @@ func containsInnerFunction(stmt uast.Statement) bool {
 		case *uast.WhileStatement:
 			walk(node.Condition)
 			walk(node.Body)
+		case *uast.ForEachStatement:
+			walk(node.Iterable)
+			walk(node.Body)
+		case *uast.ForStatement:
+			if node.Init != nil {
+				walk(node.Init)
+			}
+			if node.Condition != nil {
+				walk(node.Condition)
+			}
+			if node.Update != nil {
+				walk(node.Update)
+			}
+			walk(node.Body)
+		case *uast.TryCatchStatement:
+			walk(node.Block)
+			if node.Handler != nil {
+				walk(node.Handler.Body)
+			}
+			if node.Finalizer != nil {
+				walk(node.Finalizer)
+			}
+		case *uast.SwitchStatement:
+			walk(node.Discriminant)
+			for _, c := range node.Cases {
+				if c.Value != nil {
+					walk(c.Value)
+				}
+				for _, s := range c.Body {
+					walk(s)
+				}
+			}
+		case *uast.ConcurrencyStatement:
+			for _, t := range node.Tasks {
+				walk(t)
+			}
+		case *uast.StyleBlockStatement:
+			if node.Body != nil {
+				walk(node.Body)
+			}
+		case *uast.CallExpression:
+			walk(node.Callee)
+			for _, arg := range node.Arguments {
+				walk(arg)
+			}
 		}
 	}
 	walk(stmt)

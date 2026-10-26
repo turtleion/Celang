@@ -170,6 +170,8 @@ export default defineConfig({
           { text: 'Pertukaran Data JSON (json)', link: '/pustaka-standar/json' },
           { text: 'Sistem Operasi & Proses (sistem / os)', link: '/pustaka-standar/sistem' },
           { text: 'Jaringan & Protokol HTTP (http / jaringan)', link: '/pustaka-standar/http' },
+          { text: 'Kriptografi & Hashing (kripto / crypto)', link: '/pustaka-standar/kripto' },
+          { text: 'Arsip & Kompresi (arsip / archive)', link: '/pustaka-standar/arsip' },
           { text: 'Antarmuka Fungsi Asing C (ffi)', link: '/pustaka-standar/ffi' }
         ]
       },

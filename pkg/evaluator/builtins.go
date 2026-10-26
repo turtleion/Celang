@@ -2,9 +2,12 @@ package evaluator
 
 import (
 	"bufio"
+	"encoding/base64"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"os"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -130,12 +133,14 @@ func RegisterBuiltinsWithIO(env *Environment, in io.Reader, out io.Writer) {
 			}
 			var elems []Object
 			if start <= end {
-				for i := start; i <= end; i++ {
-					elems = append(elems, &Integer{Value: i})
+				count := end - start + 1
+				for idx := int64(0); idx < count; idx++ {
+					elems = append(elems, &Integer{Value: start + idx})
 				}
 			} else {
-				for i := start; i >= end; i-- {
-					elems = append(elems, &Integer{Value: i})
+				count := start - end + 1
+				for idx := int64(0); idx < count; idx++ {
+					elems = append(elems, &Integer{Value: start - idx})
 				}
 			}
 			return &Array{Elements: elems}
@@ -276,6 +281,33 @@ func RegisterBuiltinsWithIO(env *Environment, in io.Reader, out io.Writer) {
 			if len(args) == 0 {
 				return &Bytes{Elements: []byte{}}
 			}
+			if len(args) == 2 {
+				strObj, ok1 := args[0].(*String)
+				encObj, ok2 := args[1].(*String)
+				if !ok1 || !ok2 {
+					return &Error{Message: fmt.Sprintf("konstruktor bita dengan encoding mengharapkan teks dan format encoding, menerima %s dan %s", args[0].Type(), args[1].Type())}
+				}
+				enc := strings.ToLower(strings.TrimSpace(encObj.Value))
+				switch enc {
+				case "base64":
+					data, err := base64.StdEncoding.DecodeString(strings.TrimSpace(strObj.Value))
+					if err != nil {
+						return &Error{Message: fmt.Sprintf("Gagal mendekode data Base64: %v", err)}
+					}
+					return &Bytes{Elements: data}
+				case "heks", "hex":
+					cleanStr := strings.TrimSpace(strObj.Value)
+					cleanStr = strings.TrimPrefix(cleanStr, "0x")
+					cleanStr = strings.TrimPrefix(cleanStr, "0X")
+					data, err := hex.DecodeString(cleanStr)
+					if err != nil {
+						return &Error{Message: fmt.Sprintf("Gagal mendekode teks heksadesimal: %v", err)}
+					}
+					return &Bytes{Elements: data}
+				default:
+					return &Error{Message: fmt.Sprintf("encoding '%s' tidak dikenal, gunakan 'base64' atau 'heks'/'hex'", enc)}
+				}
+			}
 			switch a := args[0].(type) {
 			case *Bytes:
 				cp := make([]byte, len(a.Elements))
@@ -309,6 +341,65 @@ func RegisterBuiltinsWithIO(env *Environment, in io.Reader, out io.Writer) {
 			}
 		},
 	}
+
+	dariBase64Fn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 {
+				msg := "bita.dari_base64 mengharapkan 1 argumen teks Base64"
+				hint := "Contoh: bita.dari_base64(\"SGFsbw==\")"
+				if env != nil && env.IsUniversal {
+					msg = "bytes.from_base64 expects 1 Base64 string argument"
+					hint = "Example: bytes.from_base64(\"SGFsbw==\")"
+				}
+				return newError(nil, msg, hint)
+			}
+			strObj, ok := args[0].(*String)
+			if !ok {
+				return newError(nil, fmt.Sprintf("argumen dari_base64 harus berupa teks, menerima %s", args[0].Type()), "")
+			}
+			data, err := base64.StdEncoding.DecodeString(strings.TrimSpace(strObj.Value))
+			if err != nil {
+				return newError(nil, fmt.Sprintf("Gagal mendekode data Base64: %v", err), "Pastikan teks merupakan format Base64 yang valid.")
+			}
+			return &Bytes{Elements: data}
+		},
+	}
+
+	dariHeksFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) != 1 {
+				msg := "bita.dari_heks mengharapkan 1 argumen teks heksadesimal"
+				hint := "Contoh: bita.dari_heks(\"48656c6c6f\")"
+				if env != nil && env.IsUniversal {
+					msg = "bytes.from_hex expects 1 hex string argument"
+					hint = "Example: bytes.from_hex(\"48656c6c6f\")"
+				}
+				return newError(nil, msg, hint)
+			}
+			strObj, ok := args[0].(*String)
+			if !ok {
+				return newError(nil, fmt.Sprintf("argumen dari_heks harus berupa teks, menerima %s", args[0].Type()), "")
+			}
+			cleanStr := strings.TrimSpace(strObj.Value)
+			cleanStr = strings.TrimPrefix(cleanStr, "0x")
+			cleanStr = strings.TrimPrefix(cleanStr, "0X")
+			data, err := hex.DecodeString(cleanStr)
+			if err != nil {
+				return newError(nil, fmt.Sprintf("Gagal mendekode teks heksadesimal: %v", err), "Pastikan teks hanya berisi karakter heksadesimal (0-9, a-f, A-F).")
+			}
+			return &Bytes{Elements: data}
+		},
+	}
+
+	bitaFn.Properties = map[string]Object{
+		"dari_base64": dariBase64Fn,
+		"from_base64": dariBase64Fn,
+		"dari_heks":   dariHeksFn,
+		"dari_hex":    dariHeksFn,
+		"from_hex":    dariHeksFn,
+		"from_heks":   dariHeksFn,
+	}
+
 	env.Define("Bita", bitaFn, false, "function")
 	env.Define("bita", bitaFn, false, "function")
 	env.Define("Bytes", bitaFn, false, "function")
@@ -498,6 +589,78 @@ func RegisterBuiltinsWithIO(env *Environment, in io.Reader, out io.Writer) {
 	env.Define("jemput_pertama", jemputPertamaFn, false, "function")
 	env.Define("await_race", jemputPertamaFn, false, "function")
 	env.Define("await_first", jemputPertamaFn, false, "function")
+
+	// Dynamic Import: impor_dinamis(path) / import_dynamic(path)
+	imporDinamisFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) < 1 {
+				if env.IsUniversal {
+					return &Error{Message: "import_dynamic() requires 1 string argument (module path or package name)"}
+				}
+				return &Error{Message: "impor_dinamis() membutuhkan 1 argumen string (path modul atau nama paket)"}
+			}
+
+			pathStr, ok := args[0].(*String)
+			if !ok {
+				if env.IsUniversal {
+					return &Error{Message: fmt.Sprintf("import_dynamic() argument must be a string, got %s", args[0].Type())}
+				}
+				return &Error{Message: fmt.Sprintf("Argumen impor_dinamis() harus berupa teks (string), menerima %s", args[0].Type())}
+			}
+
+			importSource := pathStr.Value
+
+			if env.IsUniversal {
+				switch strings.ToLower(strings.TrimSpace(importSource)) {
+				case "berkas":
+					return &Error{Message: "Indonesian module 'berkas' is not allowed in Universal Mode. Import 'fs' instead."}
+				case "matematika":
+					return &Error{Message: "Indonesian module 'matematika' is not allowed in Universal Mode. Import 'math' instead."}
+				case "teks":
+					return &Error{Message: "Indonesian module 'teks' is not allowed in Universal Mode. Import 'strings' instead."}
+				case "waktu":
+					return &Error{Message: "Indonesian module 'waktu' is not allowed in Universal Mode. Import 'time' instead."}
+				case "sistem":
+					return &Error{Message: "Indonesian module 'sistem' is not allowed in Universal Mode. Import 'os' instead."}
+				case "kripto":
+					return &Error{Message: "Indonesian module 'kripto' is not allowed in Universal Mode. Import 'crypto' instead."}
+				case "arsip", "kompresi":
+					return &Error{Message: fmt.Sprintf("Indonesian module '%s' is not allowed in Universal Mode. Import 'archive' or 'compression' instead.", importSource)}
+				}
+			}
+
+			targetAbsPath, err := resolveModulePath(env.FilePath, importSource)
+			if err != nil {
+				return &Error{Message: fmt.Sprintf("Gagal menemukan modul '%s': %s", importSource, err.Error())}
+			}
+
+			targetEnv, err := loadModule(targetAbsPath, env)
+			if err != nil {
+				return &Error{Message: fmt.Sprintf("Gagal memuat modul '%s': %s", importSource, err.Error())}
+			}
+
+			callerFile := env.FilePath
+			callerRoot := env.ModuleRoot
+			targetFile := targetEnv.FilePath
+			targetRoot := targetEnv.ModuleRoot
+
+			mapPairs := make(map[string]Object)
+			var mapOrder []string
+			for name, entry := range targetEnv.AllEntries() {
+				if err := checkVisibilityAccess(callerFile, callerRoot, targetFile, targetRoot, name, entry.Visibility); err == nil {
+					mapPairs[name] = entry.Current()
+					mapOrder = append(mapOrder, name)
+				}
+			}
+			sort.Strings(mapOrder)
+
+			return &Map{Pairs: mapPairs, Order: mapOrder}
+		},
+	}
+	env.Define("impor_dinamis", imporDinamisFn, false, "function")
+	env.Define("ambil_dinamis", imporDinamisFn, false, "function")
+	env.Define("import_dynamic", imporDinamisFn, false, "function")
+	env.Define("import_module", imporDinamisFn, false, "function")
 
 	// Register testing assertions & callbacks
 	registerTestingBuiltins(env)

@@ -170,6 +170,15 @@ cetak(kuadrat(6)) // 36
 buat buah = ["Apel", "Mangga", "Jeruk"]
 cetak(buah[0]) // "Apel"
 
+// Menambah atau manipulasi:
+buah.tambah("Pisang")
+
+// Transformasi fungsional (menghasilkan array baru / imutabel):
+buat hasil = [1, 2, 3, 4]
+    .saring(x => x % 2 == 0)          // [2, 4]
+    .petakan(x => x * 10)             // [20, 40]
+    .reduksi((acc, x) => acc + x, 0)  // 60
+
 // 2. Kamus data berlabel (Map):
 buat profil = {
     "nama": "Siti",
@@ -177,3 +186,14 @@ buat profil = {
 }
 cetak(profil.nama) // "Siti"
 ```
+
+---
+
+## 9. Tiga Cara Menjalankan Perintah (Arsitektur Pemanggilan)
+
+Celang mengelompokkan pemanggilan fungsi menjadi 3 gaya agar rapi dan tidak saling tabrakan:
+
+1. **Fungsi Bawaan Global**: Langsung dipanggil tanpa awalan (misal: `cetak()`, `panjang()`, `tipe()`, `bita()`).
+2. **Metode Objek (`.xxx()`)**: Menempel pada data tertentu (misal: `daftar.saring()`, `daftar.petakan()`, `teks.huruf_besar()`).
+3. **Modul Ber-namespace**: Dikelompokkan dalam domain pustaka standar yang otomatis tersedia secara global (misal: `berkas.baca()`, `matematika.akar()`, `json.urai()`).
+

@@ -6,6 +6,25 @@ Seluruh fungsi bawaan mendukung **nama Bahasa Indonesia yang ramah** serta **nam
 
 ---
 
+## 🏛️ Arsitektur Pemanggilan: 3 Pintu Masuk Sintaks Celang
+
+Sebelum mempelajari daftar fungsi bawaan, penting untuk memahami bagaimana Celang mengorganisir pemanggilan fungsi dan metode dalam program Anda. Celang menyediakan 3 pintu masuk pemanggilan yang harmonis:
+
+| Jenis Pemanggilan | Sintaks | Contoh | Alasan Desain |
+| :--- | :--- | :--- | :--- |
+| **1. Fungsi Bawaan Global (*Global Builtin*)** | `fungsi(...)` | `cetak("Halo")`, `panjang(arr)`, `tipe(x)` | **Operasi Primitif & Esensial**. Selalu tersedia tanpa impor. Menjaga ruang lingkup global tetap ramping agar tidak terjadi tabrakan nama variabel. |
+| **2. Metode Objek (*Object Method*)** | `objek.metode(...)` | `arr.saring(...)`, `arr.tambah(1)`, `teks.huruf_besar()` | **Melekat pada Data & Fluent Pipeline**. Memungkinkan *method chaining* (`arr.saring(...).petakan(...)`) tanpa tumpukan tanda kurung bersarang. |
+| **3. Modul Ber-namespace (*Namespaced Module*)** | `modul.fungsi(...)` | `berkas.baca(...)`, `matematika.akar(...)`, `json.urai(...)` | **Isolasi Domain & Kejelasan Konteks**. Mencegah ambiguitas (misal: membedakan membaca berkas vs membaca input terminal). Modul standar di-inject otomatis secara global. |
+
+### 🔀 Fleksibilitas Gaya Ganda (*Dual Syntax: Pythonic vs OOP*)
+Celang mendukung dua kebiasaan pemrograman yang populer:
+* **Gaya Fungsional / Pythonic**: Menggunakan fungsi bawaan `panjang(daftar)` atau `saring(daftar, fn)`.
+* **Gaya OOP / Fluent JavaScript**: Menggunakan metode objek `daftar.panjang` atau `daftar.saring(fn)`.
+
+Keduanya merujuk ke mesin yang sama di balik layar, sehingga Anda bebas menulis kode sesuai kenyamanan gaya berpikir Anda.
+
+---
+
 ## ⚡ Navigasi Kategori Tipe Data
 
 Pilih kategori fungsi bawaan berdasarkan jenis data yang ingin Anda kelola:

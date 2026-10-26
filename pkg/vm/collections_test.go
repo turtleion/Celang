@@ -117,3 +117,104 @@ func TestVM_ForEach_ContinueAndBreak(t *testing.T) {
 		t.Fatalf("expected 2,6, got %s", res.Inspect())
 	}
 }
+
+func TestVM_InnerFunctionAndDeferInLoop(t *testing.T) {
+	// 1. Inner function inside loop capturing outer variable
+	code := `
+	fungsi luar() {
+		buat x = 100
+		untuk i dalam [1] {
+			fungsi inner() {
+				kembalikan x
+			}
+			kembalikan inner()
+		}
+	}
+	luar()
+	`
+	res, _, _ := runVM(t, code)
+	if res.Inspect() != "100" {
+		t.Fatalf("expected 100, got: %s", res.Inspect())
+	}
+
+	// 2. Defer inside loop in function executed on function return
+	codeDefer := `
+	buat log = []
+	fungsi uji_defer() {
+		untuk i dalam [1] {
+			saat_selesai log.tambah("defer_loop")
+		}
+		log.tambah("selesai_fungsi")
+	}
+	uji_defer()
+	log.gabung(",")
+	`
+	resDefer, _, _ := runVM(t, codeDefer)
+	if resDefer.Inspect() != "selesai_fungsi,defer_loop" {
+		t.Fatalf("expected 'selesai_fungsi,defer_loop', got: %s", resDefer.Inspect())
+	}
+}
+
+func TestVM_FaseA_FunctionalArrayAndBita(t *testing.T) {
+	// 1. Array map, filter, reduce, find, some, every in VM
+	codeArray := `
+	buat awal = [1, 2, 3, 4, 5, 6]
+	buat genap = awal.saring(x => x % 2 == 0)
+	buat kali10 = genap.petakan((x, i) => x * 10 + i)
+	buat total = kali10.lipat((acc, x) => acc + x, 0)
+	buat temukan_ada = awal.temukan(x => x > 4)
+	buat temukan_kosong = (awal.temukan(x => x > 100)) ?? 999
+	buat ada_sepuluh = awal.ada_yang(x => x == 5)
+	buat semua_positif = awal.semuanya(x => x > 0)
+	[total, temukan_ada, temukan_kosong, ada_sepuluh, semua_positif].gabung(":")
+	`
+	res, _, _ := runVM(t, codeArray)
+	expected := "123:5:999:true:true"
+	if res.Inspect() != expected {
+		t.Fatalf("expected '%s', got '%s'", expected, res.Inspect())
+	}
+
+	// 2. Chaining in VM
+	codeChain := `
+	[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+		.filter(x => x % 2 == 0)
+		.map(x => x * 10)
+		.reduce((acc, x) => acc + x, 0)
+	`
+	resChain, _, _ := runVM(t, codeChain)
+	if resChain.Inspect() != "300" {
+		t.Fatalf("expected 300, got '%s'", resChain.Inspect())
+	}
+
+	// 3. Bita decoding in VM
+	codeBita := `
+	buat b1 = bita.dari_base64("SGFsbw==")
+	buat b2 = bytes.from_base64("SGFsbw==")
+	buat b3 = bita.dari_heks("48656c6c6f")
+	buat b4 = bytes.from_hex("0x48656c6c6f")
+	buat b5 = bita("SGFsbw==", "base64")
+	buat b6 = bytes("48656c6c6f", "hex")
+	[b1.ke_teks(), b2.to_string(), b3.ke_teks(), b4.to_string(), b5.ke_teks(), b6.to_string()].gabung(",")
+	`
+	resBita, _, _ := runVM(t, codeBita)
+	if resBita.Inspect() != "Halo,Halo,Hello,Hello,Halo,Hello" {
+		t.Fatalf("expected 'Halo,Halo,Hello,Hello,Halo,Hello', got '%s'", resBita.Inspect())
+	}
+}
+
+func TestVM_FaseA_UniversalMode(t *testing.T) {
+	code := `
+	"use universal"
+	let arr = [10, 20, 30]
+	let mapped = arr.map(x => x / 10)
+	let filtered = mapped.filter(x => x > 1)
+	let sum = filtered.reduce((a, b) => a + b, 0)
+	let b = bytes.from_base64("T0s=")
+	sum + ":" + b.to_string()
+	`
+	res, _, _ := runVM(t, code)
+	if res.Inspect() != "5:OK" {
+		t.Fatalf("expected 5:OK, got: %s", res.Inspect())
+	}
+}
+

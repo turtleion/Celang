@@ -337,3 +337,302 @@ func TestModule_CleanPackageAndStdlibImports(t *testing.T) {
 	}
 }
 
+func TestModule_DirectoryEntrypointResolution(t *testing.T) {
+	tempDir := t.TempDir()
+
+	// 1. Folder with modul.ce
+	dir1 := filepath.Join(tempDir, "komp_modul")
+	if err := os.MkdirAll(dir1, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir1, "modul.ce"), []byte(`publik! buat pesan = "dari modul.ce"`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// 2. Folder with utama.ce
+	dir2 := filepath.Join(tempDir, "komp_utama")
+	if err := os.MkdirAll(dir2, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir2, "utama.ce"), []byte(`publik! buat pesan = "dari utama.ce"`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// 3. Folder with index.ce
+	dir3 := filepath.Join(tempDir, "komp_index")
+	if err := os.MkdirAll(dir3, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir3, "index.ce"), []byte(`publik! buat pesan = "dari index.ce"`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// 4. Folder with <dirname>.ce
+	dir4 := filepath.Join(tempDir, "komp_nama")
+	if err := os.MkdirAll(dir4, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir4, "komp_nama.ce"), []byte(`publik! buat pesan = "dari komp_nama.ce"`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	consumerScript := `
+	ambil { pesan as p1 } dari "./komp_modul"
+	ambil { pesan as p2 } dari "./komp_utama"
+	ambil { pesan as p3 } dari "./komp_index"
+	ambil { pesan as p4 } dari "./komp_nama"
+	`
+	l := parser.NewLexer(consumerScript)
+	p := parser.NewParser(l)
+	prog, err := p.ParseProgram()
+	if err != nil {
+		t.Fatalf("Parse error: %v", err)
+	}
+
+	env := evaluator.NewEnvironment()
+	env.FilePath = filepath.Join(tempDir, "main.ce")
+	res := evaluator.Eval(prog, env)
+	if res != nil && res.Type() == evaluator.ERROR_OBJ {
+		t.Fatalf("Eval error: %s", res.Inspect())
+	}
+
+	for _, tc := range []struct {
+		name     string
+		expected string
+	}{
+		{"p1", "dari modul.ce"},
+		{"p2", "dari utama.ce"},
+		{"p3", "dari index.ce"},
+		{"p4", "dari komp_nama.ce"},
+	} {
+		val, ok := env.Get(tc.name)
+		if !ok || val.Inspect() != tc.expected {
+			t.Errorf("Expected %s=%q, got %+v", tc.name, tc.expected, val)
+		}
+	}
+}
+
+func TestModule_ReExportBarrel(t *testing.T) {
+	tempDir := t.TempDir()
+
+	// sub1.ce
+	sub1 := filepath.Join(tempDir, "sub1.ce")
+	sub1Code := `
+	publik! buat angka_a = 100
+	buat rahasia = 999
+	publik! fungsi kali(x) { kembalikan x * 2 }
+	`
+	if err := os.WriteFile(sub1, []byte(sub1Code), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// sub2.ce
+	sub2 := filepath.Join(tempDir, "sub2.ce")
+	sub2Code := `
+	publik! buat kata = "celang"
+	publik! buat versi = "2.0"
+	`
+	if err := os.WriteFile(sub2, []byte(sub2Code), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// barrel.ce re-exports sub1 and sub2
+	barrel := filepath.Join(tempDir, "barrel.ce")
+	barrelCode := `
+	ekspor { angka_a, kali sebagai ganda } dari "./sub1.ce"
+	ekspor * dari "./sub2.ce"
+	`
+	if err := os.WriteFile(barrel, []byte(barrelCode), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// consumer.ce imports through barrel
+	consumerScript := `
+	ambil { angka_a, ganda, kata, versi } dari "./barrel.ce"
+	buat hasil_kali = ganda(21)
+	`
+	l := parser.NewLexer(consumerScript)
+	p := parser.NewParser(l)
+	prog, err := p.ParseProgram()
+	if err != nil {
+		t.Fatalf("Parse error: %v", err)
+	}
+
+	env := evaluator.NewEnvironment()
+	env.FilePath = filepath.Join(tempDir, "consumer.ce")
+	res := evaluator.Eval(prog, env)
+	if res != nil && res.Type() == evaluator.ERROR_OBJ {
+		t.Fatalf("Eval error: %s", res.Inspect())
+	}
+
+	if val, ok := env.Get("angka_a"); !ok || val.(*evaluator.Integer).Value != 100 {
+		t.Errorf("Expected angka_a=100, got %+v", val)
+	}
+	if val, ok := env.Get("hasil_kali"); !ok || val.(*evaluator.Integer).Value != 42 {
+		t.Errorf("Expected hasil_kali=42, got %+v", val)
+	}
+	if val, ok := env.Get("kata"); !ok || val.Inspect() != "celang" {
+		t.Errorf("Expected kata='celang', got %+v", val)
+	}
+	if val, ok := env.Get("versi"); !ok || val.Inspect() != "2.0" {
+		t.Errorf("Expected versi='2.0', got %+v", val)
+	}
+
+	// Test privacy barrier: importing private 'rahasia' through barrel must fail
+	leakScript := `ambil { rahasia } dari "./barrel.ce"`
+	lLeak := parser.NewLexer(leakScript)
+	pLeak := parser.NewParser(lLeak)
+	progLeak, _ := pLeak.ParseProgram()
+	envLeak := evaluator.NewEnvironment()
+	envLeak.FilePath = filepath.Join(tempDir, "leak.ce")
+	resLeak := evaluator.Eval(progLeak, envLeak)
+	if resLeak == nil || resLeak.Type() != evaluator.ERROR_OBJ {
+		t.Fatalf("Expected error when importing private variable through barrel, got %+v", resLeak)
+	}
+}
+
+func TestModule_UniversalReExport(t *testing.T) {
+	tempDir := t.TempDir()
+
+	sub := filepath.Join(tempDir, "math_sub.ce")
+	subCode := `"use universal"
+export const PI = 314
+export function double_it(n) {
+    return n * 2
+}
+`
+	if err := os.WriteFile(sub, []byte(subCode), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	barrel := filepath.Join(tempDir, "math_barrel.ce")
+	barrelCode := `"use universal"
+export { PI, double_it as times_two } from "./math_sub.ce"
+`
+	if err := os.WriteFile(barrel, []byte(barrelCode), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	consumerScript := `"use universal"
+import { PI, times_two } from "./math_barrel.ce"
+const res = times_two(PI)
+`
+	l := parser.NewLexer(consumerScript)
+	p := parser.NewParser(l)
+	prog, err := p.ParseProgram()
+	if err != nil {
+		t.Fatalf("Parse error: %v", err)
+	}
+
+	env := evaluator.NewEnvironment()
+	env.FilePath = filepath.Join(tempDir, "consumer_univ.ce")
+	res := evaluator.Eval(prog, env)
+	if res != nil && res.Type() == evaluator.ERROR_OBJ {
+		t.Fatalf("Eval error: %s", res.Inspect())
+	}
+
+	resVal, ok := env.Get("res")
+	if !ok || resVal.(*evaluator.Integer).Value != 628 {
+		t.Fatalf("Expected res=628, got %+v", resVal)
+	}
+}
+
+func TestModule_DynamicImport(t *testing.T) {
+	tempDir := t.TempDir()
+
+	modulePath := filepath.Join(tempDir, "helper.ce")
+	moduleCode := `
+	publik! buat greeting = "halo dari modul"
+	publik! fungsi jumlah(a, b) {
+		kembalikan a + b
+	}
+	buat rahasia = 1234
+	`
+	if err := os.WriteFile(modulePath, []byte(moduleCode), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// 1. Dynamic import in Indonesian mode
+	script := `
+	buat m = impor_dinamis("./helper.ce")
+	buat salam = m.greeting
+	buat total = m.jumlah(10, 20)
+	buat ada_rahasia = m.kunci().ada_yang(k => k == "rahasia")
+	`
+	l := parser.NewLexer(script)
+	p := parser.NewParser(l)
+	prog, err := p.ParseProgram()
+	if err != nil {
+		t.Fatalf("Parse error: %v", err)
+	}
+
+	env := evaluator.NewEnvironment()
+	env.FilePath = filepath.Join(tempDir, "main.ce")
+	evaluator.RegisterBuiltins(env, nil)
+	res := evaluator.Eval(prog, env)
+	if res != nil && res.Type() == evaluator.ERROR_OBJ {
+		t.Fatalf("Eval error in dynamic import: %s", res.Inspect())
+	}
+
+	salamVal, ok := env.Get("salam")
+	if !ok || salamVal.Inspect() != "halo dari modul" {
+		t.Errorf("Expected salam='halo dari modul', got %+v", salamVal)
+	}
+
+	totalVal, ok := env.Get("total")
+	if !ok || totalVal.(*evaluator.Integer).Value != 30 {
+		t.Errorf("Expected total=30, got %+v", totalVal)
+	}
+
+	adaRahasiaVal, ok := env.Get("ada_rahasia")
+	if !ok || adaRahasiaVal != evaluator.FALSE {
+		t.Errorf("Expected ada_rahasia=false, got %+v", adaRahasiaVal)
+	}
+
+	// 2. Dynamic import in Universal mode
+	univScript := `"use universal"
+let mod = import_dynamic("./helper.ce")
+let msg = mod.greeting
+let sum = mod.jumlah(5, 7)
+`
+	lUniv := parser.NewLexer(univScript)
+	pUniv := parser.NewParser(lUniv)
+	progUniv, err := pUniv.ParseProgram()
+	if err != nil {
+		t.Fatalf("Universal parse error: %v", err)
+	}
+
+	envUniv := evaluator.NewEnvironment()
+	envUniv.FilePath = filepath.Join(tempDir, "main_univ.ce")
+	evaluator.RegisterBuiltins(envUniv, nil)
+	resUniv := evaluator.Eval(progUniv, envUniv)
+	if resUniv != nil && resUniv.Type() == evaluator.ERROR_OBJ {
+		t.Fatalf("Universal dynamic import eval error: %s", resUniv.Inspect())
+	}
+
+	msgVal, ok := envUniv.Get("msg")
+	if !ok || msgVal.Inspect() != "halo dari modul" {
+		t.Errorf("Expected msg='halo dari modul', got %+v", msgVal)
+	}
+
+	sumVal, ok := envUniv.Get("sum")
+	if !ok || sumVal.(*evaluator.Integer).Value != 12 {
+		t.Errorf("Expected sum=12, got %+v", sumVal)
+	}
+
+	// 3. Universal mode rejects Indonesian 'impor_dinamis'
+	rejectScript := `"use universal"
+let m = impor_dinamis("./helper.ce")
+`
+	lRej := parser.NewLexer(rejectScript)
+	pRej := parser.NewParser(lRej)
+	progRej, _ := pRej.ParseProgram()
+	envRej := evaluator.NewEnvironment()
+	envRej.FilePath = filepath.Join(tempDir, "reject.ce")
+	evaluator.RegisterBuiltins(envRej, nil)
+	resRej := evaluator.Eval(progRej, envRej)
+	if resRej == nil || resRej.Type() != evaluator.ERROR_OBJ {
+		t.Fatalf("Expected universal mode rejection for 'impor_dinamis', got %+v", resRej)
+	}
+}
+

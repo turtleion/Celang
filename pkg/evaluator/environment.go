@@ -145,6 +145,7 @@ type Environment struct {
 	savepoints      []*transactionFrame
 	reactivityDepth int64
 	activeTracker   *VariableEntry
+	isFunctionScope bool
 	IsUniversal     bool
 	testContext     *TestContext
 }
@@ -171,6 +172,13 @@ func NewEnclosedEnvironment(outer *Environment) *Environment {
 	return env
 }
 
+// NewFunctionEnvironment creates an environment representing a function execution frame.
+func NewFunctionEnvironment(outer *Environment) *Environment {
+	env := NewEnclosedEnvironment(outer)
+	env.isFunctionScope = true
+	return env
+}
+
 // GetTestContext traverses the environment chain to find the active TestContext, if any.
 func (e *Environment) GetTestContext() *TestContext {
 	curr := e
@@ -190,9 +198,13 @@ func (e *Environment) SetTestContext(tc *TestContext) {
 
 // PushDefer adds a statement to be executed at scope exit (LIFO).
 func (e *Environment) PushDefer(stmt uast.Statement) {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	e.defers = append(e.defers, stmt)
+	target := e
+	for target.outer != nil && !target.isFunctionScope {
+		target = target.outer
+	}
+	target.mu.Lock()
+	defer target.mu.Unlock()
+	target.defers = append(target.defers, stmt)
 }
 
 // PopAllDefers extracts all deferred statements in LIFO (reverse) order and clears the stack.
@@ -235,7 +247,7 @@ func (e *Environment) DefineWithVisibility(name string, val Object, isMutable bo
 		hasSavepoints := len(curr.savepoints) > 0
 		if hasSavepoints {
 			top := curr.savepoints[len(curr.savepoints)-1]
-			top.created = append(top.created, name)
+			top.created = append(top.created, createdVar{env: e, name: name})
 		}
 		next := curr.outer
 		if curr != e {
@@ -487,9 +499,14 @@ type transactionSavepoint struct {
 	historyLen int
 }
 
+type createdVar struct {
+	env  *Environment
+	name string
+}
+
 type transactionFrame struct {
 	mutations map[*VariableEntry]transactionSavepoint
-	created   []string
+	created   []createdVar
 }
 
 func (e *Environment) recordSavepoint(target *VariableEntry) {
@@ -523,7 +540,7 @@ func (e *Environment) BeginTransaction() {
 	defer e.mu.Unlock()
 	e.savepoints = append(e.savepoints, &transactionFrame{
 		mutations: make(map[*VariableEntry]transactionSavepoint),
-		created:   make([]string, 0),
+		created:   make([]createdVar, 0),
 	})
 }
 
@@ -547,9 +564,15 @@ func (e *Environment) RollbackTransaction() {
 	top := e.savepoints[len(e.savepoints)-1]
 	e.savepoints = e.savepoints[:len(e.savepoints)-1]
 
-	// 1. Remove variables declared in this transaction frame
-	for _, createdName := range top.created {
-		delete(e.store, createdName)
+	// 1. Remove variables declared in this transaction frame from their respective environments
+	for _, cv := range top.created {
+		if cv.env == e {
+			delete(e.store, cv.name)
+		} else {
+			cv.env.mu.Lock()
+			delete(cv.env.store, cv.name)
+			cv.env.mu.Unlock()
+		}
 	}
 
 	// 2. Restore mutated variables to their pre-transaction snapshot

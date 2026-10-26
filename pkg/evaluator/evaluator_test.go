@@ -1308,6 +1308,38 @@ func TestEvaluator_ErgonomicFeatures(t *testing.T) {
 		t.Errorf("expected log[2] = akhir_1, got %v", logArr.Elements[2])
 	}
 
+	// 2b. Defer inside loops and try-catch
+	inputDeferLoop := `
+	buat logLoop = []
+	fungsi tes_defer_loop() {
+		untuk i dalam [1] {
+			saat_selesai logLoop.tambah("defer_loop")
+		}
+		coba {
+			lempar "err"
+		} tangkap e {
+			saat_selesai logLoop.tambah("defer_catch")
+		}
+		logLoop.tambah("fungsi_selesai")
+	}
+	tes_defer_loop()
+	logLoop
+	`
+	resDeferLoop := testEvalSource(t, inputDeferLoop)
+	arrDeferLoop, ok := resDeferLoop.(*evaluator.Array)
+	if !ok || len(arrDeferLoop.Elements) != 3 {
+		t.Fatalf("expected 3 log elements from defer loop/catch, got: %v", resDeferLoop)
+	}
+	if arrDeferLoop.Elements[0].(*evaluator.String).Value != "fungsi_selesai" {
+		t.Errorf("expected first element 'fungsi_selesai', got %v", arrDeferLoop.Elements[0])
+	}
+	if arrDeferLoop.Elements[1].(*evaluator.String).Value != "defer_catch" {
+		t.Errorf("expected second element 'defer_catch', got %v", arrDeferLoop.Elements[1])
+	}
+	if arrDeferLoop.Elements[2].(*evaluator.String).Value != "defer_loop" {
+		t.Errorf("expected third element 'defer_loop', got %v", arrDeferLoop.Elements[2])
+	}
+
 	// 3. Range & Slicing (1..5, arr[1..3], str[0..2])
 	inputRange := `
 	buat r = 1..5
@@ -1873,6 +1905,26 @@ func TestFeature_TransaksiDanRollback(t *testing.T) {
 	if arrNestedOuter.Elements[1].(*evaluator.Integer).Value != 20 {
 		t.Errorf("expected y 20, got: %v", arrNestedOuter.Elements[1])
 	}
+
+	// 6. Rollback with shadowing in inner scope does not destroy outer variable
+	codeShadow := `
+	buat x = 100
+	transaksi {
+		untuk i dalam [1] {
+			buat x = 999
+			batalkan "batal"
+		}
+	}
+	x
+	`
+	resShadow := testEvalSource(t, codeShadow)
+	iShadow, ok := resShadow.(*evaluator.Integer)
+	if !ok {
+		t.Fatalf("expected outer variable x to survive rollback, got: %v", resShadow)
+	}
+	if iShadow.Value != 100 {
+		t.Errorf("expected outer x = 100, got: %d", iShadow.Value)
+	}
 }
 
 func TestFeature_ReaktifDanPengamat(t *testing.T) {
@@ -2387,6 +2439,22 @@ func TestEvaluator_RangeSizeGuard(t *testing.T) {
 	res2 := testEvalSource(t, `1..10000000`)
 	if _, ok := res2.(*evaluator.Error); !ok {
 		t.Fatalf("expected error for excessive range expression size, got %s", res2.Inspect())
+	}
+}
+
+func TestEvaluator_RangeMaxIntOverflow(t *testing.T) {
+	// 1. rentang reaching math.MaxInt64 without hanging
+	res1 := testEvalSource(t, `rentang(9223372036854775805, 9223372036854775807)`)
+	arr1, ok := res1.(*evaluator.Array)
+	if !ok || len(arr1.Elements) != 3 {
+		t.Fatalf("expected 3 elements for range to MaxInt64, got %v", res1)
+	}
+
+	// 2. range operator .. reaching math.MaxInt64 without hanging
+	res2 := testEvalSource(t, `9223372036854775805..9223372036854775807`)
+	arr2, ok := res2.(*evaluator.Array)
+	if !ok || len(arr2.Elements) != 3 {
+		t.Fatalf("expected 3 elements for .. to MaxInt64, got %v", res2)
 	}
 }
 

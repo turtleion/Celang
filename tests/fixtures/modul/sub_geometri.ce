@@ -1,0 +1,7 @@
+publik! fungsi luas_persegi(sisi) {
+    kembalikan sisi * sisi
+}
+
+publik! fungsi keliling_persegi(sisi) {
+    kembalikan 4 * sisi
+}

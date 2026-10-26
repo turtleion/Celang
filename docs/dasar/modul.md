@@ -82,6 +82,17 @@ dari matematika ambil *
 from "./utilitas.ce" import cetak_baris, cetak_kolom as kolom
 ```
 
+> 🌟 **Pustaka Standar Tersedia Otomatis (*Auto-Injected Globals*)**
+>
+> Seluruh modul standar inti di Celang (`berkas`, `matematika`, `teks`, `waktu`, `json`, `sistem`, `http`, `ffi`) sudah **otomatis terdaftar sebagai objek global**.
+> Anda dapat langsung menulis `berkas.baca("catatan.txt")` atau `matematika.akar(16)` **tanpa harus memanggil perintah `impor` terlebih dahulu**.
+>
+> Kata kunci `impor` / `ambil` digunakan ketika:
+> 1. Mengimpor berkas kode lokal buatan Anda sendiri (misal: `ambil { formatData } dari "./util.ce"`).
+> 2. Mengambil simbol tertentu secara langsung ke ruang lingkup lokal (misal: `ambil { akar, PI } dari matematika`).
+> 3. Memberikan alias namespace pendek (misal: `impor matematika sebagai math`).
+> 4. Menggunakan modul/paket eksternal yang diinstal melalui Package Manager.
+
 ---
 
 ## 🔒 Kontrol Visibilitas Ekspor
@@ -139,4 +150,75 @@ Ketika Anda mengimpor nama paket tanpa awalan jalur (misal: `ambil { sesuatu } d
 5. `celang_modules/<paket>/index.ce`
 6. `celang_modules/<paket>.ce`
 
+---
+
+## 📂 Resolusi Impor Folder / Direktori
+
+Celang mendukung impor langsung ke direktori tanpa perlu menulis nama berkas entrypoint secara manual. Ini sangat memudahkan pengorganisasian komponen atau sub-paket.
+
+```celang
+// Mengimpor dari folder "./komponen"
+ambil { Tombol, InputTeks } dari "./komponen"
+```
+
+Ketika jalur yang dituju adalah sebuah folder, Celang akan mencari berkas entrypoint dengan urutan prioritas:
+1. `modul.ce` *(Konvensi utama Celang)*
+2. `utama.ce`
+3. `index.ce`
+4. `<nama_folder>.ce` *(misal: `komponen/komponen.ce`)*
+5. Varian `.ast` (U-AST terkompilasi)
+
+---
+
+## 🔄 Re-Ekspor & Pola Barrel (*Barrel Exports*)
+
+Pola *barrel* memungkinkan sebuah berkas menyatukan dan mengekspor kembali simbol-simbol dari sub-berkas lain, sehingga pengguna modul hanya perlu mengimpor dari satu pintu masuk utama.
+
+### 1. Re-ekspor Simbol Tertentu (*Named Re-export*)
+```celang
+// Di dalam komponen/modul.ce:
+ekspor { Tombol, Modal } dari "./tombol.ce"
+ekspor { Input as KolomInput } dari "./input.ce"
+
+// Mode universal:
+export { Button, Modal } from "./button.ce"
+```
+
+### 2. Re-ekspor Seluruh Simbol (*Wildcard Re-export*)
+```celang
+// Mengekspor semua simbol publik dari sub-modul:
+ekspor * dari "./utilitas.ce"
+
+// Mode universal:
+export * from "./utils.ce"
+```
+
+> 🛡️ **Penjaga Privasi:** Simbol privat atau bertanda `privat-modul!` pada sub-modul tidak akan bocor keluar melalui *barrel export*, memastikan enkapsulasi tetap terlindungi 100%.
+
+---
+
+## ⚡ Impor Dinamis (*Dynamic Import*)
+
+Selain deklarasi impor statis di awal berkas, Celang menyediakan fungsi bawaan `impor_dinamis(path)` (atau `import_dynamic(path)` pada Mode Universal) untuk memuat modul secara kondisional atau saat runtime:
+
+```celang
+buat konfigurasiPlugin = "modul_tambahan.ce"
+
+// Memuat modul saat runtime:
+buat plugin = impor_dinamis("./plugins/" + konfigurasiPlugin)
+
+// Hasil impor dinamis adalah Map berisi seluruh simbol publik modul:
+buat hasil = plugin.jalankan()
+buat daftarFungsi = plugin.kunci()
+
+// Aman dibungkus dalam blok coba/tangkap:
+coba {
+    buat driver = impor_dinamis("./drivers/" + namaDriver)
+    driver.hubungkan()
+} tangkap (e) {
+    cetak("Gagal memuat driver:", e)
+}
+```
+
 Struktur ini dirancang agar siap menyambut *package manager* ekosistem Celang di masa mendatang!
+

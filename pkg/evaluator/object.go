@@ -201,11 +201,20 @@ func (f *Function) Inspect() string {
 type BuiltinFunction func(args ...Object) Object
 
 type Builtin struct {
-	Fn BuiltinFunction
+	Fn         BuiltinFunction
+	Properties map[string]Object
 }
 
 func (b *Builtin) Type() ObjectType { return BUILTIN_OBJ }
 func (b *Builtin) Inspect() string  { return "fungsi bawaan (builtin)" }
+
+func (b *Builtin) GetProperty(name string) (Object, bool) {
+	if b.Properties == nil {
+		return nil, false
+	}
+	val, ok := b.Properties[name]
+	return val, ok
+}
 
 // Array represents an ordered collection of objects.
 type Array struct {

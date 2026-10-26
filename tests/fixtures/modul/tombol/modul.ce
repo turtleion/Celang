@@ -1,0 +1,3 @@
+publik! fungsi buat_tombol(label) {
+    kembalikan "[ " + label + " ]"
+}

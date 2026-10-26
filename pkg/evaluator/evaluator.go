@@ -714,6 +714,10 @@ func Eval(node uast.Node, env *Environment) Object {
 				return newError(n.GetMetadata(), "Indonesian module 'waktu' is not allowed in Universal Mode.", "Import 'time' instead.")
 			case "sistem":
 				return newError(n.GetMetadata(), "Indonesian module 'sistem' is not allowed in Universal Mode.", "Import 'os' instead.")
+			case "kripto":
+				return newError(n.GetMetadata(), "Indonesian module 'kripto' is not allowed in Universal Mode.", "Import 'crypto' instead.")
+			case "arsip", "kompresi":
+				return newError(n.GetMetadata(), fmt.Sprintf("Indonesian module '%s' is not allowed in Universal Mode.", n.Source), "Import 'archive' or 'compression' instead.")
 			}
 		}
 		targetAbsPath, err := resolveModulePath(env.FilePath, n.Source)
@@ -735,6 +739,11 @@ func Eval(node uast.Node, env *Environment) Object {
 		targetFile := targetEnv.FilePath
 		targetRoot := targetEnv.ModuleRoot
 
+		vis := n.Visibility
+		if vis == nil {
+			vis = &uast.Visibility{Kind: uast.VisibilityPrivate}
+		}
+
 		for _, spec := range n.Specifiers {
 			if spec.IsAll {
 				// Namespace import: ambil * sebagai math dari "..."
@@ -754,13 +763,13 @@ func Eval(node uast.Node, env *Environment) Object {
 						if entry != nil {
 							hint = entry.TypeHint
 						}
-						if _, err := env.Define(name, val, true, hint); err != nil {
+						if _, err := env.DefineWithVisibility(name, val, true, hint, vis); err != nil {
 							return newError(n.GetMetadata(), err.Error(), "")
 						}
 					}
 				} else {
 					obj := &Map{Pairs: mapPairs, Order: mapOrder}
-					if _, err := env.Define(spec.Local, obj, true, "Map"); err != nil {
+					if _, err := env.DefineWithVisibility(spec.Local, obj, true, "Map", vis); err != nil {
 						return newError(n.GetMetadata(), err.Error(), "")
 					}
 				}
@@ -772,7 +781,7 @@ func Eval(node uast.Node, env *Environment) Object {
 				if err := checkVisibilityAccess(callerFile, callerRoot, targetFile, targetRoot, spec.Imported, entry.Visibility); err != nil {
 					return newError(n.GetMetadata(), err.Error(), "Pastikan aturan visibilitas pada file target mengizinkan akses dari file ini.")
 				}
-				if _, err := env.Define(spec.Local, entry.Current(), true, entry.TypeHint); err != nil {
+				if _, err := env.DefineWithVisibility(spec.Local, entry.Current(), true, entry.TypeHint, vis); err != nil {
 					return newError(n.GetMetadata(), err.Error(), "")
 				}
 			}
@@ -1054,6 +1063,8 @@ func Eval(node uast.Node, env *Environment) Object {
 				return newError(n.GetMetadata(), "Indonesian function 'salin' is not allowed in Universal Mode.", "Use 'clone' instead.")
 			case "Saluran", "saluran":
 				return newError(n.GetMetadata(), fmt.Sprintf("Indonesian type '%s' is not allowed in Universal Mode.", n.Name), "Use 'Channel' or 'channel' instead.")
+			case "Bita", "bita":
+				return newError(n.GetMetadata(), fmt.Sprintf("Indonesian type '%s' is not allowed in Universal Mode.", n.Name), "Use 'Bytes' or 'bytes' instead.")
 			case "jemput":
 				return newError(n.GetMetadata(), "Indonesian function 'jemput' is not allowed in Universal Mode.", "Use 'await' instead.")
 			case "jemput_semua":
@@ -1068,6 +1079,12 @@ func Eval(node uast.Node, env *Environment) Object {
 				return newError(n.GetMetadata(), "Indonesian module 'waktu' is not allowed in Universal Mode.", "Use 'time' instead.")
 			case "sistem":
 				return newError(n.GetMetadata(), "Indonesian module 'sistem' is not allowed in Universal Mode.", "Use 'os' instead.")
+			case "kripto":
+				return newError(n.GetMetadata(), "Indonesian module 'kripto' is not allowed in Universal Mode.", "Use 'crypto' instead.")
+			case "arsip", "kompresi":
+				return newError(n.GetMetadata(), fmt.Sprintf("Indonesian module '%s' is not allowed in Universal Mode.", n.Name), "Use 'archive' or 'compression' instead.")
+			case "impor_dinamis", "ambil_dinamis":
+				return newError(n.GetMetadata(), fmt.Sprintf("Indonesian function '%s' is not allowed in Universal Mode.", n.Name), "Use 'import_dynamic' instead.")
 			}
 		}
 		val, ok := env.Get(n.Name)
@@ -1580,7 +1597,7 @@ func applyFunctionWithGenerics(callee Object, args []Object, typeArgs []string, 
 		}
 		return res
 	case *Function:
-		fnEnv := NewEnclosedEnvironment(fn.Env)
+		fnEnv := NewFunctionEnvironment(fn.Env)
 		defer func() {
 			for _, defStmt := range fnEnv.PopAllDefers() {
 				Eval(defStmt, fnEnv)
@@ -1883,7 +1900,7 @@ func castValueToType(val Object, targetType string, meta *uast.NodeMetadata, env
 }
 
 func applyFunctionWithASTArgs(fn *Function, argNodes []uast.Expression, callerEnv *Environment, meta *uast.NodeMetadata, typeArgs []string) Object {
-	fnEnv := NewEnclosedEnvironment(fn.Env)
+	fnEnv := NewFunctionEnvironment(fn.Env)
 	defer func() {
 		for _, defStmt := range fnEnv.PopAllDefers() {
 			Eval(defStmt, fnEnv)
@@ -2249,6 +2266,32 @@ func evalMemberAccess(obj Object, n *uast.MemberExpression, env *Environment) Ob
 		return res
 	}
 
+	// 3e. Builtin static properties / methods access (e.g. bita.dari_base64, bytes.from_hex)
+	if b, ok := obj.(*Builtin); ok {
+		propName := n.Property
+		if n.Computed && n.PropertyExpr != nil {
+			pObj := Eval(n.PropertyExpr, env)
+			if !isError(pObj) {
+				if s, ok := pObj.(*String); ok {
+					propName = s.Value
+				} else {
+					propName = pObj.Inspect()
+				}
+			}
+		}
+		if env.IsUniversal {
+			switch propName {
+			case "dari_base64":
+				return newError(n.GetMetadata(), "Indonesian method 'dari_base64' is not allowed in Universal Mode.", "Use '.from_base64(...)' instead.")
+			case "dari_heks":
+				return newError(n.GetMetadata(), "Indonesian method 'dari_heks' is not allowed in Universal Mode.", "Use '.from_hex(...)' instead.")
+			}
+		}
+		if prop, exists := b.GetProperty(propName); exists {
+			return prop
+		}
+	}
+
 	// 4. Time-Travel Variable access fallback (e.g. x.sebelumnya, x.awal, x.histori, x.previous, x.initial, x.history)
 	if id, ok := n.Object.(*uast.Identifier); ok {
 		entry, exists := env.GetEntry(id.Name)
@@ -2383,11 +2426,8 @@ func evalRangeExpression(rng *uast.RangeExpression, env *Environment) Object {
 		}
 	}
 
-	diff := endVal - startVal
-	if diff < 0 {
-		diff = -diff
-	}
-	if diff > 1_000_000 {
+	if (endVal >= startVal && (endVal-startVal > 1_000_000 || endVal-startVal < 0)) ||
+		(startVal > endVal && (startVal-endVal > 1_000_000 || startVal-endVal < 0)) {
 		msg := "Ukuran rentang terlalu besar (maksimal 1.000.000 elemen)"
 		if env.IsUniversal {
 			msg = "Range size is too large (maximum 1,000,000 elements)"
@@ -2397,12 +2437,14 @@ func evalRangeExpression(rng *uast.RangeExpression, env *Environment) Object {
 
 	var elements []Object
 	if startVal <= endVal {
-		for i := startVal; i <= endVal; i++ {
-			elements = append(elements, &Integer{Value: i})
+		count := endVal - startVal + 1
+		for idx := int64(0); idx < count; idx++ {
+			elements = append(elements, &Integer{Value: startVal + idx})
 		}
 	} else {
-		for i := startVal; i >= endVal; i-- {
-			elements = append(elements, &Integer{Value: i})
+		count := startVal - endVal + 1
+		for idx := int64(0); idx < count; idx++ {
+			elements = append(elements, &Integer{Value: startVal - idx})
 		}
 	}
 	return &Array{Elements: elements}

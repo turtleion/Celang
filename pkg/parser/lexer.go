@@ -75,6 +75,7 @@ var keywords = map[string]TokenType{
 	"sebagai":      AS,
 	"as":           AS,
 	"export":       VIS_PUBLIC,
+	"ekspor":       VIS_PUBLIC,
 	"coba":         TRY,
 	"try":          TRY,
 	"tangkap":      CATCH,

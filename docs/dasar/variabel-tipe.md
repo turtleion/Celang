@@ -81,6 +81,11 @@ cetak(b1.ke_teks()) // "Jalo"
 // 3. Konversi format biner:
 cetak(b1.ke_heks())   // "4a616c6f"
 cetak(b1.ke_base64()) // "SmFsbw=="
+
+// 4. Dekode dari Base64 dan Heksadesimal:
+buat bDariB64 = bita.dari_base64("SmFsbw==")
+buat bDariHex = bita.dari_heks("4a616c6f")
+cetak(bDariB64.ke_teks()) // "Jalo"
 ```
 
 ### E. Kumpulan Data: Daftar (`Array`) & Kamus (`Map`)
@@ -169,6 +174,13 @@ konstanta NAMA_APLIKASI = "TokoKita"
 // PAJAK = 0.15 
 // ❌ Celang akan menolak dengan ramah: nilai konstanta tidak boleh diubah!
 ```
+
+> 💡 **Konsep Immutability: Binding vs Nilai Objek**
+>
+> Perlu dibedakan antara **Binding Immutability** dan **Value Immutability**:
+> * `konstanta` / `tetap` hanya mengunci **label variabel** (*binding*) agar tidak bisa di-assign ulang ke objek lain.
+> * Jika konstanta menampung sebuah Array, pemanggilan metode mutasi internal seperti `daftar.tambah(4)` tetap dapat memodifikasi isi memori array tersebut.
+> * Untuk menciptakan **Immutability Nilai (Bebas Efek Samping)** tanpa `konstanta`, gunakan metode transformasi fungsional seperti `.saring()`, `.petakan()`, atau salin array dengan `.salin()` sebelum memodifikasinya.
 
 ### C. Anotasi Tipe Statis Opsional (Type Hinting)
 

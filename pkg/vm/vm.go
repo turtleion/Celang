@@ -835,6 +835,24 @@ func (vm *VM) evalIndex(targetObj, indexObj evaluator.Object) (evaluator.Object,
 		}
 		return &evaluator.Null{}, nil
 
+	case *evaluator.Builtin:
+		key := indexObj.Inspect()
+		if s, ok := indexObj.(*evaluator.String); ok {
+			key = s.Value
+		}
+		if vm.env != nil && vm.env.IsUniversal {
+			switch key {
+			case "dari_base64":
+				return nil, fmt.Errorf("Indonesian method 'dari_base64' is not allowed in Universal Mode. Use '.from_base64(...)' instead.")
+			case "dari_heks":
+				return nil, fmt.Errorf("Indonesian method 'dari_heks' is not allowed in Universal Mode. Use '.from_hex(...)' instead.")
+			}
+		}
+		if prop, exists := obj.GetProperty(key); exists {
+			return prop, nil
+		}
+		return &evaluator.Null{}, nil
+
 	default:
 		return nil, fmt.Errorf("tipe %s tidak mendukung operasi indeks", targetObj.Type())
 	}

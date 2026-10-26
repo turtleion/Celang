@@ -29,8 +29,16 @@ var StdlibNames = map[string]string{
 	"os":         "sistem",
 	"http":       "http",
 	"jaringan":   "http",
-	"net":        "http",
-	"ffi":        "ffi",
+	"net":         "http",
+	"ffi":         "ffi",
+	"kripto":      "kripto",
+	"crypto":      "kripto",
+	"arsip":       "arsip",
+	"archive":     "arsip",
+	"kompresi":    "arsip",
+	"compression": "arsip",
+	"zip":         "arsip",
+	"tar":         "arsip",
 }
 
 func isStdlibModule(name string) bool {
@@ -87,6 +95,10 @@ func getStdlibModuleEnvironment(canonicalName string) (*Environment, error) {
 		initStdlibHTTP(newEnv)
 	case "ffi":
 		initStdlibFFI(newEnv)
+	case "kripto":
+		initStdlibKripto(newEnv)
+	case "arsip":
+		initStdlibArsip(newEnv)
 	default:
 		return nil, fmt.Errorf("modul standar '%s' belum diimplementasikan", canonicalName)
 	}
@@ -115,9 +127,9 @@ func getStdlibModuleMap(canonicalName string) *Map {
 	return stdlibMaps[canonicalName]
 }
 
-// RegisterStdlibGlobals injects standard library modules as global objects (e.g., berkas, fs, matematika, math, teks, strings, waktu, time, json, sistem, os, http, jaringan, net).
+// RegisterStdlibGlobals injects standard library modules as global objects (e.g., berkas, fs, matematika, math, teks, strings, waktu, time, json, sistem, os, http, jaringan, net, arsip, archive).
 func RegisterStdlibGlobals(env *Environment) {
-	canonicalList := []string{"berkas", "matematika", "teks", "waktu", "json", "sistem", "http", "ffi"}
+	canonicalList := []string{"berkas", "matematika", "teks", "waktu", "json", "sistem", "http", "ffi", "kripto", "arsip"}
 	for _, canon := range canonicalList {
 		modMap := getStdlibModuleMap(canon)
 		// Register canonical Indonesian name
@@ -138,6 +150,14 @@ func RegisterStdlibGlobals(env *Environment) {
 		case "http":
 			env.Define("jaringan", modMap, false, "Map")
 			env.Define("net", modMap, false, "Map")
+		case "kripto":
+			env.Define("crypto", modMap, false, "Map")
+		case "arsip":
+			env.Define("archive", modMap, false, "Map")
+			env.Define("kompresi", modMap, false, "Map")
+			env.Define("compression", modMap, false, "Map")
+			env.Define("zip", modMap, false, "Map")
+			env.Define("tar", modMap, false, "Map")
 		}
 	}
 }

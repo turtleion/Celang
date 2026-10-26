@@ -588,6 +588,7 @@ type ImportDeclaration struct {
 	Metadata   *NodeMetadata     `json:"metadata,omitempty"`
 	Source     string            `json:"source"`
 	Specifiers []ImportSpecifier `json:"specifiers"`
+	Visibility *Visibility       `json:"visibility,omitempty"`
 }
 
 func (i *ImportDeclaration) Type() NodeType          { return NodeTypeImportDeclaration }

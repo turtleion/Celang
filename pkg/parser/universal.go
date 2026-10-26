@@ -76,6 +76,10 @@ var IndonesianToEnglishKeywords = map[string]string{
 	"rujuk":         "ref",
 	"sebagai":       "as",
 	"uji":           "test",
+	"ekspor":        "export",
+	"ambil":         "import",
+	"impor":         "import",
+	"dari":          "from",
 }
 
 // IsIndonesianKeyword checks if a word is an Indonesian-specific keyword and returns its English replacement.

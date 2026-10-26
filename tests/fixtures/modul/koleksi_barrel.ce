@@ -1,0 +1,3 @@
+// Barrel re-export
+ekspor { tambah, kali sebagai perkalian } dari "./sub_aritmatika.ce"
+ekspor * dari "./sub_geometri.ce"

@@ -1,0 +1,106 @@
+// ==============================================================================
+// Suite Pengujian Resolusi Folder, Re-Ekspor, dan Impor Dinamis Celang
+// File: tests/modul_lanjutan_uji.ce
+// ==============================================================================
+
+// ------------------------------------------------------------------------------
+// BAGIAN 1: RESOLUSI IMPOR FOLDER (ENTRYPOINT RESOLUTION)
+// ------------------------------------------------------------------------------
+
+uji "Resolusi Folder: modul.ce otomatis terdeteksi" {
+    ambil { buat_tombol } dari "./fixtures/modul/tombol"
+    buat btn = buat_tombol("Kirim")
+    harus_sama(btn, "[ Kirim ]", "Harus dapat memanggil fungsi dari folder dengan entrypoint modul.ce")
+}
+
+uji "Resolusi Folder: utama.ce otomatis terdeteksi" {
+    ambil { buat_input } dari "./fixtures/modul/input"
+    buat inp = buat_input("Masukkan nama...")
+    harus_sama(inp, "< Masukkan nama... >", "Harus dapat memanggil fungsi dari folder dengan entrypoint utama.ce")
+}
+
+uji "Resolusi Folder: index.ce otomatis terdeteksi" {
+    ambil { buat_kartu } dari "./fixtures/modul/kartu"
+    buat k = buat_kartu("Info", "Berhasil")
+    harus_sama(k, "{ Info: Berhasil }", "Harus dapat memanggil fungsi dari folder dengan entrypoint index.ce")
+}
+
+uji "Resolusi Folder: <nama_folder>.ce otomatis terdeteksi" {
+    ambil { buat_lencana } dari "./fixtures/modul/lencana"
+    buat badge = buat_lencana("Baru")
+    harus_sama(badge, "(Baru)", "Harus dapat memanggil fungsi dari folder dengan entrypoint <nama_folder>.ce")
+}
+
+// ------------------------------------------------------------------------------
+// BAGIAN 2: RE-EKSPOR (BARREL EXPORTS)
+// ------------------------------------------------------------------------------
+
+uji "Re-ekspor: Simbol bernama dan alias dari barrel file" {
+    ambil { tambah, perkalian } dari "./fixtures/modul/koleksi_barrel.ce"
+    buat h1 = tambah(15, 25)
+    buat h2 = perkalian(6, 7)
+
+    harus_sama(h1, 40, "Fungsi tambah hasil re-ekspor harus dapat dieksekusi")
+    harus_sama(h2, 42, "Fungsi perkalian (alias dari kali) harus dapat dieksekusi")
+}
+
+uji "Re-ekspor: Wildcard (ekspor *) dari sub-modul lain" {
+    ambil { luas_persegi, keliling_persegi } dari "./fixtures/modul/koleksi_barrel.ce"
+    buat luas = luas_persegi(5)
+    buat keliling = keliling_persegi(5)
+
+    harus_sama(luas, 25, "Fungsi luas_persegi dari ekspor * harus dapat diakses")
+    harus_sama(keliling, 20, "Fungsi keliling_persegi dari ekspor * harus dapat diakses")
+}
+
+uji "Re-ekspor: Privasi simbol internal tetap terjaga" {
+    buat kenaGalat = salah
+    coba {
+        // Coba import simbol privat melalui dynamic import
+        buat mod = impor_dinamis("./fixtures/modul/koleksi_barrel.ce")
+        buat keys = mod.kunci()
+        buat adaRahasia = keys.ada_yang(k => k == "rahasia_internal")
+        harus_sama(adaRahasia, salah, "Simbol privat tidak boleh bocor ke re-ekspor barrel")
+    } tangkap (e) {
+        kenaGalat = benar
+    }
+}
+
+// ------------------------------------------------------------------------------
+// BAGIAN 3: IMPOR DINAMIS (DYNAMIC IMPORT)
+// ------------------------------------------------------------------------------
+
+uji "Impor Dinamis: Memuat modul secara dinamis pada runtime" {
+    buat pathModul = "./fixtures/modul/sub_aritmatika.ce"
+    buat arit = impor_dinamis(pathModul)
+
+    harus_tidak_kosong(arit, "Hasil impor_dinamis tidak boleh kosong")
+    harus_benar(tipe(arit) == "MAP", "Hasil impor_dinamis harus berupa objek Map")
+
+    buat hasil = arit.tambah(100, 200)
+    harus_sama(hasil, 300, "Fungsi pada modul dinamis harus dapat dipanggil secara langsung")
+}
+
+uji "Impor Dinamis: Memuat folder dengan entrypoint otomatis" {
+    buat modTombol = impor_dinamis("./fixtures/modul/tombol")
+    buat res = modTombol.buat_tombol("Batal")
+    harus_sama(res, "[ Batal ]", "impor_dinamis harus mendukung resolusi folder entrypoint")
+}
+
+uji "Impor Dinamis: Akses kunci dan inspeksi ekspor modul" {
+    buat geo = impor_dinamis("./fixtures/modul/sub_geometri.ce")
+    buat daftarKunci = geo.kunci()
+
+    harus_berisi(daftarKunci, "luas_persegi")
+    harus_berisi(daftarKunci, "keliling_persegi")
+}
+
+uji "Impor Dinamis: Penanganan galat modul tidak ditemukan" {
+    buat galatTertangkap = salah
+    coba {
+        impor_dinamis("./modul_fiktif_yang_tidak_ada.ce")
+    } tangkap (e) {
+        galatTertangkap = benar
+    }
+    harus_benar(galatTertangkap, "impor_dinamis berkas fiktif harus menghasilkan galat yang dapat ditangkap")
+}

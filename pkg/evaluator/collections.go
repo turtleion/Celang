@@ -144,6 +144,18 @@ func EvalArrayMethod(arr *Array, method string, env *Environment, meta *uast.Nod
 			return newError(meta, "Indonesian property 'panjang' is not allowed in Universal Mode.", "Use '.length' or '.len' instead."), true
 		case "ukuran":
 			return newError(meta, "Indonesian method 'ukuran' is not allowed in Universal Mode.", "Use '.size()' instead."), true
+		case "petakan":
+			return newError(meta, "Indonesian method 'petakan' is not allowed in Universal Mode.", "Use '.map(...)' instead."), true
+		case "saring":
+			return newError(meta, "Indonesian method 'saring' is not allowed in Universal Mode.", "Use '.filter(...)' instead."), true
+		case "lipat", "reduksi":
+			return newError(meta, fmt.Sprintf("Indonesian method '%s' is not allowed in Universal Mode.", method), "Use '.reduce(...)' instead."), true
+		case "temukan":
+			return newError(meta, "Indonesian method 'temukan' is not allowed in Universal Mode.", "Use '.find(...)' instead."), true
+		case "ada_yang":
+			return newError(meta, "Indonesian method 'ada_yang' is not allowed in Universal Mode.", "Use '.some(...)' instead."), true
+		case "semuanya":
+			return newError(meta, "Indonesian method 'semuanya' is not allowed in Universal Mode.", "Use '.every(...)' instead."), true
 		}
 	}
 
@@ -441,6 +453,139 @@ func EvalArrayMethod(arr *Array, method string, env *Environment, meta *uast.Nod
 		return &Builtin{
 			Fn: func(args ...Object) Object {
 				return &Integer{Value: int64(len(arr.Elements))}
+			},
+		}, true
+
+	case "petakan", "map":
+		return &Builtin{
+			Fn: func(args ...Object) Object {
+				if len(args) < 1 {
+					return newError(meta, "Metode petakan/map membutuhkan 1 argumen fungsi transformasi", "Contoh: arr.petakan(x => x * 2)")
+				}
+				fn := args[0]
+				newElems := make([]Object, len(arr.Elements))
+				for i, el := range arr.Elements {
+					res := applyFunction(fn, []Object{el, &Integer{Value: int64(i)}}, meta)
+					if isError(res) {
+						return res
+					}
+					newElems[i] = res
+				}
+				return &Array{Elements: newElems}
+			},
+		}, true
+
+	case "saring", "filter":
+		return &Builtin{
+			Fn: func(args ...Object) Object {
+				if len(args) < 1 {
+					return newError(meta, "Metode saring/filter membutuhkan 1 argumen fungsi predikat", "Contoh: arr.saring(x => x > 0)")
+				}
+				fn := args[0]
+				var newElems []Object
+				for i, el := range arr.Elements {
+					res := applyFunction(fn, []Object{el, &Integer{Value: int64(i)}}, meta)
+					if isError(res) {
+						return res
+					}
+					if CoerceToBoolean(res) {
+						newElems = append(newElems, el)
+					}
+				}
+				if newElems == nil {
+					newElems = []Object{}
+				}
+				return &Array{Elements: newElems}
+			},
+		}, true
+
+	case "lipat", "reduksi", "reduce":
+		return &Builtin{
+			Fn: func(args ...Object) Object {
+				if len(args) < 1 {
+					return newError(meta, "Metode reduksi/lipat membutuhkan setidaknya 1 argumen fungsi akumulasi", "Contoh: arr.reduksi((acc, x) => acc + x, 0)")
+				}
+				fn := args[0]
+				if len(arr.Elements) == 0 && len(args) < 2 {
+					return newError(meta, "Tidak dapat melakukan reduksi/lipat pada array kosong tanpa nilai awal", "Sertakan nilai awal: arr.reduksi((acc, x) => ..., nilai_awal)")
+				}
+				var acc Object
+				startIdx := 0
+				if len(args) >= 2 {
+					acc = args[1]
+					startIdx = 0
+				} else {
+					acc = arr.Elements[0]
+					startIdx = 1
+				}
+				for i := startIdx; i < len(arr.Elements); i++ {
+					res := applyFunction(fn, []Object{acc, arr.Elements[i], &Integer{Value: int64(i)}}, meta)
+					if isError(res) {
+						return res
+					}
+					acc = res
+				}
+				return acc
+			},
+		}, true
+
+	case "temukan", "find":
+		return &Builtin{
+			Fn: func(args ...Object) Object {
+				if len(args) < 1 {
+					return newError(meta, "Metode temukan/find membutuhkan 1 argumen fungsi pencarian", "Contoh: arr.temukan(x => x == target)")
+				}
+				fn := args[0]
+				for i, el := range arr.Elements {
+					res := applyFunction(fn, []Object{el, &Integer{Value: int64(i)}}, meta)
+					if isError(res) {
+						return res
+					}
+					if CoerceToBoolean(res) {
+						return el
+					}
+				}
+				return NULL
+			},
+		}, true
+
+	case "ada_yang", "some":
+		return &Builtin{
+			Fn: func(args ...Object) Object {
+				if len(args) < 1 {
+					return newError(meta, "Metode ada_yang/some membutuhkan 1 argumen fungsi predikat", "Contoh: arr.ada_yang(x => x > 10)")
+				}
+				fn := args[0]
+				for i, el := range arr.Elements {
+					res := applyFunction(fn, []Object{el, &Integer{Value: int64(i)}}, meta)
+					if isError(res) {
+						return res
+					}
+					if CoerceToBoolean(res) {
+						return TRUE
+					}
+				}
+				return FALSE
+			},
+		}, true
+
+	case "semuanya", "every":
+		return &Builtin{
+			Fn: func(args ...Object) Object {
+				if len(args) < 1 {
+					return newError(meta, "Metode semuanya/every membutuhkan 1 argumen fungsi predikat", "Contoh: arr.semuanya(x => x > 0)")
+				}
+				fn := args[0]
+				for i, el := range arr.Elements {
+					res := applyFunction(fn, []Object{el, &Integer{Value: int64(i)}}, meta)
+					if isError(res) {
+						return res
+					}
+					if !CoerceToBoolean(res) {
+						return FALSE
+					}
+				}
+				return TRUE
 			},
 		}, true
 	}

@@ -1,0 +1,885 @@
+// ==============================================================================
+// Suite Pengujian Komprehensif Kriptografi Celang (kripto_uji.ce)
+// Sesuai Spesifikasi PROJECT.md & TEST_INFRA.md
+// Meliputi 4 Tier Pengujian:
+//   Tier 1: Feature Coverage (R1 Enkripsi, R2 Hashing/KDF, R3 Ed25519, R4 Dwibahasa)
+//   Tier 2: Boundary & Corner Cases (Tamper Detection, Deteksi Rusak, Payload Ekstrem)
+//   Tier 3: Interaksi Antar-Fitur (Derivasi KDF -> Enkripsi -> TTD -> Verifikasi)
+//   Tier 4: Skenario Dunia Nyata (Package Manager, Brankas Sandi, Rantai Audit)
+// ==============================================================================
+
+// ------------------------------------------------------------------------------
+// TIER 1: FEATURE COVERAGE (HAPPY PATH)
+// ------------------------------------------------------------------------------
+
+// --- R1: Enkripsi Simetris Terotentikasi (AES-256-GCM) ---
+
+uji "Tier 1 - R1: Enkripsi dan dekripsi round-trip teks standar" {
+    buat kunci = kripto.buat_kunci()
+    buat pesanAsli = "Pesan rahasia tingkat tinggi dalam Celang 2026!"
+    buat terenkripsi = kripto.enkripsi(pesanAsli, kunci)
+    buat pulih = kripto.dekripsi(terenkripsi, kunci)
+
+    harus_sama(pulih, pesanAsli, "Dekripsi harus memulihkan teks asli secara utuh")
+}
+
+uji "Tier 1 - R1: Keacakan Nonce AES-GCM (Ciphertext tidak deterministik)" {
+    buat kunci = kripto.buat_kunci()
+    buat pesan = "Data penting yang sama"
+    buat enc1 = kripto.enkripsi(pesan, kunci)
+    buat enc2 = kripto.enkripsi(pesan, kunci)
+
+    harus_beda(enc1, enc2, "Dua enkripsi terhadap data yang sama harus menghasilkan ciphertext berbeda karena nonce acak")
+    harus_sama(kripto.dekripsi(enc1, kunci), pesan)
+    harus_sama(kripto.dekripsi(enc2, kunci), pesan)
+}
+
+uji "Tier 1 - R1: Enkripsi dan dekripsi objek Bita (Binary Data)" {
+    buat kunci = kripto.buat_kunci()
+    buat dataBita = bita([72, 97, 108, 111, 32, 67, 101, 108, 97, 110, 103]) // "Halo Celang"
+    buat terenkripsi = kripto.enkripsi(dataBita, kunci)
+    buat pulih = kripto.dekripsi(terenkripsi, kunci)
+
+    harus_sama(pulih, "Halo Celang", "Dekripsi masukan Bita harus menghasilkan representasi teks yang tepat")
+}
+
+uji "Tier 1 - R1: Karakteristik kunci Base64 dari buat_kunci" {
+    buat k1 = kripto.buat_kunci()
+    buat k2 = kripto.buat_kunci()
+
+    harus_sama(panjang(k1), 44, "Panjang string Base64 kunci 32-byte harus 44 karakter")
+    harus_beda(k1, k2, "Setiap panggilan buat_kunci() harus menghasilkan kunci yang unik")
+}
+
+uji "Tier 1 - R1: Dukungan format kunci heksadesimal 64-karakter" {
+    buat kunciHex = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    buat pesan = "Pengujian kunci heksadesimal"
+    buat enc = kripto.enkripsi(pesan, kunciHex)
+    buat dec = kripto.dekripsi(enc, kunciHex)
+
+    harus_sama(dec, pesan)
+}
+
+uji "Tier 1 - R1: Ekivalensi fungsi bahasa Inggris (crypto.generate_key, encrypt, decrypt)" {
+    buat key = crypto.generate_key()
+    buat secret = "Universal English Encryption Test"
+    buat cipher = crypto.encrypt(secret, key)
+    buat plain = crypto.decrypt(cipher, key)
+
+    harus_sama(plain, secret, "API bahasa Inggris crypto harus memulihkan teks dengan sempurna")
+}
+
+// --- R2: Password Hashing & Key Derivation (PBKDF2-HMAC-SHA256) ---
+
+uji "Tier 1 - R2: Password hashing dan verifikasi round-trip" {
+    buat kataSandi = "KatasandiKuat#2026"
+    buat hash = kripto.hash_sandi(kataSandi)
+    buat terverifikasi = kripto.verifikasi_sandi(kataSandi, hash)
+
+    harus_benar(terverifikasi, "Kata sandi yang benar harus terverifikasi bernilai benar")
+}
+
+uji "Tier 1 - R2: Keacakan salt pada hash_sandi" {
+    buat kataSandi = "SandiRahasia123!"
+    buat hash1 = kripto.hash_sandi(kataSandi)
+    buat hash2 = kripto.hash_sandi(kataSandi)
+
+    harus_beda(hash1, hash2, "Dua pemanggilan hash_sandi berturut-turut harus menghasilkan hash berbeda karena salt acak")
+    harus_benar(kripto.verifikasi_sandi(kataSandi, hash1))
+    harus_benar(kripto.verifikasi_sandi(kataSandi, hash2))
+}
+
+uji "Tier 1 - R2: Verifikasi sandi salah mengembalikan nilai salah" {
+    buat kataSandi = "SandiAsliBenar"
+    buat hash = kripto.hash_sandi(kataSandi)
+    buat terverifikasi = kripto.verifikasi_sandi("SandiKeliruSalah", hash)
+
+    harus_salah(terverifikasi, "Kata sandi keliru harus menghasilkan nilai salah")
+}
+
+uji "Tier 1 - R2: Format hash PHC ($pbkdf2-sha256$i=100000$...)" {
+    buat hash = kripto.hash_sandi("FormatCheck2026")
+    harus_berisi(hash, "$pbkdf2-sha256$i=100000$")
+
+    buat bagian = teks.pisah(hash, "$")
+    harus_sama(panjang(bagian), 5, "Format PHC harus memiliki 5 elemen saat dipisahkan dengan tanda dolar")
+    harus_sama(bagian[1], "pbkdf2-sha256", "Identifikasi algoritma PHC harus pbkdf2-sha256")
+}
+
+uji "Tier 1 - R2: Derivasi kunci biner Bita dengan turunkan_kunci" {
+    buat salt = kripto.acak_bita(16)
+    buat derivedKey = kripto.turunkan_kunci("sandi-induk-celang", salt, 32)
+
+    harus_sama(panjang(derivedKey), 32, "Kunci derivasi default harus berukuran 32 bita")
+}
+
+uji "Tier 1 - R2: Derivasi kunci format heks dan base64" {
+    buat salt = "salt123456789012"
+    buat keyHex = crypto.derive_key("password-master", salt, 32, "heks")
+    buat keyB64 = crypto.derive_key("password-master", salt, 32, "base64")
+
+    harus_sama(panjang(keyHex), 64, "Derived key hex 32-byte harus 64 karakter heksadesimal")
+    harus_sama(panjang(keyB64), 44, "Derived key base64 32-byte harus 44 karakter")
+}
+
+// --- R3: Ed25519 Signatures (Modern Asymmetric) ---
+
+uji "Tier 1 - R3: Pembuatan pasangan kunci Ed25519" {
+    buat pasangan = kripto.buat_pasangan_kunci()
+
+    harus_sama(panjang(pasangan.kunci_publik), 64, "Kunci publik heksadesimal harus 64 karakter (32 bita)")
+    harus_sama(panjang(pasangan.kunci_privat), 64, "Kunci privat heksadesimal (seed) harus 64 karakter (32 bita)")
+    harus_sama(pasangan.kunci_publik, pasangan.public_key, "Alias public_key harus cocok dengan kunci_publik")
+    harus_sama(pasangan.kunci_privat, pasangan.private_key, "Alias private_key harus cocok dengan kunci_privat")
+}
+
+uji "Tier 1 - R3: Tanda tangan dan verifikasi digital round-trip" {
+    buat pasangan = kripto.buat_pasangan_kunci()
+    buat dokumen = "Persetujuan Kontrak Digital Celang v1.0"
+    buat ttd = kripto.tanda_tangan(dokumen, pasangan.kunci_privat)
+
+    harus_sama(panjang(ttd), 128, "Tanda tangan digital Ed25519 harus 128 karakter heksadesimal (64 bita)")
+    buat sah = kripto.verifikasi_tanda_tangan(dokumen, ttd, pasangan.kunci_publik)
+    harus_benar(sah, "Tanda tangan asli harus sah terhadap kunci publik pembuat")
+}
+
+uji "Tier 1 - R3: Vektor uji standar RFC 8032 #1 (Pesan kosong 0-byte)" {
+    buat seed1 = "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60"
+    buat pub1 = "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a"
+    buat expSig1 = "e5564300c360ac729086e2cc806e828a84877f1eb8e5d974d873e065224901555fb8821590a33bacc61e39701cf9b46bd25bf5f0595bbe24655141438e7a100b"
+
+    buat sig1 = kripto.tanda_tangan("", seed1)
+    harus_sama(sig1, expSig1, "Tanda tangan RFC 8032 Vektor 1 harus cocok persis")
+    buat sah1 = kripto.verifikasi_tanda_tangan("", sig1, pub1)
+    harus_benar(sah1)
+}
+
+uji "Tier 1 - R3: Vektor uji standar RFC 8032 #2 (Pesan 1-byte 'r')" {
+    buat seed2 = "4ccd089b28ff96da9db6c346ec114e0f5b8a319f35aba624da8cf6ed4fb8a6fb"
+    buat pub2 = "3d4017c3e843895a92b70aa74d1b7ebc9c982ccf2ec4968cc0cd55f12af4660c"
+    buat expSig2 = "92a009a9f0d4cab8720e820b5f642540a2b27b5416503f8fb3762223ebdb69da085ac1e43e15996e458f3613d0f11d8c387b2eaeb4302aeeb00d291612bb0c00"
+
+    buat sig2 = kripto.tanda_tangan("r", seed2)
+    harus_sama(sig2, expSig2, "Tanda tangan RFC 8032 Vektor 2 harus cocok persis")
+    buat sah2 = kripto.verifikasi_tanda_tangan("r", sig2, pub2)
+    harus_benar(sah2)
+}
+
+uji "Tier 1 - R3: Vektor uji standar RFC 8032 #3 (Pesan bita 2-byte)" {
+    buat seed3 = "c5aa8df43f9f837bedb7442f31dcb7b166d38535076f094b85ce3a2e0b4458f7"
+    buat pub3 = "fc51cd8e6218a1a38da47ed00230f0580816ed13ba3303ac5deb911548908025"
+    buat data3 = bita([175, 130]) // 0xaf, 0x82
+    buat expSig3 = "6291d657deec24024827e69c3abe01a30ce548a284743a445e3680d7db5ac3ac18ff9b538d16f290ae67f760984dc6594a7c15e9716ed28dc027beceea1ec40a"
+
+    buat sig3 = kripto.tanda_tangan(data3, seed3)
+    harus_sama(sig3, expSig3, "Tanda tangan RFC 8032 Vektor 3 harus cocok persis")
+    buat sah3 = kripto.verifikasi_tanda_tangan(data3, sig3, pub3)
+    harus_benar(sah3)
+}
+
+uji "Tier 1 - R3: Seluruh alias tanda tangan dan verifikasi digital" {
+    buat pasangan = kripto.buat_pasangan_kunci()
+    buat pesan = "Pengujian Seluruh Alias Ed25519"
+    buat ttd = crypto.sign(pesan, pasangan.private_key)
+
+    harus_benar(kripto.verifikasi_ttd(pesan, ttd, pasangan.kunci_publik))
+    harus_benar(crypto.verify(pesan, ttd, pasangan.public_key))
+    harus_benar(crypto.verify_signature(pesan, ttd, pasangan.public_key))
+}
+
+// --- R4: Bilingual & Universal Mode ---
+
+uji "Tier 1 - R4: Kelengkapan fungsi modul kripto (Bahasa Indonesia)" {
+    buat k = kripto.buat_kunci()
+    buat enc = kripto.enkripsi("tes", k)
+    buat dec = kripto.dekripsi(enc, k)
+    harus_sama(dec, "tes")
+
+    buat hSandi = kripto.hash_sandi("sandi")
+    harus_benar(kripto.verifikasi_sandi("sandi", hSandi))
+
+    buat hSha256 = kripto.sha256("celang")
+    harus_sama(panjang(hSha256), 64)
+
+    buat hSha512 = kripto.sha512("celang")
+    harus_sama(panjang(hSha512), 128)
+
+    buat hHmac = kripto.hmac_sha256("kunci", "data")
+    harus_sama(panjang(hHmac), 64)
+
+    buat hexRnd = kripto.acak_heks(8)
+    harus_sama(panjang(hexRnd), 16)
+
+    buat bitaRnd = kripto.acak_bita(8)
+    harus_sama(panjang(bitaRnd), 8)
+
+    buat id = kripto.uuid()
+    harus_sama(panjang(id), 36)
+}
+
+uji "Tier 1 - R4: Kelengkapan fungsi modul crypto (Bahasa Inggris)" {
+    buat k = crypto.generate_key()
+    buat enc = crypto.encrypt("test", k)
+    buat dec = crypto.decrypt(enc, k)
+    harus_sama(dec, "test")
+
+    buat hPw = crypto.hash_password("mypassword")
+    harus_benar(crypto.verify_password("mypassword", hPw))
+
+    buat pair = crypto.generate_keypair()
+    buat sig = crypto.sign("payload", pair.private_key)
+    harus_benar(crypto.verify("payload", sig, pair.public_key))
+}
+
+uji "Tier 1 - R4: Perbandingan waktu-konstan dwibahasa (Anti Timing Attack)" {
+    buat t1 = "rahasia123"
+    buat t2 = "rahasia123"
+    buat t3 = "rahasia999"
+
+    harus_benar(kripto.konstanta_sama(t1, t2))
+    harus_salah(kripto.konstanta_sama(t1, t3))
+    harus_benar(kripto.banding_aman(bita(t1), bita(t2)))
+    harus_salah(kripto.banding_aman(bita(t1), bita(t3)))
+
+    harus_benar(crypto.timing_safe_equal(t1, t2))
+    harus_salah(crypto.timing_safe_equal(t1, t3))
+    harus_benar(crypto.constant_time_compare(bita(t1), bita(t2)))
+}
+
+uji "Tier 1 - R4: NIST Hash Vectors untuk SHA-256 dan SHA-512" {
+    buat sha256Kosong = kripto.sha256("")
+    harus_sama(sha256Kosong, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")
+
+    buat sha512Kosong = crypto.sha512("")
+    harus_sama(sha512Kosong, "cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e")
+}
+
+uji "Tier 1 - R4: RFC 4122 UUID v4 Generation" {
+    buat id1 = kripto.uuid()
+    buat id2 = crypto.uuid()
+
+    harus_sama(panjang(id1), 36)
+    harus_sama(panjang(id2), 36)
+    harus_beda(id1, id2, "Dua UUID yang dihasilkan berturut-turut harus berbeda")
+    harus_sama(id1[14], "4", "UUID v4 harus memiliki digit versi 4 pada posisi indeks 14")
+}
+
+// ------------------------------------------------------------------------------
+// TIER 2: BOUNDARY & CORNER CASES (TAMPER DETECTION & ERROR PATHS)
+// ------------------------------------------------------------------------------
+
+// --- R1 Boundary Cases ---
+
+uji "Tier 2 - R1: Enkripsi dan dekripsi teks kosong (\"\")" {
+    buat kunci = kripto.buat_kunci()
+    buat terenkripsi = kripto.enkripsi("", kunci)
+
+    // Ciphertext harus memuat minimal 12 bita nonce + 16 bita auth tag = 28 bita -> min 38 char Base64
+    harus_benar(panjang(terenkripsi) >= 38)
+    buat hasil = kripto.dekripsi(terenkripsi, kunci)
+    harus_sama(hasil, "", "Dekripsi ciphertext dari string kosong harus menghasilkan string kosong")
+}
+
+uji "Tier 2 - R1: Enkripsi dan dekripsi payload data besar (10 KB)" {
+    buat kunci = kripto.buat_kunci()
+    buat dataBesar = teks.ulangi("CelangAmanTerotentikasiDanCepat-2026!", 300)
+    buat terenkripsi = kripto.enkripsi(dataBesar, kunci)
+    buat hasil = kripto.dekripsi(terenkripsi, kunci)
+
+    harus_sama(hasil, dataBesar, "Payload besar harus pulih identik")
+}
+
+uji "Tier 2 - R1: Tamper detection - Kunci dekripsi salah" {
+    buat kunciA = kripto.buat_kunci()
+    buat kunciB = kripto.buat_kunci()
+    buat terenkripsi = kripto.enkripsi("Pesan Rahasia Bank", kunciA)
+
+    buat errKunciSalah = ""
+    coba {
+        kripto.dekripsi(terenkripsi, kunciB)
+    } tangkap (e) {
+        errKunciSalah = e
+    }
+
+    harus_beda(errKunciSalah, "")
+    harus_berisi(errKunciSalah, "dekripsi gagal")
+}
+
+uji "Tier 2 - R1: Tamper detection - Modifikasi 1 karakter ciphertext" {
+    buat kunci = kripto.buat_kunci()
+    buat terenkripsi = kripto.enkripsi("Data Pembayaran $10,000", kunci)
+
+    buat pengganti = "Z"
+    jika terenkripsi[10] == "Z" {
+        pengganti = "Y"
+    }
+    buat terenkripsiRusak = teks.ganti(terenkripsi, terenkripsi[10], pengganti)
+
+    buat errTamper = ""
+    coba {
+        kripto.dekripsi(terenkripsiRusak, kunci)
+    } tangkap (e) {
+        errTamper = e
+    }
+
+    harus_beda(errTamper, "")
+    harus_berisi(errTamper, "dekripsi gagal")
+}
+
+uji "Tier 2 - R1: Penolakan ciphertext terlalu pendek (< 28 bita payload)" {
+    buat kunci = kripto.buat_kunci()
+    buat errPendek = ""
+    coba {
+        kripto.dekripsi("dGVz", kunci) // "tes" Base64 (3 bita)
+    } tangkap (e) {
+        errPendek = e
+    }
+
+    harus_beda(errPendek, "")
+    harus_berisi(errPendek, "format data tersandi tidak valid")
+}
+
+uji "Tier 2 - R1: Penolakan ciphertext bukan Base64" {
+    buat kunci = kripto.buat_kunci()
+    buat errBukanB64 = ""
+    coba {
+        kripto.dekripsi("!@#$%^&*()_+BukanBase64", kunci)
+    } tangkap (e) {
+        errBukanB64 = e
+    }
+
+    harus_beda(errBukanB64, "")
+    harus_berisi(errBukanB64, "format ciphertext tidak valid")
+}
+
+uji "Tier 2 - R1: Penolakan kunci dengan panjang tidak valid" {
+    buat errKunciPendek = ""
+    coba {
+        kripto.enkripsi("data rahasia", "kunci-terlalu-pendek")
+    } tangkap (e) {
+        errKunciPendek = e
+    }
+
+    harus_beda(errKunciPendek, "")
+    harus_berisi(errKunciPendek, "format atau panjang kunci tidak valid")
+}
+
+// --- R2 Boundary Cases ---
+
+uji "Tier 2 - R2: Penolakan kata sandi kosong pada hash_sandi" {
+    buat errKosong = ""
+    coba {
+        kripto.hash_sandi("")
+    } tangkap (e) {
+        errKosong = e
+    }
+
+    harus_beda(errKosong, "")
+    harus_berisi(errKosong, "kata sandi tidak boleh kosong")
+}
+
+uji "Tier 2 - R2: Penolakan kata sandi kosong pada turunkan_kunci" {
+    buat salt = "salt123456789012"
+    buat errSandiKosong = ""
+    coba {
+        kripto.turunkan_kunci("", salt, 32)
+    } tangkap (e) {
+        errSandiKosong = e
+    }
+
+    harus_beda(errSandiKosong, "")
+    harus_berisi(errSandiKosong, "kata sandi tidak boleh kosong")
+}
+
+uji "Tier 2 - R2: Penolakan salt kosong pada turunkan_kunci" {
+    buat errSaltKosong = ""
+    coba {
+        kripto.turunkan_kunci("password-valid", "", 32)
+    } tangkap (e) {
+        errSaltKosong = e
+    }
+
+    harus_beda(errSaltKosong, "")
+    harus_berisi(errSaltKosong, "salt tidak boleh kosong")
+}
+
+uji "Tier 2 - R2: Penolakan panjang kunci non-positif pada turunkan_kunci" {
+    buat salt = "salt123456789012"
+    buat errPanjangNol = ""
+    coba {
+        kripto.turunkan_kunci("password-valid", salt, 0)
+    } tangkap (e) {
+        errPanjangNol = e
+    }
+
+    harus_beda(errPanjangNol, "")
+    harus_berisi(errPanjangNol, "harus lebih besar dari 0")
+}
+
+uji "Tier 2 - R2: Penolakan format keluaran tidak dikenal pada turunkan_kunci" {
+    buat salt = "salt123456789012"
+    buat errFormat = ""
+    coba {
+        kripto.turunkan_kunci("password-valid", salt, 32, "xml_format")
+    } tangkap (e) {
+        errFormat = e
+    }
+
+    harus_beda(errFormat, "")
+    harus_berisi(errFormat, "tidak dikenal")
+}
+
+uji "Tier 2 - R2: Penanganan string hash tampered / rusak pada verifikasi_sandi" {
+    buat sandi = "SandiAsli#123"
+    buat hashValid = kripto.hash_sandi(sandi)
+
+    // Modifikasi karakter pada hash
+    harus_salah(kripto.verifikasi_sandi(sandi, hashValid + "x"))
+    harus_salah(kripto.verifikasi_sandi(sandi, hashValid + "=="))
+    harus_salah(kripto.verifikasi_sandi(sandi, "bukan-string-hash-pbkdf2"))
+    harus_salah(kripto.verifikasi_sandi(sandi, "$argon2id$i=1000$salt$hash"))
+    harus_salah(kripto.verifikasi_sandi(sandi, "$pbkdf2-sha256$i=abc$salt$hash"))
+}
+
+uji "Tier 2 - R2: Penanganan panjang digest terpotong atau diperpanjang pada verifikasi_sandi" {
+    buat sandi = "SandiUjiPanjang"
+    // Digest 1 bita (AQ)
+    harus_salah(kripto.verifikasi_sandi(sandi, "$pbkdf2-sha256$i=100000$c2FsdHNhbHRzYWx0c2E$AQ"))
+    // Digest 16 bita
+    harus_salah(kripto.verifikasi_sandi(sandi, "$pbkdf2-sha256$i=100000$c2FsdHNhbHRzYWx0c2E$AQIDBAUGBwgJCgsMDQ4PEA"))
+    // Digest 33 bita
+    harus_salah(kripto.verifikasi_sandi(sandi, "$pbkdf2-sha256$i=100000$c2FsdHNhbHRzYWx0c2E$AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyEh"))
+}
+
+// --- R3 Boundary Cases ---
+
+uji "Tier 2 - R3: Verifikasi tanda tangan terhadap pesan yang dimodifikasi" {
+    buat pasangan = kripto.buat_pasangan_kunci()
+    buat pesanAsli = "Transfer Rp 50.000.000 ke Rekening A"
+    buat ttd = kripto.tanda_tangan(pesanAsli, pasangan.kunci_privat)
+
+    buat pesanDimanipulasi = "Transfer Rp 50.000.000 ke Rekening B"
+    buat sah = kripto.verifikasi_tanda_tangan(pesanDimanipulasi, ttd, pasangan.kunci_publik)
+
+    harus_salah(sah, "Tanda tangan harus ditolak jika pesan mengalami modifikasi sekecil apapun")
+}
+
+uji "Tier 2 - R3: Verifikasi tanda tangan dengan kunci publik keliru" {
+    buat pasanganA = kripto.buat_pasangan_kunci()
+    buat pasanganB = kripto.buat_pasangan_kunci()
+    buat pesan = "Otorisasi Akses Root"
+    buat ttdA = kripto.tanda_tangan(pesan, pasanganA.kunci_privat)
+
+    buat sahDenganKunciB = kripto.verifikasi_tanda_tangan(pesan, ttdA, pasanganB.kunci_publik)
+    harus_salah(sahDenganKunciB, "Tanda tangan harus ditolak jika diverifikasi dengan kunci publik yang berbeda")
+    harus_salah(kripto.verifikasi_tanda_tangan(pesan, ttdA, teks.ulangi("z", 64)), "Kunci publik non-heks harus ditolak")
+    harus_salah(kripto.verifikasi_tanda_tangan(pesan, ttdA, ""), "Kunci publik kosong harus ditolak")
+    harus_salah(kripto.verifikasi_tanda_tangan(pesan, ttdA, teks.ulangi("0", 63)), "Kunci publik panjang ganjil harus ditolak")
+}
+
+uji "Tier 2 - R3: Verifikasi tanda tangan dengan signature yang dirusak" {
+    buat pasangan = kripto.buat_pasangan_kunci()
+    buat pesan = "Dokumen Sah"
+    buat ttd = kripto.tanda_tangan(pesan, pasangan.kunci_privat)
+
+    buat pengganti = "0"
+    jika ttd[0] == "0" {
+        pengganti = "1"
+    }
+    buat ttdRusak = teks.ganti(ttd, ttd[0], pengganti)
+
+    harus_salah(kripto.verifikasi_tanda_tangan(pesan, ttdRusak, pasangan.kunci_publik))
+    harus_salah(kripto.verifikasi_tanda_tangan(pesan, ttd + "0", pasangan.kunci_publik))
+    harus_salah(kripto.verifikasi_tanda_tangan(pesan, "", pasangan.kunci_publik))
+    harus_salah(kripto.verifikasi_tanda_tangan(pesan, teks.ulangi("z", 128), pasangan.kunci_publik))
+}
+
+uji "Tier 2 - R3: Penolakan kunci privat rusak (non-heks 64 'z')" {
+    buat errKunci64z = ""
+    coba {
+        kripto.tanda_tangan("pesan", teks.ulangi("z", 64))
+    } tangkap (e) {
+        errKunci64z = e
+    }
+
+    harus_beda(errKunci64z, "")
+    harus_berisi(errKunci64z, "kunci privat")
+}
+
+uji "Tier 2 - R3: Penolakan kunci privat heksadesimal 64-karakter dengan salah ketik" {
+    buat keyTypo = "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f6z"
+    buat errTypo = ""
+    coba {
+        kripto.tanda_tangan("pesan", keyTypo)
+    } tangkap (e) {
+        errTypo = e
+    }
+
+    harus_beda(errTypo, "")
+    harus_berisi(errTypo, "kunci privat")
+}
+
+uji "Tier 2 - R3: Penolakan kunci privat expanded 128-karakter yang tidak konsisten" {
+    buat seedHex = "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60"
+    buat fakePubHex = teks.ulangi("0", 64)
+    buat inconsistentKey = seedHex + fakePubHex
+
+    buat errInkonsisten = ""
+    coba {
+        kripto.tanda_tangan("pesan", inconsistentKey)
+    } tangkap (e) {
+        errInkonsisten = e
+    }
+
+    harus_beda(errInkonsisten, "")
+    harus_berisi(errInkonsisten, "tidak konsisten antara seed dan public key")
+}
+
+// --- R4 Boundary Cases ---
+
+uji "Tier 2 - R4: Interoperabilitas enkripsi Indonesia dan dekripsi Inggris" {
+    buat k = kripto.buat_kunci()
+    buat pesan = "Pesan Lintas Bahasa Celang"
+    buat cipher = kripto.enkripsi(pesan, k)
+    buat plain = crypto.decrypt(cipher, k)
+
+    harus_sama(plain, pesan)
+}
+
+uji "Tier 2 - R4: Interoperabilitas tanda tangan Indonesia dan verifikasi Inggris" {
+    buat pasangan = kripto.buat_pasangan_kunci()
+    buat pesan = "Kontrak Lintas Bahasa"
+    buat sig = kripto.tanda_tangan(pesan, pasangan.kunci_privat)
+    buat sah = crypto.verify(pesan, sig, pasangan.public_key)
+
+    harus_benar(sah)
+}
+
+uji "Tier 2 - R4: Interoperabilitas hash_sandi Indonesia dan verify_password Inggris" {
+    buat sandi = "SandiBilingual#2026"
+    buat hash = kripto.hash_sandi(sandi)
+    buat terverifikasi = crypto.verify_password(sandi, hash)
+
+    harus_benar(terverifikasi)
+}
+
+uji "Tier 2 - R4: Akses properti pasangan kunci dwibahasa" {
+    buat pasangan = kripto.buat_pasangan_kunci()
+    harus_sama(pasangan["kunci_publik"], pasangan["public_key"])
+    harus_sama(pasangan["kunci_privat"], pasangan["private_key"])
+}
+
+uji "Tier 2 - R4: Pesan galat empati pada tipe argumen tidak valid" {
+    buat errTipe = ""
+    coba {
+        kripto.enkripsi("teks", 12345)
+    } tangkap (e) {
+        errTipe = e
+    }
+
+    harus_beda(errTipe, "")
+    harus_berisi(errTipe, "argumen kunci harus berupa teks atau Bita")
+}
+
+// ------------------------------------------------------------------------------
+// TIER 3: CROSS-FEATURE INTERACTIONS
+// ------------------------------------------------------------------------------
+
+uji "Tier 3 - Alur 1: Derivasi KDF -> Enkripsi AES-GCM -> Dekripsi" {
+    buat sandiInduk = "KataKunciKeluargaRahasia2026!"
+    buat salt = kripto.acak_bita(16)
+    buat kunciTurunan = kripto.turunkan_kunci(sandiInduk, salt, 32) // Hasil Bita 32-byte
+
+    buat catatanRahasia = "Nomor Rekening Rahasia: 123-456-7890"
+    buat terenkripsi = kripto.enkripsi(catatanRahasia, kunciTurunan)
+    buat pulih = kripto.dekripsi(terenkripsi, kunciTurunan)
+
+    harus_sama(pulih, catatanRahasia, "Dekripsi dengan kunci hasil PBKDF2 harus berhasil memulihkan data asli")
+}
+
+uji "Tier 3 - Alur 2: Interoperabilitas format derived key (Hex vs Bita)" {
+    buat sandi = "PassphraseMultiFormat"
+    buat salt = "saltUnik12345678"
+    buat keyBita = kripto.turunkan_kunci(sandi, salt, 32, "bita")
+    buat keyHex = crypto.derive_key(sandi, salt, 32, "heks")
+
+    buat pesan = "Data Rahasia Antar Format Kunci"
+    // Enkripsi dengan Bita, dekripsi dengan Hex
+    buat enc1 = kripto.enkripsi(pesan, keyBita)
+    buat dec1 = kripto.dekripsi(enc1, keyHex)
+    harus_sama(dec1, pesan)
+
+    // Enkripsi dengan Hex, dekripsi dengan Bita
+    buat enc2 = kripto.enkripsi(pesan, keyHex)
+    buat dec2 = kripto.dekripsi(enc2, keyBita)
+    harus_sama(dec2, pesan)
+}
+
+uji "Tier 3 - Alur 3: Enkripsi data -> Tanda tangan ciphertext -> Verifikasi TTD -> Dekripsi" {
+    buat kunciSimetris = kripto.buat_kunci()
+    buat pasanganEd = kripto.buat_pasangan_kunci()
+    buat payloadAsli = "Data Intelijen Sensitif"
+
+    // 1. Enkripsi muatan
+    buat terenkripsi = kripto.enkripsi(payloadAsli, kunciSimetris)
+
+    // 2. Tanda tangani ciphertext dengan Ed25519
+    buat ttdCipher = kripto.tanda_tangan(terenkripsi, pasanganEd.kunci_privat)
+
+    // 3. Penerima memvalidasi tanda tangan ciphertext sebelum dekripsi
+    buat ttdSah = kripto.verifikasi_tanda_tangan(terenkripsi, ttdCipher, pasanganEd.kunci_publik)
+    harus_benar(ttdSah, "Tanda tangan ciphertext harus valid")
+
+    // 4. Dekripsi muatan setelah tanda tangan terverifikasi
+    buat hasilDekripsi = kripto.dekripsi(terenkripsi, kunciSimetris)
+    harus_sama(hasilDekripsi, payloadAsli)
+}
+
+uji "Tier 3 - Alur 4: Amplop Kriptografis Aman Terpadu (Authenticated & Signed Envelope)" {
+    buat kunciEnkripsi = kripto.buat_kunci()
+    buat pasanganPengirim = kripto.buat_pasangan_kunci()
+
+    buat pesanPenting = "Instruksi Transfer: $500,000 ke Kas Utama"
+    buat ciphertext = kripto.enkripsi(pesanPenting, kunciEnkripsi)
+    buat signature = kripto.tanda_tangan(ciphertext, pasanganPengirim.kunci_privat)
+
+    // Simulasi serangan man-in-the-middle: memodifikasi ciphertext
+    buat pengganti = "A"
+    jika ciphertext[12] == "A" {
+        pengganti = "B"
+    }
+    buat ciphertextPalsu = teks.ganti(ciphertext, ciphertext[12], pengganti)
+
+    // Verifikasi tanda tangan pada ciphertext palsu harus gagal
+    buat sigPalsuSah = kripto.verifikasi_tanda_tangan(ciphertextPalsu, signature, pasanganPengirim.kunci_publik)
+    harus_salah(sigPalsuSah, "Tanda tangan harus mendeteksi manipulasi transit pada ciphertext")
+
+    // Jika penerima tetap mencoba mendekripsi ciphertext palsu, AES-GCM harus menolaknya
+    buat errAuth = ""
+    coba {
+        kripto.dekripsi(ciphertextPalsu, kunciEnkripsi)
+    } tangkap (e) {
+        errAuth = e
+    }
+    harus_berisi(errAuth, "dekripsi gagal")
+}
+
+uji "Tier 3 - Alur 5: Rotasi Kunci Kriptografis (Cryptographic Key Rotation)" {
+    buat sandiPengguna = "SandiPenggunaTetap2026"
+    buat saltLama = "saltGenerasi0001"
+    buat saltBaru = "saltGenerasi0002"
+
+    buat kunciLama = kripto.turunkan_kunci(sandiPengguna, saltLama, 32)
+    buat kunciBaru = kripto.turunkan_kunci(sandiPengguna, saltBaru, 32)
+
+    buat arsipSensitif = "Data Riwayat Medis Pasien No 88921"
+    buat terenkripsiLama = kripto.enkripsi(arsipSensitif, kunciLama)
+
+    // Migrasi: Dekripsi dengan kunci lama, enkripsi ulang dengan kunci baru
+    buat dataPulih = kripto.dekripsi(terenkripsiLama, kunciLama)
+    buat terenkripsiBaru = kripto.enkripsi(dataPulih, kunciBaru)
+
+    // Kunci lama tidak boleh bisa mendekripsi data baru
+    buat errKunciLama = ""
+    coba {
+        kripto.dekripsi(terenkripsiBaru, kunciLama)
+    } tangkap (e) {
+        errKunciLama = e
+    }
+    harus_berisi(errKunciLama, "dekripsi gagal")
+
+    // Kunci baru berhasil mendekripsi data baru
+    buat dataFinal = kripto.dekripsi(terenkripsiBaru, kunciBaru)
+    harus_sama(dataFinal, arsipSensitif)
+}
+
+// ------------------------------------------------------------------------------
+// TIER 4: REAL-WORLD SCENARIOS
+// ------------------------------------------------------------------------------
+
+uji "Tier 4 - Skenario 1: Verifikasi Integritas & Tanda Tangan Manifest Package Manager" {
+    // Skenario: Developer Celang mempublikasikan paket 'kalkulator-cepat'
+    buat pasanganPengembang = kripto.buat_pasangan_kunci()
+
+    buat namaPaket = "kalkulator-cepat"
+    buat versiPaket = "2.1.0"
+    buat hashArsip = kripto.sha256("konten-arsip-paket-zip-12345")
+    buat manifest = namaPaket + "@" + versiPaket + ":" + hashArsip
+
+    // Pengembang menandatangani manifest paket
+    buat tandaTanganPaket = kripto.tanda_tangan(manifest, pasanganPengembang.kunci_privat)
+
+    // Klien package manager memvalidasi tanda tangan pengembang
+    buat valid = kripto.verifikasi_tanda_tangan(manifest, tandaTanganPaket, pasanganPengembang.kunci_publik)
+    harus_benar(valid, "Package manager harus menerima paket yang bertanda tangan sah")
+
+    // Skenario serangan pembajakan versi (tampering)
+    buat manifestDibajak = namaPaket + "@2.1.1:" + hashArsip
+    buat validDibajak = kripto.verifikasi_tanda_tangan(manifestDibajak, tandaTanganPaket, pasanganPengembang.kunci_publik)
+    harus_salah(validDibajak, "Package manager harus menolak paket yang manifest-nya dimanipulasi")
+}
+
+uji "Tier 4 - Skenario 2: Brankas Autentikasi Pengguna & Reset Sandi Aman" {
+    // 1. Pendaftaran pengguna: kata sandi di-hash dengan salt acak aman
+    buat sandiAwal = "PasswordSuperAman!2026"
+    buat hashBrankas = kripto.hash_sandi(sandiAwal)
+
+    // 2. Login berhasil
+    harus_benar(kripto.verifikasi_sandi(sandiAwal, hashBrankas))
+
+    // 3. Login gagal dengan sandi salah
+    harus_salah(kripto.verifikasi_sandi("PasswordSalahTebak", hashBrankas))
+
+    // 4. Reset sandi: menghasilkan hash baru dengan salt baru
+    buat sandiBaru = "PasswordBaruLebihAman#2026"
+    buat hashBaru = kripto.hash_sandi(sandiBaru)
+    harus_beda(hashBrankas, hashBaru)
+
+    harus_salah(kripto.verifikasi_sandi(sandiAwal, hashBaru), "Sandi lama harus ditolak pada hash baru")
+    harus_benar(kripto.verifikasi_sandi(sandiBaru, hashBaru), "Sandi baru harus diterima pada hash baru")
+
+    // 5. Pembuatan token sesi & verifikasi anti-timing attack
+    buat tokenSesi = kripto.uuid()
+    buat tokenInput = tokenSesi
+    harus_benar(kripto.konstanta_sama(tokenInput, tokenSesi))
+    harus_salah(kripto.konstanta_sama(kripto.uuid(), tokenSesi))
+}
+
+uji "Tier 4 - Skenario 3: Brankas Penyimpanan Kredensial Database Terenkripsi" {
+    // Master key diturunkan dari master password
+    buat masterPass = "CelangMasterKeyPassphrase#2026"
+    buat saltVault = "vault-salt-db-credential"
+    buat keyVault = kripto.turunkan_kunci(masterPass, saltVault, 32)
+
+    // Konfigurasi database sensitif dalam bentuk JSON
+    buat configData = {
+        "host": "database.internal.celang.id",
+        "port": 5432,
+        "pengguna": "celang_admin",
+        "sandi": "S4ng4tR4h4s14!",
+        "database": "produksi_db"
+    }
+    buat configTeks = json.format(configData)
+
+    // Enkripsi konfigurasi ke dalam brankas
+    buat vaultTerenkripsi = kripto.enkripsi(configTeks, keyVault)
+
+    // Dekripsi brankas saat aplikasi booting
+    buat configPulihTeks = kripto.dekripsi(vaultTerenkripsi, keyVault)
+    buat configPulih = json.uraikan(configPulihTeks)
+
+    harus_sama(configPulih["host"], "database.internal.celang.id")
+    harus_sama(configPulih["pengguna"], "celang_admin")
+    harus_sama(configPulih["sandi"], "S4ng4tR4h4s14!")
+
+    // Simulasi kerusakan data brankas di penyimpanan
+    buat pengganti = "x"
+    jika vaultTerenkripsi[8] == "x" {
+        pengganti = "y"
+    }
+    buat vaultRusak = teks.ganti(vaultTerenkripsi, vaultTerenkripsi[8], pengganti)
+
+    buat errVault = ""
+    coba {
+        kripto.dekripsi(vaultRusak, keyVault)
+    } tangkap (e) {
+        errVault = e
+    }
+    harus_berisi(errVault, "dekripsi gagal")
+}
+
+uji "Tier 4 - Skenario 4: Rantai Audit Kriptografis Anti-Pemalsuan (Tamper-Evident Audit Trail)" {
+    buat otoritasAudit = kripto.buat_pasangan_kunci()
+
+    // Blok 0 (Genesis)
+    buat entri0 = "GENESIS:Inisialisasi sistem log audit"
+    buat hash0 = kripto.sha256(entri0)
+
+    // Blok 1 (Transaksi 1)
+    buat entri1 = hash0 + "->TX_1001:Transfer Rp 10.000.000 dari Akun A ke B"
+    buat hash1 = kripto.sha256(entri1)
+
+    // Blok 2 (Transaksi 2)
+    buat entri2 = hash1 + "->TX_1002:Perubahan hak akses user ID 42"
+    buat hash2 = kripto.sha256(entri2)
+
+    // Kepala rantai (head) ditandatangani oleh otoritas audit
+    buat ttdKepala = kripto.tanda_tangan(hash2, otoritasAudit.kunci_privat)
+
+    // Verifikasi integritas rantai audit
+    buat ttdSah = kripto.verifikasi_tanda_tangan(hash2, ttdKepala, otoritasAudit.kunci_publik)
+    harus_benar(ttdSah, "Kepala rantai audit harus sah")
+
+    // Serangan pemalsuan riwayat masa lalu (modifikasi entri0)
+    buat entri0Palsu = "GENESIS:Inisialisasi sistem log (dipalsukan)"
+    buat hash0Palsu = kripto.sha256(entri0Palsu)
+    buat entri1Recalc = hash0Palsu + "->TX_1001:Transfer Rp 10.000.000 dari Akun A ke B"
+    buat hash1Recalc = kripto.sha256(entri1Recalc)
+    buat entri2Recalc = hash1Recalc + "->TX_1002:Perubahan hak akses user ID 42"
+    buat hash2Recalc = kripto.sha256(entri2Recalc)
+
+    // Rantai audit yang dihitung ulang dengan entri palsu menghasilkan hash berbeda dari tanda tangan otoritas
+    harus_beda(hash2Recalc, hash2)
+    buat sahPalsu = kripto.verifikasi_tanda_tangan(hash2Recalc, ttdKepala, otoritasAudit.kunci_publik)
+    harus_salah(sahPalsu, "Pemalsuan entri riwayat manapun harus membatalkan keabsahan rantai audit")
+}
+
+uji "Tier 4 - Skenario 5: Protokol Pertukaran Data Mikroservis Dwibahasa" {
+    // Skenario: Klien layanan berbahasa Indonesia mengirim data tersandi ke Server berbahasa Inggris
+    buat kunciBersama = kripto.buat_kunci()
+    buat pasanganKlien = kripto.buat_pasangan_kunci()
+
+    // Sisi Klien (Indonesian API)
+    buat payload = "PERMINTAAN_TRANSAKSI:REF_998822:NOMINAL_750000"
+    buat dataTersandi = kripto.enkripsi(payload, kunciBersama)
+    buat tandaTanganKlien = kripto.tanda_tangan(dataTersandi, pasanganKlien.kunci_privat)
+
+    // Sisi Server (English API)
+    // 1. Verifikasi tanda tangan klien pada ciphertext
+    buat ttdValid = crypto.verify(dataTersandi, tandaTanganKlien, pasanganKlien.public_key)
+    harus_benar(ttdValid, "Server harus memvalidasi tanda tangan klien")
+
+    // 2. Dekripsi muatan
+    buat plaintext = crypto.decrypt(dataTersandi, kunciBersama)
+    harus_sama(plaintext, payload, "Server harus berhasil mendekripsi muatan")
+
+    // 3. Server memverifikasi identitas permintaan dengan timing-safe compare
+    buat tokenHarapan = "REF_998822"
+    buat tokenTerurai = teks.pisah(plaintext, ":")[1]
+    harus_benar(crypto.timing_safe_equal(tokenTerurai, tokenHarapan))
+}
+
+uji "Tier 1 - R1: Streaming Hash Berkas (sha256_berkas, sha512_berkas, md5_berkas)" {
+    buat jalur = "./tests/berkas_uji_kripto_temp.txt"
+    berkas.tulis(jalur, "Halo Streaming Hash Celang 2026!")
+
+    buat hTeks = kripto.sha256("Halo Streaming Hash Celang 2026!")
+    buat hBerkas = kripto.sha256_berkas(jalur)
+    harus_sama(hBerkas, hTeks, "sha256_berkas harus identik dengan sha256 teks")
+
+    buat h512Berkas = crypto.sha512_file(jalur)
+    harus_sama(panjang(h512Berkas), 128, "sha512_file harus 128 heks")
+
+    buat md5Berkas = crypto.md5_file(jalur)
+    harus_sama(panjang(md5Berkas), 32, "md5_file harus 32 heks")
+
+    berkas.hapus(jalur)
+}
+
+uji "Tier 1 - R1: Checksum Cepat CRC-32 (crc32 dan crc32_berkas)" {
+    buat konten = "Data Cepat Untuk CRC32"
+    buat c1 = kripto.crc32(konten)
+    buat c2 = kripto.crc32(bita(konten))
+    harus_sama(c1, c2, "crc32 teks dan bita harus sama")
+    harus_benar(c1 > 0, "crc32 harus bernilai positif")
+
+    buat jalur = "./tests/berkas_uji_crc32_temp.txt"
+    berkas.tulis(jalur, konten)
+    buat cBerkas = kripto.crc32_berkas(jalur)
+    buat cFile = crypto.crc32_file(jalur)
+    harus_sama(cBerkas, c1, "crc32_berkas harus sama dengan crc32 teks")
+    harus_sama(cFile, cBerkas, "crypto.crc32_file harus sama dengan kripto.crc32_berkas")
+
+    berkas.hapus(jalur)
+}
+

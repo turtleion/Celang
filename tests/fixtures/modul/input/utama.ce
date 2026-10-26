@@ -1,0 +1,3 @@
+publik! fungsi buat_input(placeholder) {
+    kembalikan "< " + placeholder + " >"
+}

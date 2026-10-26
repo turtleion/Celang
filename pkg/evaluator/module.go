@@ -68,6 +68,27 @@ func resolvePackagePath(baseDir, packageName string) (string, error) {
 	return "", fmt.Errorf("paket '%s' tidak ditemukan di 'celang_modules'", packageName)
 }
 
+// resolveDirectoryEntrypoint searches a directory for common module entrypoints.
+func resolveDirectoryEntrypoint(dirPath string) (string, error) {
+	baseName := filepath.Base(dirPath)
+	candidates := []string{
+		filepath.Join(dirPath, "modul.ce"),
+		filepath.Join(dirPath, "utama.ce"),
+		filepath.Join(dirPath, "index.ce"),
+		filepath.Join(dirPath, baseName+".ce"),
+		filepath.Join(dirPath, "modul.ast"),
+		filepath.Join(dirPath, "utama.ast"),
+		filepath.Join(dirPath, "index.ast"),
+		filepath.Join(dirPath, baseName+".ast"),
+	}
+	for _, c := range candidates {
+		if info, err := os.Stat(c); err == nil && !info.IsDir() {
+			return filepath.Abs(c)
+		}
+	}
+	return "", fmt.Errorf("folder '%s' tidak memiliki berkas entrypoint (modul.ce, utama.ce, index.ce, %s.ce)", dirPath, baseName)
+}
+
 // resolveModulePath resolves an import path relative to the caller's file.
 func resolveModulePath(callerFilePath, importSource string) (string, error) {
 	if isStdlibModule(importSource) {
@@ -95,9 +116,15 @@ func resolveModulePath(callerFilePath, importSource string) (string, error) {
 		candidate = filepath.Join(baseDir, candidate)
 	}
 
-	// 1. Check exact path
-	if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
-		return filepath.Abs(candidate)
+	// 1. Check exact path (file or directory)
+	if info, err := os.Stat(candidate); err == nil {
+		if !info.IsDir() {
+			return filepath.Abs(candidate)
+		}
+		// Candidate is a directory: resolve entrypoint file
+		if entrypoint, err := resolveDirectoryEntrypoint(candidate); err == nil {
+			return entrypoint, nil
+		}
 	}
 
 	// 2. Try with .ce extension
@@ -155,6 +182,7 @@ func loadModule(targetAbsPath string, env *Environment) (*Environment, error) {
 	targetEnv.FilePath = targetAbsPath
 	targetEnv.ModuleRoot = findModuleRoot(targetAbsPath)
 	targetEnv.ModuleRegistry = env.ModuleRegistry
+	targetEnv.IsUniversal = prog.IsUniversal
 
 	// Cache early to support recursive or mutual imports
 	env.ModuleRegistry.mu.Lock()

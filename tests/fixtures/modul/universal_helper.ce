@@ -1,0 +1,7 @@
+"use universal"
+
+export function greet(name) {
+    return "Hello, " + name + "!"
+}
+
+export const APP_VERSION = "2.1.0"

@@ -25,8 +25,15 @@ Array di Celang merepresentasikan kumpulan data berurutan. Anda dapat memanipula
 | `.join([pemisah])` | `.gabung([pemisah])` | `[pemisah]` | Menggabungkan seluruh elemen menjadi satu teks (bawaan: `", "`) | `Teks` (*String*) |
 | `.contains(el)` / `.includes(el)` | `.berisi(el)` | `elemen` | Memeriksa apakah suatu elemen ada di dalam array | `Kebenaran` (`benar`/`salah`) |
 | `.index_of(el)` | `.indeks_dari(el)` | `elemen` | Mencari posisi indeks pertama dari elemen (mengembalikan `-1` jika tidak ada) | `Angka` (*Integer*) |
+| `.map(fungsi)` | `.petakan(fungsi)` | `fungsi(el, [i])` | Mengubah setiap elemen dengan fungsi (tidak mengubah array asal) | Salinan Array baru (Imutabel) |
+| `.filter(fungsi)` | `.saring(fungsi)` | `fungsi(el, [i])` | Menyaring elemen yang memenuhi kondisi predikat (tidak mengubah array asal) | Salinan Array baru (Imutabel) |
+| `.reduce(fungsi, [awal])` | `.reduksi(...)` / `.lipat(...)` | `fungsi(acc, el, [i]), [awal]` | Mereduksi seluruh elemen menjadi satu nilai akumulasi | Nilai akumulasi |
+| `.find(fungsi)` | `.temukan(fungsi)` | `fungsi(el, [i])` | Mencari elemen pertama yang memenuhi kriteria (*null-safe*) | Elemen pertama / `kosong` |
+| `.some(fungsi)` | `.ada_yang(fungsi)` | `fungsi(el, [i])` | Memeriksa apakah minimal satu elemen memenuhi kriteria | `Kebenaran` (`benar`/`salah`) |
+| `.every(fungsi)` | `.semuanya(fungsi)` | `fungsi(el, [i])` | Memeriksa apakah seluruh elemen memenuhi kriteria | `Kebenaran` (`benar`/`salah`) |
 | `.slice([mulai, [akhir]])` | `.potong([mulai, [akhir]])`| `[mulai, [akhir]]` | Mengambil salinan potongan array tanpa mengubah array asli | Salinan Array baru |
 | `.concat(...)` | `.gabungkan(...)` | `array_atau_elemen, ...`| Menggabungkan array dengan elemen atau array lain | Array baru |
+| `.clone()` | `.salin()` | *(tidak ada)* | Menduplikasi array secara mandiri (*shallow copy*) | Salinan Array baru |
 | `.clear()` | `.bersihkan()` | *(tidak ada)* | Mengosongkan seluruh isi array | Array (kosong `[]`) |
 | `.length` / `.len` | `.panjang` | *(properti)* | Mengambil jumlah total elemen | `Angka` (*Integer*) |
 | `.size()` | `.ukuran()` | *(tidak ada)* | Mengambil jumlah total elemen sebagai pemanggilan fungsi | `Angka` (*Integer*) |
@@ -90,6 +97,48 @@ cetak(daftarTeks) // "kucing | anjing | kelinci | panda"
 buat favorit = hewan.slice(1, 3)
 cetak(favorit) // [anjing, kelinci]
 ```
+
+#### Transformasi Fungsional & Imutabilitas (*Functional Pipelines*)
+
+Celang mendukung metode manipulasi fungsional modern yang bersifat **imutabel (tidak memutasi array asli)**. Setiap pemanggilan `.saring()` atau `.petakan()` mengembalikan objek `Array` baru di memori:
+
+```celang
+buat angka = [1, 2, 3, 4, 5, 6]
+
+// 1. .petakan() / .map() — Mengalikan setiap angka dengan 10
+buat sepuluhKali = angka.petakan(x => x * 10)
+cetak(sepuluhKali) // [10, 20, 30, 40, 50, 60]
+cetak(angka)       // [1, 2, 3, 4, 5, 6] (Array asal tetap utuh!)
+
+// 2. .saring() / .filter() — Mengambil hanya bilangan genap
+buat genap = angka.saring(x => x % 2 == 0)
+cetak(genap)       // [2, 4, 6]
+
+// 3. .reduksi() / .lipat() / .reduce() — Menjumlahkan total
+buat total = angka.reduksi((acc, x) => acc + x, 0)
+cetak(total)       // 21
+
+// 4. .temukan() / .find() — Menemukan elemen pertama (null-safe)
+buat pertamaBesar = angka.temukan(x => x > 4) // 5
+buat nihil = angka.temukan(x => x > 100)       // kosong
+
+// 5. .ada_yang() / .some() & .semuanya() / .every()
+cetak(angka.ada_yang(x => x > 5))  // benar
+cetak(angka.semuanya(x => x > 0))  // benar
+
+// 6. Rantai Proses (Fluent Pipeline Chaining)
+buat ringkasan = angka
+    .saring(x => x % 2 != 0)          // [1, 3, 5]
+    .petakan(x => x * x)              // [1, 9, 25]
+    .reduksi((acc, x) => acc + x, 0)  // 35
+cetak("Total kuadrat ganjil:", ringkasan) // 35
+```
+
+> 💡 **Mengapa `.saring()` dan `.petakan()` Bersifat Imutabel? Apakah Memakai `const`?**
+>
+> 1. **Bukan karena `const` (`tetap`)**: Kata kunci `const` hanya mengunci penugasan (*variable binding*) agar variabel tidak bisa di-assign ulang, bukan mengunci data di dalam memori.
+> 2. **Imutabilitas Struktural (Fungsi Murni)**: Di balik layar mesin Celang, `.saring()` dan `.petakan()` mengalokasikan irisan memori baru (`new Array`) dan mengembalikannya ke pemanggil. Array asli sama sekali tidak disentuh, sehingga bebas dari efek samping (*zero side-effects*).
+> 3. **Pola Imutabel Tanpa `const`**: Untuk menjaga data tidak berubah tanpa bergantung pada `const`, biasakan memakai metode murni di atas, atau duplikasi data terlebih dahulu dengan `.salin()` sebelum memanggil metode mutasi seperti `.tambah()`.
 
 ---
 
@@ -216,6 +265,16 @@ cetak(b.ke_teks())           // "Gelang v2!"
 // Enkoding heksadesimal dan Base64
 cetak(b.ke_heks())           // "47656c616e6720763221"
 cetak(b.ke_base64())         // "R2VsYW5nIHYyIQ=="
+
+// Dekode Base64 & Heksadesimal menjadi Bita
+buat bBase64 = bita.dari_base64("R2VsYW5nIHYyIQ==")
+buat bHeks   = bita.dari_heks("47656c616e6720763221")
+cetak(bBase64.ke_teks())     // "Gelang v2!"
+cetak(bHeks.ke_teks())       // "Gelang v2!"
+
+// Atau menggunakan konstruktor dengan argumen format:
+buat b3 = bita("R2VsYW5n", "base64")
+buat b4 = bita("43656c616e67", "heks") // "Celang"
 
 // Operasi potong (slice)
 buat potong = b[0..6]        // bita([71, 101, 108, 97, 110, 103])

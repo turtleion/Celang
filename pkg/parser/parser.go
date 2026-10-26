@@ -132,6 +132,7 @@ func NewParser(l *Lexer) *Parser {
 	p.registerPrefix(JEMPUT, p.parseJemputExpression)
 	p.registerPrefix(TEST, p.parseIdentifier)
 	p.registerPrefix(HARUS, p.parseIdentifier)
+	p.registerPrefix(TYPE_DECL, p.parseIdentifier)
 
 	p.infixParseFns = make(map[TokenType]infixParseFn)
 	p.registerInfix(PIPE_ARROW, p.parsePipelineExpression)
@@ -316,6 +317,9 @@ func (p *Parser) parseStatement() uast.Statement {
 	case STRUCT_DECL:
 		return p.parseStructDeclaration()
 	case TYPE_DECL:
+		if p.peekTokenIs(LPAREN) {
+			return p.parseExpressionStatement()
+		}
 		return p.parseTypeDeclaration()
 	case REF_DECL:
 		return p.parseReferenceDeclaration()
@@ -377,18 +381,95 @@ func (p *Parser) parseVisibilityOrExportStatement() uast.Statement {
 		vis = &uast.Visibility{Kind: uast.VisibilityAllowlist, Targets: targets}
 	}
 
-	// Standalone export list: publik! { kali, bagi }
+	// Re-export all: ekspor * dari "./sub.ce" or export * from "./sub.ce"
+	if p.curTokenIs(ASTERISK) {
+		p.nextToken() // eat '*'
+		local := "*"
+		if p.curTokenIs(AS) {
+			p.nextToken() // eat 'sebagai' / 'as'
+			if !p.curTokenIs(IDENT) {
+				p.addError("Diharapkan nama alias identifier setelah 'sebagai' / 'as'")
+				return nil
+			}
+			local = p.curToken.Literal
+			p.nextToken() // move past alias
+		}
+		if !p.curTokenIs(FROM) {
+			p.addError("Diharapkan 'dari' atau 'from' setelah '*' dalam re-ekspor")
+			return nil
+		}
+		p.nextToken() // eat 'dari' / 'from'
+		if !p.curTokenIs(STRING) && !p.curTokenIs(IDENT) {
+			p.addError("Diharapkan nama modul atau path berkas setelah 'dari' / 'from'")
+			return nil
+		}
+		source := p.curToken.Literal
+		return &uast.ImportDeclaration{
+			NodeType:   uast.NodeTypeImportDeclaration,
+			Metadata:   meta,
+			Source:     source,
+			Specifiers: []uast.ImportSpecifier{{Imported: "*", Local: local, IsAll: true}},
+			Visibility: vis,
+		}
+	}
+
+	// Named export or re-export:
+	// ekspor { kali, bagi } dari "./sub.ce"
+	// or standalone: publik! { kali, bagi } / ekspor { kali, bagi }
 	if p.curTokenIs(LBRACE) {
 		p.nextToken() // enter brace
-		idents := []string{}
+		type itemSpec struct {
+			imported string
+			local    string
+		}
+		var items []itemSpec
 		for !p.curTokenIs(RBRACE) && !p.curTokenIs(EOF) {
 			if p.curTokenIs(IDENT) {
-				idents = append(idents, p.curToken.Literal)
+				imported := p.curToken.Literal
+				local := imported
+				if p.peekTokenIs(AS) {
+					p.nextToken() // eat 'as' / 'sebagai'
+					p.nextToken() // move to alias
+					if p.curTokenIs(IDENT) {
+						local = p.curToken.Literal
+					}
+				}
+				items = append(items, itemSpec{imported: imported, local: local})
 			}
 			if p.peekTokenIs(COMMA) {
 				p.nextToken()
 			}
 			p.nextToken()
+		}
+
+		if p.peekTokenIs(FROM) {
+			p.nextToken() // move to 'dari' / 'from'
+			p.nextToken() // move to source
+			if !p.curTokenIs(STRING) && !p.curTokenIs(IDENT) {
+				p.addError("Diharapkan nama modul atau path berkas setelah 'dari' / 'from'")
+				return nil
+			}
+			source := p.curToken.Literal
+			var specifiers []uast.ImportSpecifier
+			for _, item := range items {
+				specifiers = append(specifiers, uast.ImportSpecifier{
+					Imported: item.imported,
+					Local:    item.local,
+				})
+			}
+			return &uast.ImportDeclaration{
+				NodeType:   uast.NodeTypeImportDeclaration,
+				Metadata:   meta,
+				Source:     source,
+				Specifiers: specifiers,
+				Visibility: vis,
+			}
+		}
+
+		// Standalone visibility statement: publik! { kali, bagi }
+		var idents []string
+		for _, item := range items {
+			idents = append(idents, item.imported)
 		}
 		return &uast.VisibilityStatement{
 			NodeType:    uast.NodeTypeVisibilityStatement,
@@ -398,8 +479,20 @@ func (p *Parser) parseVisibilityOrExportStatement() uast.Statement {
 		}
 	}
 
-	// Declaration with visibility
+	// Declaration, import, or pythonic import with visibility
 	switch p.curToken.Type {
+	case IMPORT:
+		imp := p.parseImportStatement()
+		if imp != nil {
+			imp.Visibility = vis
+		}
+		return imp
+	case FROM:
+		imp := p.parsePythonicImportStatement()
+		if imp != nil {
+			imp.Visibility = vis
+		}
+		return imp
 	case VAR_DECL:
 		decl := p.parseVariableDeclaration(true)
 		if d, ok := decl.(*uast.DestructureDeclaration); ok {
@@ -446,21 +539,20 @@ func (p *Parser) parseImportStatement() *uast.ImportDeclaration {
 
 	specifiers := []uast.ImportSpecifier{}
 
-	// Case 1: Namespace import: ambil * sebagai math dari "./mod.ce"
+	// Case 1: Namespace import: ambil * sebagai math dari "./mod.ce" or ambil * dari "./mod.ce"
 	if p.curTokenIs(ASTERISK) {
 		p.nextToken() // eat '*'
-		if !p.curTokenIs(AS) {
-			p.addError("Diharapkan 'sebagai' atau 'as' setelah '*' dalam impor")
-			return nil
+		local := "*"
+		if p.curTokenIs(AS) {
+			p.nextToken() // move to alias identifier
+			if !p.curTokenIs(IDENT) {
+				p.addError("Diharapkan nama alias identifier setelah 'sebagai' / 'as'")
+				return nil
+			}
+			local = p.curToken.Literal
+			p.nextToken() // move to 'dari' / 'from'
 		}
-		p.nextToken() // move to alias identifier
-		if !p.curTokenIs(IDENT) {
-			p.addError("Diharapkan nama alias identifier setelah 'sebagai'")
-			return nil
-		}
-		local := p.curToken.Literal
 		specifiers = append(specifiers, uast.ImportSpecifier{Imported: "*", Local: local, IsAll: true})
-		p.nextToken() // move to 'dari' / 'from'
 	} else if p.curTokenIs(LBRACE) {
 		// Case 2: Named import: ambil { tambah, kali sebagai perkalian } dari "./mod.ce"
 		p.nextToken() // enter '{'
@@ -761,11 +853,16 @@ func (p *Parser) parseTransactionStatement() *uast.TransactionStatement {
 
 func (p *Parser) parseRollbackStatement() *uast.RollbackStatement {
 	meta := p.currentMetadata()
-	p.nextToken() // eat 'batalkan' / 'rollback'
-
 	var arg uast.Expression
-	if !p.curTokenIs(SEMICOLON) && !p.curTokenIs(RBRACE) && !p.curTokenIs(EOF) {
+
+	if p.peekTokenIs(SEMICOLON) {
+		p.nextToken()
+	} else if !p.peekTokenIs(RBRACE) && !p.peekTokenIs(EOF) && p.peekToken.Line == p.curToken.Line {
+		p.nextToken()
 		arg = p.parseExpression(LOWEST)
+		if p.peekTokenIs(SEMICOLON) {
+			p.nextToken()
+		}
 	}
 
 	return &uast.RollbackStatement{
@@ -1648,11 +1745,16 @@ func (p *Parser) parseTypeHint() string {
 
 func (p *Parser) parseReturnStatement() *uast.ReturnStatement {
 	meta := p.currentMetadata()
-	p.nextToken() // eat 'kembalikan' or 'return'
-
 	var val uast.Expression
-	if !p.curTokenIs(SEMICOLON) && !p.curTokenIs(RBRACE) && !p.curTokenIs(EOF) {
+
+	if p.peekTokenIs(SEMICOLON) {
+		p.nextToken()
+	} else if !p.peekTokenIs(RBRACE) && !p.peekTokenIs(EOF) && p.peekToken.Line == p.curToken.Line {
+		p.nextToken()
 		val = p.parseExpression(LOWEST)
+		if p.peekTokenIs(SEMICOLON) {
+			p.nextToken()
+		}
 	}
 
 	return &uast.ReturnStatement{
