@@ -66,19 +66,81 @@ const total = extract_zip("bundle.zip", "./dest")
 
 ### 1. Arsip ZIP
 
-#### `arsip.buat_zip(sumber, tujuanZip)`
+#### `arsip.buat_zip(sumber, tujuanZip, [opsi])`
 Mengemas berkas atau folder menjadi file ZIP.
 - **Parameter**:
   - `sumber`: `Teks` (jalur folder atau berkas) atau `Daftar` teks (kumpulan jalur berkas).
   - `tujuanZip`: `Teks` (jalur berkas ZIP keluaran).
+  - `opsi` (opsional): `Peta` opsi:
+    - `"metode"` / `"method"`: `"deflate"` (bawaan, kompresi standar) atau `"store"` / `"simpan"` (tanpa kompresi).
 - **Kembalian**: `Logika` (`benar` jika sukses).
 
 ```celang
 // Mengemas seluruh isi folder secara rekursif:
 arsip.buat_zip("./projek", "projek.zip")
 
+// Mengemas tanpa kompresi (store mode):
+arsip.buat_zip("./video", "video.zip", { "metode": "store" })
+
 // Mengemas daftar berkas tertentu:
 arsip.buat_zip(["./berkas1.txt", "./berkas2.png"], "aset.zip")
+```
+
+#### `arsip.buat_zip_memori(petaKonten, tujuanZip, [opsi])`
+Mengemas kumpulan data string atau `Bita` langsung dari memori menjadi berkas ZIP di disk tanpa perlu membuat berkas sementara. Dilengkapi proteksi otomatis terhadap upaya *path traversal* (Zip Slip).
+- **Parameter**:
+  - `petaKonten`: `Peta` dengan pasangan `nama_berkas: data` (data dapat berupa `Teks` atau `Bita`).
+  - `tujuanZip`: `Teks` (jalur berkas ZIP keluaran).
+  - `opsi` (opsional): `Peta` opsi (`"metode"`: `"deflate"` atau `"store"`).
+- **Kembalian**: `Logika` (`benar` jika sukses).
+
+```celang
+buat berkasMemori = {
+    "catatan.txt": "Dibuat langsung dari memori Celang!",
+    "aset/logo.png": berkas.baca_bita("./logo.png"),
+    "data/konfig.json": "{\"versi\": 1}"
+}
+arsip.buat_zip_memori(berkasMemori, "paket_memori.zip")
+```
+
+#### `arsip.uji_zip(jalur)`
+Memverifikasi integritas checksum CRC-32 dan header seluruh anggota di dalam arsip ZIP tanpa perlu mengekstrak berkas ke disk (mirip `ZipFile.testzip()` di Python).
+- **Parameter**:
+  - `jalur`: `Teks` (jalur berkas ZIP).
+- **Kembalian**:
+  - `kosong` (`null`): Jika seluruh berkas di dalam arsip sehat dan lolos verifikasi CRC-32.
+  - `Teks`: Nama berkas pertama yang terdeteksi rusak atau mengalami korupsi data.
+
+```celang
+buat hasil = arsip.uji_zip("unduhan.zip")
+jika hasil == kosong {
+    cetak("✓ Seluruh arsip ZIP sehat dan lolos uji integritas CRC-32.")
+} jika tidak {
+    cetak("⚠ Terdeteksi korupsi data pada berkas:", hasil)
+}
+```
+
+#### `arsip.info_berkas_zip(berkasZip, namaBerkas)`
+Mengambil metadata detail satu entri berkas di dalam arsip ZIP tanpa mengekstraknya.
+- **Parameter**:
+  - `berkasZip`: `Teks` (jalur berkas ZIP).
+  - `namaBerkas`: `Teks` (jalur berkas di dalam arsip).
+- **Kembalian**: `Peta` metadata yang memuat:
+  - `nama`: Nama entri berkas.
+  - `ukuran`: Ukuran asli sebelum kompresi (*uncompressed size*).
+  - `ukuran_terkompresi`: Ukuran setelah kompresi (*compressed size*).
+  - `crc32`: Nilai checksum CRC-32 (`Angka`).
+  - `metode_kompresi` / `compression_method`: Teks metode kompresi (`"deflate"` atau `"store"`).
+  - `apakah_direktori`: `benar` jika entri folder.
+  - `tipe`: `"berkas"` atau `"direktori"`.
+  - `waktu_modifikasi`: String RFC 3339.
+
+```celang
+buat info = arsip.info_berkas_zip("paket.zip", "data.csv")
+cetak("Nama:", info.nama)
+cetak("Ukuran asli:", info.ukuran, "bita")
+cetak("CRC32:", info.crc32)
+cetak("Metode:", info.metode_kompresi)
 ```
 
 #### `arsip.ekstrak_zip(berkasZip, folderTujuan, [opsi])`
@@ -89,11 +151,14 @@ Mengekstrak seluruh berkas dari arsip ZIP ke folder tujuan secara aman.
   - `opsi` (opsional): `Peta` opsi:
     - `"timpa"` / `"overwrite"`: `Logika` (bawaan `benar`).
     - `"saring"` / `"filter"`: `Fungsi` penyaring kustom `fungsi(info) -> Logika`.
+    - `"batas_ukuran"` / `"max_size"`: `Angka` (batas total kuota ekstraksi dalam bita, bawaan `4 GB` / 4.294.967.296 bita, perlindungan anti *decompression bomb*).
+    - `"batas_entri"` / `"max_entries"`: `Angka` (batas total jumlah entri arsip yang diproses, bawaan `100.000`).
 - **Kembalian**: `Angka` (jumlah berkas yang berhasil diekstrak).
 
 ```celang
-// Ekstraksi selektif menggunakan filter callback:
+// Ekstraksi aman dengan batas kuota dan saringan filter:
 buat total = arsip.ekstrak_zip("paket.zip", "./distribusi", {
+    "batas_ukuran": 50 * 1024 * 1024, // Maksimal 50 MB
     "saring": fungsi(info) {
         kembalikan teks.diakhiri_dengan(info.nama, ".ce")
     }
@@ -128,6 +193,8 @@ Melihat isi berkas ZIP tanpa melakukan ekstraksi ke disk.
   - `nama`: Nama entri berkas.
   - `ukuran`: Ukuran berkas asli sebelum kompresi (dalam bita).
   - `ukuran_terkompresi`: Ukuran setelah kompresi.
+  - `crc32`: Checksum CRC-32.
+  - `metode_kompresi` / `compression_method`: `"deflate"` atau `"store"`.
   - `apakah_direktori`: `benar` jika entri merupakan folder.
   - `apakah_tautan`: `benar` jika entri merupakan tautan simbolik (*symlink*).
   - `tipe`: Teks jenis entri (`"berkas"`, `"direktori"`, atau `"tautan"`).
@@ -138,7 +205,7 @@ Melihat isi berkas ZIP tanpa melakukan ekstraksi ke disk.
 buat daftar = arsip.daftar_zip("paket.zip")
 untuk item dalam daftar {
     jika item.tipe == "berkas" {
-        cetak("- Berkas:", item.nama, "(", item.ukuran, "bita )")
+        cetak("- Berkas:", item.nama, "(", item.ukuran, "bita, metode:", item.metode_kompresi, ")")
     }
 }
 ```

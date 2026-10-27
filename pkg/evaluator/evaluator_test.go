@@ -2559,5 +2559,102 @@ func TestAudit_JSONMaxAutoExpand(t *testing.T) {
 	}
 }
 
+func TestAudit_TitipAssertionErrorDoesNotPanic(t *testing.T) {
+	code := `
+	fungsi gagal() {
+		harus_sama(1, 2)
+	}
+	buat t = titip gagal()
+	jemput t
+	`
+	res := testEvalSource(t, code)
+	if res == nil {
+		t.Fatalf("expected result, got nil")
+	}
+	if aErr, ok := res.(*evaluator.AssertionError); !ok {
+		t.Fatalf("expected AssertionError, got %T (%s)", res, res.Inspect())
+	} else if !strings.Contains(aErr.Message, "Gagal:") && !strings.Contains(aErr.Message, "ekspektasi") {
+		t.Errorf("unexpected assertion error message: %s", aErr.Message)
+	}
+
+	// Test with jemput_semua
+	codeSemua := `
+	fungsi gagalSemua() {
+		harus_sama(10, 20)
+	}
+	buat t1 = titip gagalSemua()
+	jemput_semua([t1])
+	`
+	resSemua := testEvalSource(t, codeSemua)
+	if _, ok := resSemua.(*evaluator.AssertionError); !ok {
+		t.Fatalf("expected jemput_semua to return AssertionError without panic, got %T (%s)", resSemua, resSemua.Inspect())
+	}
+}
+
+func TestAudit_MemberAccessSideEffectEvaluatedOnce(t *testing.T) {
+	codeArray := `
+	buat arr = [100, 200, 300]
+	buat hitungan = 0
+	buat dapatkanIndeks = fungsi() {
+		hitungan = hitungan + 1
+		kembalikan 1
+	}
+	buat el = arr[dapatkanIndeks()]
+	[el, hitungan]
+	`
+	resArr := testEvalSource(t, codeArray)
+	arr, ok := resArr.(*evaluator.Array)
+	if !ok || len(arr.Elements) != 2 {
+		t.Fatalf("expected 2-element array, got %v", resArr)
+	}
+	if elVal, ok := arr.Elements[0].(*evaluator.Integer); !ok || elVal.Value != 200 {
+		t.Errorf("expected el = 200, got %v", arr.Elements[0])
+	}
+	if countVal, ok := arr.Elements[1].(*evaluator.Integer); !ok || countVal.Value != 1 {
+		t.Errorf("expected hitungan = 1 (evaluated once), got %v", arr.Elements[1])
+	}
+
+	codeBytes := `
+	buat b = bita([10, 20, 30])
+	buat hitunganB = 0
+	buat dapatkanIndeksB = fungsi() {
+		hitunganB = hitunganB + 1
+		kembalikan 2
+	}
+	buat bVal = b[dapatkanIndeksB()]
+	[bVal, hitunganB]
+	`
+	resBytes := testEvalSource(t, codeBytes)
+	arrB, ok := resBytes.(*evaluator.Array)
+	if !ok || len(arrB.Elements) != 2 {
+		t.Fatalf("expected 2-element array, got %v", resBytes)
+	}
+	if bVal, ok := arrB.Elements[0].(*evaluator.Integer); !ok || bVal.Value != 30 {
+		t.Errorf("expected bVal = 30, got %v", arrB.Elements[0])
+	}
+	if countValB, ok := arrB.Elements[1].(*evaluator.Integer); !ok || countValB.Value != 1 {
+		t.Errorf("expected hitunganB = 1 (evaluated once), got %v", arrB.Elements[1])
+	}
+}
+
+func TestAudit_MemberAccessErrorPropagation(t *testing.T) {
+	code := `
+	buat arr = [1, 2, 3]
+	buat lemparGalat = fungsi() {
+		lempar "Koneksi database putus!"
+	}
+	arr[lemparGalat()]
+	`
+	res := testEvalSource(t, code)
+	if res == nil || res.Type() != evaluator.ERROR_OBJ {
+		t.Fatalf("expected Error object, got %v", res)
+	}
+	errObj := res.(*evaluator.Error)
+	if !strings.Contains(errObj.Message, "Koneksi database putus!") {
+		t.Errorf("expected error message to be propagated, got: %s", errObj.Message)
+	}
+}
+
+
 
 

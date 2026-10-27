@@ -6,13 +6,13 @@ outline: deep
 
 The **`crypto`** module (official Indonesian name **`kripto`**) provides a modern, production-grade cryptography ecosystem in Celang. Built with pure Go standard library primitives (zero external dependencies and no CGo bindings), it is designed around the **safe-by-default** philosophy and inspired by modern high-level cryptographic libraries like Python's `cryptography.io`.
 
-The library provides comprehensive cryptographic functionality ranging from authenticated encryption and GPU-resistant password hashing to asymmetric Ed25519 signatures, standard digests, and constant-time utilities:
+The library provides comprehensive cryptographic functionality ranging from authenticated encryption and GPU-resistant password hashing to asymmetric Ed25519 signatures, standard digests, modern hashes, and post-quantum cryptography (PQC):
 
-1. **Authenticated Symmetric Encryption (AES-256-GCM AEAD)**: Safe, foolproof symmetric encryption with automatic 12-byte random nonce generation, 16-byte authentication tag, and built-in tamper detection (`generate_key`, `encrypt`, `decrypt`).
-2. **Password Hashing & Key Derivation (PBKDF2-HMAC-SHA256)**: GPU brute-force resistant password storage adhering to the PHC string format, timing-safe verification, and cryptographic key derivation (`hash_password`, `verify_password`, `derive_key`).
-3. **Modern Asymmetric Digital Signatures (Ed25519 - RFC 8032)**: High-performance digital signing and verification with compact 32-byte keys for package manager verification, software updates, and API contracts (`generate_keypair`, `sign`, `verify`).
-4. **Cryptographic Hashes & Checksums**: Fast and secure digests (SHA-256, SHA-512, SHA-1, MD5).
-5. **Keyed-Hash Message Authentication Codes (HMAC)**: HMAC-SHA256 for webhook signing and API request verification.
+1. **Authenticated Symmetric Encryption (AEAD AES-256-GCM & ChaCha20-Poly1305)**: Safe symmetric encryption with automatic nonce generation and built-in tamper detection (`generate_key`, `encrypt`, `decrypt`, `generate_chacha_key`, `encrypt_chacha`, `decrypt_chacha`).
+2. **Password Hashing & Key Derivation (Argon2id, PBKDF2, HKDF)**: Memory-hard Argon2id and standard PBKDF2 password storage, plus RFC 5869 HKDF (*extract-and-expand*) (`hash_password_argon2`, `verify_password_argon2`, `hkdf`, `hkdf_extract`, `hkdf_expand`).
+3. **Asymmetric Cryptography & Key Exchange (Ed25519, X25519, RSA)**: Modern Ed25519 digital signatures, high-speed X25519 ECDH key exchange, and enterprise RSA 2048/4096-bit (OAEP encryption & PSS signatures).
+4. **Modern Hashes & Message Authentication (SHA-3, SHAKE, BLAKE2, BLAKE3, Poly1305)**: FIPS 202 SHA-3, SHAKE extensible-output functions, BLAKE2b/s, ultra-fast BLAKE3 tree hashing, and Poly1305 one-time authenticator.
+5. **Post-Quantum Cryptography & Hybrid KEM (ML-KEM-768 & Hybrid X-Wing)**: NIST FIPS 203 ML-KEM-768 (Kyber) quantum-resistant KEM and future-proof Hybrid X-Wing (X25519 + ML-KEM-768).
 6. **Cryptographic Randomness & Identifiers**: Operating-system-backed CSPRNG entropy for session tokens and salt generation (`random_hex`, `random_bytes`, `uuid`).
 7. **Anti-Timing Attack Protection**: Constant-time byte and string comparison to defend against timing side-channel attacks (`timing_safe_equal`).
 
@@ -85,6 +85,65 @@ let recovered = decrypt(ciphertext, key)
 | `crypto.random_bytes(bytes)` | `kripto.acak_bita(panjang)` | `bytes`: `Integer` | `Bytes` | Generates raw `Bytes` buffer containing CSPRNG random entropy |
 | `crypto.uuid()` | `kripto.uuid()` | `-` | `String` (UUID v4) | Generates RFC 4122 Version 4 random UUID (aliases: `uuid_v4`, `uuid4`) |
 | `crypto.timing_safe_equal(a, b)` | `kripto.konstanta_sama(a, b)` | `a`, `b`: `String` / `Bytes` | `Boolean` (`true` / `false`) | Compares two secrets in constant CPU time to prevent timing attacks |
+
+### 5. Modern Hashes & Message Authentication Codes (SHA-3, SHAKE, BLAKE2, BLAKE3, Poly1305)
+
+| Function (English) | Indonesian Alias | Arguments | Return Type | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `crypto.sha3_256(data)` | `kripto.sha3_256(data)` | `data`: `String` / `Bytes` | `String` (hex) | Computes SHA3-256 digest (FIPS 202 Keccak, 64 hex characters) |
+| `crypto.sha3_512(data)` | `kripto.sha3_512(data)` | `data`: `String` / `Bytes` | `String` (hex) | Computes SHA3-512 digest (FIPS 202 Keccak, 128 hex characters) |
+| `crypto.shake128(data, length)` | `kripto.shake128(data, panjang)` | `data`: `String` / `Bytes`<br>`length`: `Integer` (bytes) | `String` (hex) | Extendable-Output Function (XOF) SHAKE128 with custom output length |
+| `crypto.shake256(data, length)` | `kripto.shake256(data, panjang)` | `data`: `String` / `Bytes`<br>`length`: `Integer` (bytes) | `String` (hex) | Extendable-Output Function (XOF) SHAKE256 with custom output length |
+| `crypto.blake2b(data, [key])` | `kripto.blake2b(data, [kunci])` | `data`: `String` / `Bytes`<br>`key`: `String` / `Bytes` (optional) | `String` (hex) | High-speed 64-byte (128 hex) hash (RFC 7693) with optional keyed MAC |
+| `crypto.blake2s(data, [key])` | `kripto.blake2s(data, [kunci])` | `data`: `String` / `Bytes`<br>`key`: `String` / `Bytes` (optional) | `String` (hex) | 32-bit optimized 32-byte (64 hex) hash (RFC 7693) with optional keyed MAC |
+| `crypto.blake3(data, [key])` | `kripto.blake3(data, [kunci])` | `data`: `String` / `Bytes`<br>`key`: `String` / `Bytes` (optional) | `String` (hex) | Ultra-fast parallel Merkle-tree hash with keyed MAC support |
+| `crypto.poly1305_auth(msg, key)` | `kripto.poly1305_buat_mac(pesan, kunci)` | `msg`: `String` / `Bytes`<br>`key`: `String` / `Bytes` (32 bytes) | `String` (hex) | Generates a 16-byte (32 hex) one-time Poly1305 authenticator (RFC 8439) |
+| `crypto.poly1305_verify(msg, tag, key)` | `kripto.poly1305_verifikasi(...)` | `msg`, `tag`, `key` | `Boolean` (`true` / `false`) | Verifies Poly1305 authentication tag in constant CPU time |
+
+### 6. Advanced Key Derivation & Modern Password Hashing (HKDF & Argon2id)
+
+| Function (English) | Indonesian Alias | Arguments | Return Type | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `crypto.hkdf(secret, salt, info, length)` | `kripto.hkdf(...)` | `secret`, `salt`, `info`: `String`/`Bytes`<br>`length`: `Integer` | `Bytes` | Derives cryptographic keys using RFC 5869 HKDF (*extract-and-expand*) |
+| `crypto.hkdf_extract(secret, salt)` | `kripto.hkdf_ekstrak(...)` | `secret`, `salt`: `String` / `Bytes` | `Bytes` | HKDF extract step producing a 32-byte Pseudorandom Key (PRK) |
+| `crypto.hkdf_expand(prk, info, length)` | `kripto.hkdf_ekspansi(...)` | `prk`, `info`: `String`/`Bytes`<br>`length`: `Integer` | `Bytes` | HKDF expand step producing derived key bytes of requested length |
+| `crypto.hash_password_argon2(password, ...)` | `kripto.hash_sandi_argon2(...)` | `password`: `String`/`Bytes`<br>optional cost parameters | `String` (PHC) | Industry-standard memory-hard Argon2id password hash ($argon2id$ format) |
+| `crypto.verify_password_argon2(pwd, hash)` | `kripto.verifikasi_sandi_argon2(...)` | `pwd`: `String`/`Bytes`<br>`hash`: `String` | `Boolean` (`true` / `false`) | Verifies password against Argon2id PHC string in constant time |
+| `crypto.argon2id_derive_key(...)` | `kripto.argon2id_turunkan_kunci(...)` | `password`, `salt`<br>`time`, `mem`, `threads`, `length` | `Bytes` | Derives symmetric key using memory-hard Argon2id KDF |
+
+### 7. Symmetric ChaCha20-Poly1305 AEAD & AES Block Modes
+
+| Function (English) | Indonesian Alias | Arguments | Return Type | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `crypto.generate_chacha_key()` | `kripto.buat_kunci_chacha()` | `-` | `String` (Base64) | Generates a cryptographically secure 32-byte Base64 key for ChaCha20 |
+| `crypto.encrypt_chacha(data, key, [aad])` | `kripto.enkripsi_chacha(...)` | `data`, `key`: `String`/`Bytes`<br>`aad`: `String`/`Bytes` (optional) | `String` (Base64) | Authenticated encryption using RFC 8439 ChaCha20-Poly1305 with automatic nonce |
+| `crypto.decrypt_chacha(ciphertext, key, [aad])` | `kripto.dekripsi_chacha(...)` | `ciphertext`, `key`<br>`aad` (optional) | `String` | Decrypts and authenticates ChaCha20-Poly1305 ciphertext |
+| `crypto.aes_ctr(data, key, iv)` | `kripto.aes_ctr(data, kunci, iv)` | `data`: `String`/`Bytes`<br>`key`: 16/24/32 bytes<br>`iv`: 16 bytes | `Bytes` | AES Counter (CTR) mode stream encryption / decryption |
+| `crypto.aes_cbc_encrypt(data, key, iv)` | `kripto.aes_cbc_enkripsi(...)` | `data`: `String`/`Bytes`<br>`key`: 16/24/32 bytes<br>`iv`: 16 bytes | `Bytes` | AES CBC encryption with automatic standard PKCS#7 padding |
+| `crypto.aes_cbc_decrypt(ciphertext, key, iv)` | `kripto.aes_cbc_dekripsi(...)` | `ciphertext`, `key`, `iv` | `Bytes` | AES CBC decryption with PKCS#7 padding validation and strip |
+
+### 8. Asymmetric Cryptography & Key Exchange (X25519 & RSA)
+
+| Function (English) | Indonesian Alias | Arguments | Return Type | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `crypto.generate_x25519_keypair()` | `kripto.buat_kunci_x25519()` | `-` | `Map` | Generates X25519 ECDH keypair (`public_key`, `private_key`) |
+| `crypto.x25519_shared_secret(priv, pub)` | `kripto.x25519_hitung_rahasia(...)` | `priv`: private key<br>`pub`: peer public key | `Bytes` | Computes 32-byte Diffie-Hellman shared secret over Curve25519 |
+| `crypto.rsa_generate_keypair([bits])` | `kripto.rsa_buat_kunci([bits])` | `bits`: `Integer` (optional, default 2048) | `Map` | Generates RSA keypair in standard PKCS#1 / PKIX PEM format |
+| `crypto.rsa_encrypt_oaep(data, pub_pem)` | `kripto.rsa_enkripsi_oaep(...)` | `data`: `String`/`Bytes`<br>`pub_pem`: `String` | `String` (Base64) | Encrypts data using RSA-OAEP with SHA-256 and MGF1 |
+| `crypto.rsa_decrypt_oaep(cipher, priv_pem)` | `kripto.rsa_dekripsi_oaep(...)` | `cipher`: `String`<br>`priv_pem`: `String` | `String` | Decrypts data using RSA-OAEP private key |
+| `crypto.rsa_sign_pss(data, priv_pem)` | `kripto.rsa_tanda_tangan_pss(...)` | `data`: `String`/`Bytes`<br>`priv_pem`: `String` | `String` (Base64) | Computes probabilistic RSA-PSS digital signature (SHA-256) |
+| `crypto.rsa_verify_pss(data, sig, pub_pem)` | `kripto.rsa_verifikasi_pss(...)` | `data`, `sig`<br>`pub_pem`: `String` | `Boolean` (`true` / `false`) | Verifies RSA-PSS digital signature against sender's public key |
+
+### 9. Post-Quantum Cryptography & Hybrid KEM (NIST FIPS 203 & X-Wing)
+
+| Function (English) | Indonesian Alias | Arguments | Return Type | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `crypto.pqc_generate_keypair()` | `kripto.pqc_buat_kunci()` | `-` | `Map` | Generates NIST FIPS 203 ML-KEM-768 keypair (`encapsulation_key`, `decapsulation_key`) |
+| `crypto.pqc_encapsulate(ek)` | `kripto.pqc_enkapsulasi(...)` | `ek`: encapsulation key | `Map` | Encapsulates quantum-resistant shared secret: returns `{ ciphertext, shared_secret }` |
+| `crypto.pqc_decapsulate(ciphertext, dk)` | `kripto.pqc_dekapsulasi(...)` | `ciphertext`, `dk`: decapsulation key | `Bytes` | Decapsulates 32-byte shared secret from ML-KEM-768 ciphertext |
+| `crypto.xwing_generate_keypair()` | `kripto.xwing_buat_kunci()` | `-` | `Map` | Generates Hybrid X-Wing keypair (combining X25519 classical + ML-KEM-768 quantum) |
+| `crypto.xwing_encapsulate(public_key)` | `kripto.xwing_enkapsulasi(...)` | `public_key`: `String`/`Bytes` | `Map` | Encapsulates hybrid shared secret: returns `{ ciphertext, shared_secret }` |
+| `crypto.xwing_decapsulate(ciphertext, priv_key)` | `kripto.xwing_dekapsulasi(...)` | `ciphertext`, `priv_key` | `Bytes` | Decapsulates 32-byte hybrid shared secret from X-Wing ciphertext |
 
 ---
 
@@ -335,6 +394,141 @@ print("Account UUID:", accountId)
 // e.g. "a98835e0-82a8-48b4-8777-62f79f2ff049"
 ```
 
+### 4. High-Performance Modern Hashes & Poly1305 MAC
+
+```celang
+"use universal"
+import "crypto"
+
+let message = "Confidential API payload"
+
+// 1. Keccak SHA-3 & SHAKE XOF
+let h3_256 = crypto.sha3_256(message)
+let h3_512 = crypto.sha3_512(message)
+let shake = crypto.shake128(message, 32) // 32-byte dynamic length
+
+// 2. High-speed BLAKE2 & BLAKE3
+let b2 = crypto.blake2b(message)
+let b3 = crypto.blake3(message)
+
+// Keyed MAC using BLAKE3 (32 bytes)
+let macKey = "exact-32-byte-secret-key-material!"
+let mac = crypto.blake3(message, macKey)
+
+// 3. One-time Poly1305 MAC (RFC 8439)
+let polyKey = crypto.generate_key()
+let tag = crypto.poly1305_auth(message, polyKey)
+let isTagValid = crypto.poly1305_verify(message, tag, polyKey)
+```
+
+### 5. Memory-Hard Password Hashing (Argon2id) & HKDF (RFC 5869)
+
+```celang
+"use universal"
+import "crypto"
+
+// 1. Argon2id Password Storage (PHC String Format)
+let password = "SuperSecretPassword#2026!"
+let argonHash = crypto.hash_password_argon2(password)
+// Output: "$argon2id$v=19$m=65536,t=3,p=4$..."
+
+// Custom options can be passed via Map:
+let customHash = crypto.hash_password_argon2(password, {"time": 2, "memory": 65536, "threads": 2})
+
+let isPasswordMatch = crypto.verify_password_argon2(password, argonHash)
+print("Password valid:", isPasswordMatch) // true
+
+// 2. HKDF Key Derivation (RFC 5869 Extract-and-Expand)
+// Per RFC 5869 with SHA-256, max derived key length is 255 * 32 = 8,160 bytes.
+let masterSecret = "high-entropy-master-secret"
+let salt = "app-salt-session-1234"
+let derivedKey = crypto.hkdf(masterSecret, salt, "celang-service-v1", 32)
+```
+
+> [!NOTE]
+> **Argon2 Verification DoS Protection**:
+> When verifying password hashes from external inputs, `crypto.verify_password_argon2` enforces strict upper bounds: maximum memory $\le 256$ MB (`256 * 1024` KB) and iterations $t \le 10$ to protect servers against Denial of Service (DoS / OOM) attacks.
+
+### 6. Symmetric XChaCha20-Poly1305 AEAD & AES Block Modes
+
+```celang
+"use universal"
+import "crypto"
+
+let plaintext = "Sensitive data transmission over untrusted network"
+
+// 1. XChaCha20-Poly1305 AEAD with Extended 24-byte Nonce
+// Uses a 192-bit (24-byte) random nonce to eliminate nonce collision risk (birthday bound).
+// Decryption is adaptive: transparently supports both 24-byte nonces and legacy 12-byte nonces.
+let chachaKey = crypto.generate_chacha_key()
+let aad = "user-id:1001;org:celang"
+let ciphertext = crypto.encrypt_chacha(plaintext, chachaKey, aad)
+let recovered = crypto.decrypt_chacha(ciphertext, chachaKey, aad)
+
+// 2. Standard AES Modes (CTR & CBC with PKCS#7)
+// AES-CBC incorporates constant-time PKCS#7 unpadding to mitigate padding oracle attacks.
+let aesKey = "01234567890123456789012345678901" // 32 bytes (AES-256)
+let iv = "0123456789012345"                     // 16 bytes
+let encCTR = crypto.aes_ctr(plaintext, aesKey, iv)
+let decCTR = crypto.aes_ctr(encCTR, aesKey, iv)
+
+let encCBC = crypto.aes_cbc_encrypt(plaintext, aesKey, iv)
+let decCBC = crypto.aes_cbc_decrypt(encCBC, aesKey, iv)
+```
+
+### 7. Asymmetric Key Exchange & Signatures (X25519 & RSA)
+
+```celang
+"use universal"
+import "crypto"
+
+// 1. Curve25519 ECDH Key Exchange (Alice & Bob)
+let alice = crypto.generate_x25519_keypair()
+let bob = crypto.generate_x25519_keypair()
+
+let aliceSecret = crypto.x25519_shared_secret(alice.private_key, bob.public_key)
+let bobSecret = crypto.x25519_shared_secret(bob.private_key, alice.public_key)
+let ecdhMatches = crypto.timing_safe_equal(aliceSecret, bobSecret) // true
+
+// 2. RSA 2048/4096-bit Encryption (OAEP) & Signatures (PSS)
+let rsa = crypto.rsa_generate_keypair(2048)
+let rsaCipher = crypto.rsa_encrypt_oaep("Classified Note", rsa.public_key)
+let rsaPlain = crypto.rsa_decrypt_oaep(rsaCipher, rsa.private_key)
+
+// RSA-PSS signing uses deterministic SaltLengthEqualsHash.
+// RSA-PSS verification uses SaltLengthAuto (accepting both hex and Base64 signatures from OpenSSL, Java, Python).
+let rsaSig = crypto.rsa_sign_pss("Legal Agreement", rsa.private_key)
+let isSigValid = crypto.rsa_verify_pss("Legal Agreement", rsaSig, rsa.public_key)
+```
+
+### 8. Post-Quantum Cryptography & Hybrid KEM (ML-KEM-768 & Hybrid X-Wing)
+
+Guarantees long-term forward secrecy against future quantum attacks (*Harvest Now, Decrypt Later*):
+
+```celang
+"use universal"
+import "crypto"
+
+// 1. NIST FIPS 203 ML-KEM-768 (Kyber)
+let pqc = crypto.pqc_generate_keypair()
+
+// Sender encapsulates shared secret with recipient's encapsulation key
+let encResult = crypto.pqc_encapsulate(pqc.encapsulation_key)
+let senderSecret = encResult.shared_secret
+let pqcCiphertext = encResult.ciphertext
+
+// Recipient decapsulates using private decapsulation key
+let recipientSecret = crypto.pqc_decapsulate(pqcCiphertext, pqc.decapsulation_key)
+let pqcMatches = crypto.timing_safe_equal(senderSecret, recipientSecret) // true
+
+// 2. Hybrid KEM: X-Wing (X25519 Classical + ML-KEM-768 Quantum)
+// Recommended for production: resists both classical cryptanalysis and quantum attacks
+let xwing = crypto.xwing_generate_keypair()
+let xwEnc = crypto.xwing_encapsulate(xwing.public_key)
+let xwSecret = crypto.xwing_decapsulate(xwEnc.ciphertext, xwing.private_key)
+let xwMatches = crypto.timing_safe_equal(xwEnc.shared_secret, xwSecret) // true
+```
+
 ---
 
 ## 🔒 Security Best Practices
@@ -349,4 +543,13 @@ print("Account UUID:", accountId)
    Never store user passwords using simple cryptographic digests like SHA-256 or MD5. Always rely on `crypto.hash_password()`, which enforces 100,000 PBKDF2-HMAC-SHA256 iterations and random 16-byte salt generation.
 
 4. **Safeguard Private Keys**:
-   Never commit Ed25519 private keys to source control. Store them in secure key vaults or environment variables, and distribute only the public key to clients.
+   Never commit Ed25519 or RSA private keys to source control. Store them in secure key vaults or environment variables, and distribute only the public key to clients.
+
+5. **Prefer Authenticated Encryption (AEAD) over Raw Cipher Modes (CBC / CTR)**:
+   `crypto.aes_cbc_encrypt` and `crypto.aes_ctr` do not include built-in authenticity tags. Using unauthenticated CBC over a network can expose your service to padding oracle vulnerabilities. Always prefer `crypto.encrypt` (AES-256-GCM) or `crypto.encrypt_chacha` (ChaCha20-Poly1305). If using CBC or CTR, always combine it with HMAC-SHA256 (*Encrypt-then-MAC*).
+
+6. **Poly1305 Requires a One-Time Key**:
+   Never reuse the same 32-byte key to authenticate multiple messages with Poly1305. Key reuse catastrophically compromises the authenticator. If you need a reusable key for message authentication, use `crypto.hmac` (HMAC-SHA256) or keyed `crypto.blake3(data, key)`.
+
+7. **Derive Symmetric Keys from `x25519_shared_secret` using HKDF**:
+   Do not use the raw 32-byte shared secret from X25519 directly as a symmetric cipher key. Pass the shared secret through HKDF (`crypto.hkdf(sharedSecret, salt, "protocol-purpose", 32)`) to obtain uniform key material.

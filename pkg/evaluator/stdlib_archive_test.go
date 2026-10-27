@@ -1,6 +1,7 @@
 package evaluator_test
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
@@ -413,4 +414,412 @@ func TestArchive_ExtractionFilter(t *testing.T) {
 		t.Errorf("Expected file2.log to be skipped by filter")
 	}
 }
+
+func TestArchive_ZipTestArchive(t *testing.T) {
+	tempDir := t.TempDir()
+	fPath := filepath.Join(tempDir, "data.txt")
+	if err := os.WriteFile(fPath, []byte("Data integritas arsip ZIP 2026"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	zipPath := filepath.Join(tempDir, "sehat.zip")
+
+	// 1. Uji arsip ZIP sehat
+	scriptSehat := `
+	arsip.buat_zip("` + filepath.ToSlash(fPath) + `", "` + filepath.ToSlash(zipPath) + `")
+	buat hasil = arsip.uji_zip("` + filepath.ToSlash(zipPath) + `")
+	hasil
+	`
+	resSehat, _ := runArchiveScript(t, scriptSehat, filepath.Join(tempDir, "sehat.ce"))
+	if resSehat != evaluator.NULL {
+		t.Fatalf("Expected uji_zip on healthy archive to return null, got %v", resSehat)
+	}
+
+	// 2. Buat ZIP rusak: mutasi checksum CRC32 pada direktori utama (Central Directory)
+	zipData, err := os.ReadFile(zipPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	corruptZipPath := filepath.Join(tempDir, "rusak.zip")
+	corruptData := make([]byte, len(zipData))
+	copy(corruptData, zipData)
+
+	cdIdx := bytes.Index(corruptData, []byte("PK\x01\x02"))
+	if cdIdx == -1 || cdIdx+16 >= len(corruptData) {
+		t.Fatalf("Central Directory not found in zip data")
+	}
+	corruptData[cdIdx+16] ^= 0x01 // Rusak CRC32 checksum
+
+	if err := os.WriteFile(corruptZipPath, corruptData, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	scriptRusak := `
+	buat hasil = arsip.uji_zip("` + filepath.ToSlash(corruptZipPath) + `")
+	hasil
+	`
+	resRusak, _ := runArchiveScript(t, scriptRusak, filepath.Join(tempDir, "rusak.ce"))
+	strObj, ok := resRusak.(*evaluator.String)
+	if !ok || strObj.Value != "data.txt" {
+		t.Fatalf("Expected uji_zip on corrupt archive to return 'data.txt', got %v", resRusak)
+	}
+}
+
+func TestArchive_ZipFileInfoAndCRC(t *testing.T) {
+	tempDir := t.TempDir()
+	fPath := filepath.Join(tempDir, "info_test.txt")
+	content := "Konten pengujian CRC32 dan Metadata ZIP"
+	if err := os.WriteFile(fPath, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	zipPath := filepath.Join(tempDir, "info.zip")
+
+	script := `
+	arsip.buat_zip("` + filepath.ToSlash(fPath) + `", "` + filepath.ToSlash(zipPath) + `")
+	buat info = arsip.info_berkas_zip("` + filepath.ToSlash(zipPath) + `", "info_test.txt")
+	info
+	`
+	res, _ := runArchiveScript(t, script, filepath.Join(tempDir, "info.ce"))
+	if res == nil || res.Type() == evaluator.ERROR_OBJ {
+		t.Fatalf("Script error: %v", res)
+	}
+
+	mapObj, ok := res.(*evaluator.Map)
+	if !ok {
+		t.Fatalf("Expected Map, got %v", res)
+	}
+
+	crcVal, ok := mapObj.Pairs["crc32"]
+	if !ok || crcVal.Type() != evaluator.INTEGER_OBJ {
+		t.Fatalf("Expected crc32 Integer, got %v", crcVal)
+	}
+	if crcVal.(*evaluator.Integer).Value == 0 {
+		t.Errorf("Expected non-zero CRC32, got 0")
+	}
+
+	metodeVal, ok := mapObj.Pairs["metode_kompresi"]
+	if !ok || metodeVal.Type() != evaluator.STRING_OBJ {
+		t.Fatalf("Expected metode_kompresi String, got %v", metodeVal)
+	}
+	if metodeVal.(*evaluator.String).Value != "deflate" {
+		t.Errorf("Expected metode_kompresi 'deflate', got %s", metodeVal.(*evaluator.String).Value)
+	}
+}
+
+func TestArchive_ZipCreateFromMemory(t *testing.T) {
+	tempDir := t.TempDir()
+	zipPath := filepath.Join(tempDir, "memori.zip")
+	destDir := filepath.Join(tempDir, "ekstrak_memori")
+
+	script := `
+	buat berkasMap = {
+		"halo.txt": "Halo dari memori!",
+		"sub/data.bin": bita([10, 20, 30, 40])
+	}
+	buat ok = arsip.buat_zip_memori(berkasMap, "` + filepath.ToSlash(zipPath) + `")
+	buat ujiRes = arsip.uji_zip("` + filepath.ToSlash(zipPath) + `")
+	buat total = arsip.ekstrak_zip("` + filepath.ToSlash(zipPath) + `", "` + filepath.ToSlash(destDir) + `")
+	[ok, ujiRes, total]
+	`
+	res, _ := runArchiveScript(t, script, filepath.Join(tempDir, "memori.ce"))
+	if res == nil || res.Type() == evaluator.ERROR_OBJ {
+		t.Fatalf("Script error: %v", res)
+	}
+
+	arrObj := res.(*evaluator.Array)
+	if arrObj.Elements[0] != evaluator.TRUE {
+		t.Errorf("Expected ok = true")
+	}
+	if arrObj.Elements[1] != evaluator.NULL {
+		t.Errorf("Expected ujiRes = null, got %v", arrObj.Elements[1])
+	}
+	if arrObj.Elements[2].(*evaluator.Integer).Value != 2 {
+		t.Errorf("Expected 2 extracted files, got %v", arrObj.Elements[2])
+	}
+
+	dataHalo, err := os.ReadFile(filepath.Join(destDir, "halo.txt"))
+	if err != nil || string(dataHalo) != "Halo dari memori!" {
+		t.Errorf("halo.txt content mismatch: %v, %q", err, string(dataHalo))
+	}
+
+	dataBin, err := os.ReadFile(filepath.Join(destDir, "sub", "data.bin"))
+	if err != nil || len(dataBin) != 4 || dataBin[0] != 10 {
+		t.Errorf("data.bin content mismatch: %v, %v", err, dataBin)
+	}
+
+	// Uji mitigasi Zip Slip pada buat_zip_memori
+	evilZipPath := filepath.Join(tempDir, "evil.zip")
+	scriptEvil := `
+	buat evilMap = {
+		"../bahaya.txt": "Serangan Zip Slip"
+	}
+	arsip.buat_zip_memori(evilMap, "` + filepath.ToSlash(evilZipPath) + `")
+	`
+	resEvil, _ := runArchiveScript(t, scriptEvil, filepath.Join(tempDir, "evil.ce"))
+	if resEvil == nil || resEvil.Type() != evaluator.ERROR_OBJ {
+		t.Fatalf("Expected error on Zip Slip memory entry, got %v", resEvil)
+	}
+}
+
+func TestArchive_ZipCompressionMethodStore(t *testing.T) {
+	tempDir := t.TempDir()
+	fPath := filepath.Join(tempDir, "store_test.txt")
+	if err := os.WriteFile(fPath, []byte("Data tidak dikompresi (store)"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	zipPath := filepath.Join(tempDir, "store.zip")
+
+	script := `
+	buat ok = arsip.buat_zip("` + filepath.ToSlash(fPath) + `", "` + filepath.ToSlash(zipPath) + `", { "metode": "store" })
+	buat info = arsip.info_berkas_zip("` + filepath.ToSlash(zipPath) + `", "store_test.txt")
+	[ok, info.metode_kompresi]
+	`
+	res, _ := runArchiveScript(t, script, filepath.Join(tempDir, "store.ce"))
+	if res == nil || res.Type() == evaluator.ERROR_OBJ {
+		t.Fatalf("Script error: %v", res)
+	}
+
+	arrObj := res.(*evaluator.Array)
+	if arrObj.Elements[0] != evaluator.TRUE {
+		t.Errorf("Expected ok = true")
+	}
+	if arrObj.Elements[1].(*evaluator.String).Value != "store" {
+		t.Errorf("Expected metode_kompresi 'store', got %s", arrObj.Elements[1].(*evaluator.String).Value)
+	}
+}
+
+func TestArchive_SecurityHardening(t *testing.T) {
+	tempDir := t.TempDir()
+
+	t.Run("DecompressionBomb_MaxSizeQuota", func(t *testing.T) {
+		zipPath := filepath.Join(tempDir, "bomb_size.zip")
+		scriptMake := `
+		arsip.buat_zip_memori({
+			"besar.txt": "123456789012345678901234567890"
+		}, "` + filepath.ToSlash(zipPath) + `")
+		`
+		runArchiveScript(t, scriptMake, filepath.Join(tempDir, "make.ce"))
+
+		outDir := filepath.Join(tempDir, "out_size")
+		scriptExtract := `
+		arsip.ekstrak_zip("` + filepath.ToSlash(zipPath) + `", "` + filepath.ToSlash(outDir) + `", {
+			batas_ukuran: 10
+		})
+		`
+		res, _ := runArchiveScript(t, scriptExtract, filepath.Join(tempDir, "extract.ce"))
+		if res == nil || res.Type() != evaluator.ERROR_OBJ {
+			t.Fatalf("Expected error due to exceeding batas_ukuran, got: %v", res)
+		}
+		if !strings.Contains(res.(*evaluator.Error).Message, "melebihi batas") {
+			t.Errorf("Expected 'melebihi batas' in error, got: %s", res.(*evaluator.Error).Message)
+		}
+	})
+
+	t.Run("DecompressionBomb_MaxEntriesQuota", func(t *testing.T) {
+		zipPath := filepath.Join(tempDir, "bomb_entries.zip")
+		scriptMake := `
+		arsip.buat_zip_memori({
+			"a.txt": "A",
+			"b.txt": "B",
+			"c.txt": "C",
+			"d.txt": "D"
+		}, "` + filepath.ToSlash(zipPath) + `")
+		`
+		runArchiveScript(t, scriptMake, filepath.Join(tempDir, "make_entries.ce"))
+
+		outDir := filepath.Join(tempDir, "out_entries")
+		scriptExtract := `
+		arsip.ekstrak_zip("` + filepath.ToSlash(zipPath) + `", "` + filepath.ToSlash(outDir) + `", {
+			max_entries: 2
+		})
+		`
+		res, _ := runArchiveScript(t, scriptExtract, filepath.Join(tempDir, "extract_entries.ce"))
+		if res == nil || res.Type() != evaluator.ERROR_OBJ {
+			t.Fatalf("Expected error due to exceeding max_entries, got: %v", res)
+		}
+		if !strings.Contains(res.(*evaluator.Error).Message, "melebihi batas") {
+			t.Errorf("Expected 'melebihi batas' in error, got: %s", res.(*evaluator.Error).Message)
+		}
+	})
+
+	t.Run("MemoryZip_BackslashRejection", func(t *testing.T) {
+		zipPath := filepath.Join(tempDir, "backslash.zip")
+		script := `
+		arsip.buat_zip_memori({
+			"folder\\berkas.txt": "isi"
+		}, "` + filepath.ToSlash(zipPath) + `")
+		`
+		res, _ := runArchiveScript(t, script, filepath.Join(tempDir, "bs.ce"))
+		if res == nil || res.Type() != evaluator.ERROR_OBJ {
+			t.Fatalf("Expected error rejecting backslash in entry name, got: %v", res)
+		}
+		if !strings.Contains(res.(*evaluator.Error).Message, "backslash") {
+			t.Errorf("Expected mention of backslash in error, got: %s", res.(*evaluator.Error).Message)
+		}
+	})
+
+	t.Run("InTargetSymlinkTraversal", func(t *testing.T) {
+		targetDir := filepath.Join(tempDir, "symlink_target")
+		outsideDir := filepath.Join(tempDir, "outside")
+		if err := os.MkdirAll(targetDir, 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.MkdirAll(outsideDir, 0755); err != nil {
+			t.Fatal(err)
+		}
+		linkPath := filepath.Join(targetDir, "link_out")
+		if err := os.Symlink(outsideDir, linkPath); err != nil {
+			t.Skip("Symlinks not supported on this filesystem")
+		}
+
+		zipPath := filepath.Join(tempDir, "evil_sym.zip")
+		scriptMake := `
+		arsip.buat_zip_memori({
+			"link_out/evil.txt": "konten bahaya"
+		}, "` + filepath.ToSlash(zipPath) + `")
+		`
+		runArchiveScript(t, scriptMake, filepath.Join(tempDir, "make_evil_sym.ce"))
+
+		scriptExtract := `
+		arsip.ekstrak_zip("` + filepath.ToSlash(zipPath) + `", "` + filepath.ToSlash(targetDir) + `")
+		`
+		res, _ := runArchiveScript(t, scriptExtract, filepath.Join(tempDir, "extract_evil_sym.ce"))
+		if res == nil || res.Type() != evaluator.ERROR_OBJ {
+			t.Fatalf("Expected error rejecting in-target symlink traversal, got: %v", res)
+		}
+		if !strings.Contains(res.(*evaluator.Error).Message, "symlink") && !strings.Contains(res.(*evaluator.Error).Message, "keluar") {
+			t.Errorf("Expected symlink traversal error message, got: %s", res.(*evaluator.Error).Message)
+		}
+	})
+
+	t.Run("ArchiveCreation_SkipsSymlinks", func(t *testing.T) {
+		srcDir := filepath.Join(tempDir, "src_with_symlink")
+		if err := os.MkdirAll(srcDir, 0755); err != nil {
+			t.Fatal(err)
+		}
+		realFile := filepath.Join(srcDir, "asli.txt")
+		if err := os.WriteFile(realFile, []byte("berkas asli"), 0644); err != nil {
+			t.Fatal(err)
+		}
+		secretFile := filepath.Join(tempDir, "rahasia.txt")
+		if err := os.WriteFile(secretFile, []byte("kunci rahasia"), 0600); err != nil {
+			t.Fatal(err)
+		}
+		symlinkFile := filepath.Join(srcDir, "link_rahasia.txt")
+		if err := os.Symlink(secretFile, symlinkFile); err != nil {
+			t.Skip("Symlinks not supported")
+		}
+
+		zipPath := filepath.Join(tempDir, "skip_sym.zip")
+		scriptZip := `
+		arsip.buat_zip("` + filepath.ToSlash(srcDir) + `", "` + filepath.ToSlash(zipPath) + `")
+		arsip.daftar_zip("` + filepath.ToSlash(zipPath) + `")
+		`
+		res, _ := runArchiveScript(t, scriptZip, filepath.Join(tempDir, "zip_sym.ce"))
+		if res == nil || res.Type() == evaluator.ERROR_OBJ {
+			t.Fatalf("Unexpected error creating zip: %v", res)
+		}
+		arr := res.(*evaluator.Array)
+		for _, el := range arr.Elements {
+			entryMap := el.(*evaluator.Map)
+			name := entryMap.Pairs["nama"].(*evaluator.String).Value
+			if strings.Contains(name, "link_rahasia") {
+				t.Errorf("Symlink was not skipped in ZIP! Found: %s", name)
+			}
+		}
+	})
+
+	t.Run("MapLiteralUnquotedFilterKey", func(t *testing.T) {
+		zipPath := filepath.Join(tempDir, "filter_unquoted.zip")
+		scriptMake := `
+		arsip.buat_zip_memori({
+			"a.txt": "A",
+			"b.ce": "B"
+		}, "` + filepath.ToSlash(zipPath) + `")
+		`
+		runArchiveScript(t, scriptMake, filepath.Join(tempDir, "make_f.ce"))
+
+		outDir := filepath.Join(tempDir, "out_filter")
+		// saring tanpa tanda kutip dan nama cocok dengan fungsi builtin saring
+		scriptExtract := `
+		arsip.ekstrak_zip("` + filepath.ToSlash(zipPath) + `", "` + filepath.ToSlash(outDir) + `", {
+			saring: fungsi(info) {
+				kembalikan teks.diakhiri_dengan(info.nama, ".ce")
+			}
+		})
+		`
+		res, _ := runArchiveScript(t, scriptExtract, filepath.Join(tempDir, "extract_f.ce"))
+		if res == nil || res.Type() == evaluator.ERROR_OBJ {
+			t.Fatalf("Script failed with unquoted 'saring' key: %v", res)
+		}
+		total := res.(*evaluator.Integer).Value
+		if total != 1 {
+			t.Errorf("Expected 1 extracted file, got %d", total)
+		}
+	})
+
+	t.Run("FilterAssertionErrorDoesNotPanic", func(t *testing.T) {
+		zipPath := filepath.Join(tempDir, "filter_assert.zip")
+		scriptMake := `
+		arsip.buat_zip_memori({
+			"test.txt": "konten"
+		}, "` + filepath.ToSlash(zipPath) + `")
+		`
+		runArchiveScript(t, scriptMake, filepath.Join(tempDir, "make_fa.ce"))
+
+		outDir := filepath.Join(tempDir, "out_filter_assert")
+		scriptExtract := `
+		arsip.ekstrak_zip("` + filepath.ToSlash(zipPath) + `", "` + filepath.ToSlash(outDir) + `", {
+			saring: fungsi(info) {
+				harus_sama(1, 2)
+				kembalikan benar
+			}
+		})
+		`
+		res, _ := runArchiveScript(t, scriptExtract, filepath.Join(tempDir, "extract_fa.ce"))
+		if res == nil || res.Type() != evaluator.ERROR_OBJ {
+			t.Fatalf("Expected Error object due to assertion failure in filter, got %v", res)
+		}
+		if !strings.Contains(res.Inspect(), "kesalahan pada fungsi saring") {
+			t.Errorf("Expected error to mention filter error, got: %s", res.Inspect())
+		}
+	})
+
+	t.Run("TarArrayFileListSkipsSymlink", func(t *testing.T) {
+		realFile := filepath.Join(tempDir, "real_tar.txt")
+		if err := os.WriteFile(realFile, []byte("tar real file"), 0644); err != nil {
+			t.Fatal(err)
+		}
+		secretFile := filepath.Join(tempDir, "secret_tar.txt")
+		if err := os.WriteFile(secretFile, []byte("secret tar content"), 0600); err != nil {
+			t.Fatal(err)
+		}
+		symlinkFile := filepath.Join(tempDir, "link_tar.txt")
+		if err := os.Symlink(secretFile, symlinkFile); err != nil {
+			t.Skip("Symlinks not supported")
+		}
+
+		tarPath := filepath.Join(tempDir, "out_skip.tar")
+		scriptTar := `
+		arsip.buat_tar(["` + filepath.ToSlash(realFile) + `", "` + filepath.ToSlash(symlinkFile) + `"], "` + filepath.ToSlash(tarPath) + `")
+		arsip.daftar_tar("` + filepath.ToSlash(tarPath) + `")
+		`
+		res, _ := runArchiveScript(t, scriptTar, filepath.Join(tempDir, "tar_sym.ce"))
+		if res == nil || res.Type() == evaluator.ERROR_OBJ {
+			t.Fatalf("Unexpected error creating tar from array: %v", res)
+		}
+		arr := res.(*evaluator.Array)
+		for _, el := range arr.Elements {
+			entryMap := el.(*evaluator.Map)
+			name := entryMap.Pairs["nama"].(*evaluator.String).Value
+			if strings.Contains(name, "link_tar") {
+				t.Errorf("Symlink was not skipped in TAR array file list! Found: %s", name)
+			}
+		}
+	})
+}
+
+
 

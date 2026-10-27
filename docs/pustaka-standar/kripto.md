@@ -6,16 +6,15 @@ outline: deep
 
 Modul **`kripto`** (atau dengan alias internasional **`crypto`**) menyediakan ekosistem kriptografi berstandar industri modern di Celang. Diimplementasikan murni menggunakan pustaka kriptografi Go (*pure Go*, tanpa dependensi C/eksternal), modul ini dirancang dengan prinsip **aman secara bawaan (*safe-by-default*)** dan terinspirasi dari pola resep tingkat tinggi pada pustaka modern seperti Python `cryptography.io`.
 
-Modul ini mencakup solusi komprehensif mulai dari resep enkripsi terotentikasi, hashing sandi tahan serangan brute-force, tanda tangan digital asimetris Ed25519, hingga fungsi hash dan perbandingan waktu konstan:
+Modul ini mencakup solusi komprehensif mulai dari resep enkripsi terotentikasi, hashing sandi tahan serangan brute-force, tanda tangan digital asimetris, hingga fungsi hash modern dan kriptografi pasca-kuantum (PQC):
 
-1. **Enkripsi Simetris Terotentikasi (AEAD AES-256-GCM)**: Enkripsi dan dekripsi data aman dengan perlindungan manipulasi otomatis (`buat_kunci`, `enkripsi`, `dekripsi`).
-2. **Password Hashing & Derivasi Kunci (PBKDF2-HMAC-SHA256)**: Pengamanan kata sandi berstandar format PHC dengan *constant-time comparison* serta pembuatan kunci simetris dari sandi (`hash_sandi`, `verifikasi_sandi`, `turunkan_kunci`).
-3. **Tanda Tangan Digital Asimetris (Ed25519 - RFC 8032)**: Penandatanganan dan verifikasi pesan digital berkecepatan tinggi dengan ukuran kunci ringkas 32-byte (`buat_pasangan_kunci`, `tanda_tangan`, `verifikasi_tanda_tangan`).
-4. **Verifikasi Integritas & Checksum (Hash Digest)**: SHA-256, SHA-512, SHA-1, dan MD5.
-5. **Otentikasi Pesan Berbasis Kunci (HMAC)**: HMAC-SHA256 untuk tanda tangan webhook dan integritas payload API.
-6. **Entropi & Keacakan Kriptografis**: Mengambil keacakan aman tingkat sistem operasi untuk token sesi dan salt (`acak_heks`, `acak_bita`).
-7. **Pengenal Unik Global (UUID v4)**: Pembangkit UUID versi 4 standar RFC 4122 (`uuid`).
-8. **Perlindungan Anti-Timing Attack**: Perbandingan waktu konstan untuk mencegah kebocoran informasi melalui perbedaan latensi CPU (`konstanta_sama`).
+1. **Enkripsi Simetris Terotentikasi (AEAD AES-256-GCM & ChaCha20-Poly1305)**: Enkripsi dan dekripsi data aman dengan perlindungan manipulasi otomatis (`buat_kunci`, `enkripsi`, `dekripsi`, `buat_kunci_chacha`, `enkripsi_chacha`, `dekripsi_chacha`).
+2. **Password Hashing & Derivasi Kunci Lanjutan (Argon2id, PBKDF2, HKDF)**: Pengamanan kata sandi berstandar industri dengan Argon2id dan PBKDF2, serta RFC 5869 HKDF (*extract-and-expand*) (`hash_sandi_argon2`, `verifikasi_sandi_argon2`, `hkdf`, `hkdf_ekstrak`, `hkdf_ekspansi`).
+3. **Kriptografi Asimetris & Pertukaran Kunci (Ed25519, X25519, RSA)**: Tanda tangan digital modern Ed25519, pertukaran kunci ECDH X25519, dan RSA 2048/4096-bit (OAEP enkripsi & PSS tanda tangan).
+4. **Fungsi Hash Modern & MAC Kinerja Tinggi (SHA-3, SHAKE, BLAKE2, BLAKE3, Poly1305)**: Keccak SHA-3, SHAKE extensible output, BLAKE2b/s, BLAKE3 paralel, dan Poly1305 MAC satu-kali.
+5. **Kriptografi Pasca-Kuantum (Post-Quantum Cryptography - PQC & Hybrid KEM)**: Standar NIST FIPS 203 ML-KEM-768 (Kyber) dan konstruksi hibrida tahan masa depan X-Wing (X25519 + ML-KEM-768).
+6. **Entropi & Keacakan Kriptografis**: Mengambil keacakan aman tingkat sistem operasi untuk token sesi dan salt (`acak_heks`, `acak_bita`, `uuid`).
+7. **Perlindungan Anti-Timing Attack**: Perbandingan waktu konstan untuk mencegah kebocoran informasi melalui perbedaan latensi CPU (`konstanta_sama`).
 
 ---
 
@@ -102,6 +101,66 @@ Untuk panduan sintaks lengkap dalam bahasa Inggris, silakan lihat **[Dokumentasi
 | `kripto.acak_bita(panjang)` | `crypto.random_bytes(panjang)` | `panjang`: `Angka` (byte) | `Bita` | Menghasilkan buffer objek `Bita` biner acak dari CSPRNG |
 | `kripto.uuid()` | `crypto.uuid()` | `-` | `Teks` (UUID v4) | Menghasilkan ID acak unik standar RFC 4122 versi 4 |
 | `kripto.konstanta_sama(a, b)` | `crypto.timing_safe_equal(a, b)` | `a`, `b`: `Teks` / `Bita` | `Benar` / `Salah` | Membandingkan dua nilai rahasia dalam waktu konstan anti-timing attack |
+
+### 5. Hash Modern & Message Authentication Code (SHA-3, SHAKE, BLAKE2, BLAKE3, Poly1305)
+
+| Fungsi (Bahasa Indonesia) | Alias Universal (Inggris) | Parameter Masukan | Tipe Kembalian | Deskripsi Singkat |
+| :--- | :--- | :--- | :--- | :--- |
+| `kripto.sha3_256(data)` | `crypto.sha3_256(data)` | `data`: `Teks` / `Bita` | `Teks` (heksadesimal) | Menghitung digest SHA3-256 (FIPS 202 Keccak, 64 heks) |
+| `kripto.sha3_512(data)` | `crypto.sha3_512(data)` | `data`: `Teks` / `Bita` | `Teks` (heksadesimal) | Menghitung digest SHA3-512 (FIPS 202 Keccak, 128 heks) |
+| `kripto.shake128(data, panjang)` | `crypto.shake128(data, length)` | `data`: `Teks` / `Bita`<br>`panjang`: `Angka` (byte) | `Teks` (heksadesimal) | XOF (Extendable-Output Function) SHAKE128 dengan panjang dinamis |
+| `kripto.shake256(data, panjang)` | `crypto.shake256(data, length)` | `data`: `Teks` / `Bita`<br>`panjang`: `Angka` (byte) | `Teks` (heksadesimal) | XOF (Extendable-Output Function) SHAKE256 dengan panjang dinamis |
+| `kripto.blake2b(data, [kunci])` | `crypto.blake2b(data, [key])` | `data`: `Teks` / `Bita`<br>`kunci`: `Teks` / `Bita` (opsional) | `Teks` (heksadesimal) | Hash kecepatan tinggi 64-byte (128 heks) RFC 7693 dengan opsi keyed MAC |
+| `kripto.blake2s(data, [kunci])` | `crypto.blake2s(data, [key])` | `data`: `Teks` / `Bita`<br>`kunci`: `Teks` / `Bita` (opsional) | `Teks` (heksadesimal) | Hash 32-bit teroptimasi 32-byte (64 heks) RFC 7693 dengan opsi keyed MAC |
+| `kripto.blake3(data, [kunci])` | `crypto.blake3(data, [key])` | `data`: `Teks` / `Bita`<br>`kunci`: `Teks` / `Bita` (opsional) | `Teks` (heksadesimal) | Hash pohon Merkle modern super cepat dengan dukungan keyed MAC |
+| `kripto.poly1305_buat_mac(pesan, kunci)` | `crypto.poly1305_auth(msg, key)` | `pesan`: `Teks` / `Bita`<br>`kunci`: `Teks` / `Bita` (32 bita) | `Teks` (heksadesimal) | Menghasilkan autentikator Poly1305 16-byte (32 heks) satu-kali (RFC 8439) |
+| `kripto.poly1305_verifikasi(pesan, tag, kunci)` | `crypto.poly1305_verify(msg, tag, key)` | `pesan`: `Teks` / `Bita`<br>`tag`: `Teks` / `Bita`<br>`kunci`: `Teks` / `Bita` | `Benar` / `Salah` | Memverifikasi tag autentikasi Poly1305 dalam waktu konstan |
+
+### 6. Derivasi Kunci Lanjutan & Password Hashing Modern (HKDF & Argon2id)
+
+| Fungsi (Bahasa Indonesia) | Alias Universal (Inggris) | Parameter Masukan | Tipe Kembalian | Deskripsi Singkat |
+| :--- | :--- | :--- | :--- | :--- |
+| `kripto.hkdf(secret, salt, info, panjang)` | `crypto.hkdf(...)` | `secret`, `salt`, `info`: `Teks`/`Bita`<br>`panjang`: `Angka` | `Bita` | Menurunkan kunci biner berkualitas tinggi menggunakan RFC 5869 HKDF |
+| `kripto.hkdf_ekstrak(secret, salt)` | `crypto.hkdf_extract(...)` | `secret`, `salt`: `Teks` / `Bita` | `Bita` | Tahap ekstraksi HKDF menghasilkan Pseudorandom Key (PRK) 32-byte |
+| `kripto.hkdf_ekspansi(prk, info, panjang)` | `crypto.hkdf_expand(...)` | `prk`, `info`: `Teks`/`Bita`<br>`panjang`: `Angka` | `Bita` | Tahap ekspansi HKDF memperluas PRK menjadi material kunci target |
+| `kripto.hash_sandi_argon2(sandi, [time, mem, threads])` | `crypto.hash_password_argon2(...)` | `sandi`: `Teks`/`Bita`<br>opsional cost parameters | `Teks` (PHC) | Hash sandi standar industri Argon2id tahan ASIC/GPU memory-hard |
+| `kripto.verifikasi_sandi_argon2(sandi, hash)` | `crypto.verify_password_argon2(...)` | `sandi`: `Teks`/`Bita`<br>`hash`: `Teks` | `Benar` / `Salah` | Memverifikasi kata sandi terhadap string hash format PHC `$argon2id$` |
+| `kripto.argon2id_turunkan_kunci(sandi, salt, time, mem, threads, panjang)` | `crypto.argon2id_derive_key(...)` | `sandi`, `salt`<br>`time`, `mem`, `threads`, `panjang` | `Bita` | Menurunkan kunci enkripsi dari sandi menggunakan Argon2id memory-hard |
+
+### 7. Enkripsi Simetris ChaCha20-Poly1305 & Mode Blok AES
+
+| Fungsi (Bahasa Indonesia) | Alias Universal (Inggris) | Parameter Masukan | Tipe Kembalian | Deskripsi Singkat |
+| :--- | :--- | :--- | :--- | :--- |
+| `kripto.buat_kunci_chacha()` | `crypto.generate_chacha_key()` | `-` | `Teks` (Base64) | Menghasilkan kunci 32-byte acak format Base64 untuk ChaCha20 |
+| `kripto.enkripsi_chacha(data, kunci, [aad])` | `crypto.encrypt_chacha(...)` | `data`, `kunci`: `Teks`/`Bita`<br>`aad`: `Teks`/`Bita` (opsional) | `Teks` (Base64) | Enkripsi terotentikasi RFC 8439 ChaCha20-Poly1305 dengan nonce 12-byte otomatis |
+| `kripto.dekripsi_chacha(ciphertext, kunci, [aad])` | `crypto.decrypt_chacha(...)` | `ciphertext`, `kunci`<br>`aad` (opsional) | `Teks` | Mendekripsi dan memverifikasi ciphertext ChaCha20-Poly1305 |
+| `kripto.aes_ctr(data, kunci, iv)` | `crypto.aes_ctr(data, key, iv)` | `data`: `Teks`/`Bita`<br>`kunci`: 16/24/32 bita<br>`iv`: 16 bita | `Bita` | Enkripsi/dekripsi simetris AES mode Counter (CTR) stream cipher |
+| `kripto.aes_cbc_enkripsi(data, kunci, iv)` | `crypto.aes_cbc_encrypt(...)` | `data`: `Teks`/`Bita`<br>`kunci`: 16/24/32 bita<br>`iv`: 16 bita | `Bita` | Enkripsi AES mode CBC dengan padding otomatis standar PKCS#7 |
+| `kripto.aes_cbc_dekripsi(ciphertext, kunci, iv)` | `crypto.aes_cbc_decrypt(...)` | `ciphertext`, `kunci`, `iv` | `Bita` | Dekripsi AES mode CBC dengan validasi dan pemotongan padding PKCS#7 |
+
+### 8. Kriptografi Asimetris & Pertukaran Kunci (X25519 & RSA)
+
+| Fungsi (Bahasa Indonesia) | Alias Universal (Inggris) | Parameter Masukan | Tipe Kembalian | Deskripsi Singkat |
+| :--- | :--- | :--- | :--- | :--- |
+| `kripto.buat_kunci_x25519()` | `crypto.generate_x25519_keypair()` | `-` | `Peta` (`Map`) | Menghasilkan pasangan kunci ECDH X25519 (`kunci_publik`, `kunci_privat`) |
+| `kripto.x25519_hitung_rahasia(kunci_privat, kunci_publik_lawan)` | `crypto.x25519_shared_secret(...)` | `kunci_privat`, `kunci_publik_lawan` | `Bita` | Menghitung shared secret Diffie-Hellman 32-byte berkecepatan tinggi |
+| `kripto.rsa_buat_kunci([bits])` | `crypto.rsa_generate_keypair([bits])` | `bits`: `Angka` (opsional, default 2048) | `Peta` (`Map`) | Menghasilkan pasangan kunci RSA dalam format standar PEM PKCS#1 / PKIX |
+| `kripto.rsa_enkripsi_oaep(data, kunci_publik_pem)` | `crypto.rsa_encrypt_oaep(...)` | `data`: `Teks`/`Bita`<br>`kunci_publik_pem`: `Teks` | `Teks` (Base64) | Mengenkripsi data menggunakan RSA-OAEP (SHA-256 MGF1) |
+| `kripto.rsa_dekripsi_oaep(ciphertext, kunci_privat_pem)` | `crypto.rsa_decrypt_oaep(...)` | `ciphertext`: `Teks`<br>`kunci_privat_pem`: `Teks` | `Teks` | Mendekripsi data menggunakan RSA-OAEP private key |
+| `kripto.rsa_tanda_tangan_pss(data, kunci_privat_pem)` | `crypto.rsa_sign_pss(...)` | `data`: `Teks`/`Bita`<br>`kunci_privat_pem`: `Teks` | `Teks` (Base64) | Menghasilkan tanda tangan digital probabilistik standar RSA-PSS (SHA-256) |
+| `kripto.rsa_verifikasi_pss(data, signature, kunci_publik_pem)` | `crypto.rsa_verify_pss(...)` | `data`, `signature`<br>`kunci_publik_pem`: `Teks` | `Benar` / `Salah` | Memvalidasi keabsahan tanda tangan digital RSA-PSS |
+
+### 9. Kriptografi Pasca-Kuantum & Hybrid KEM (NIST FIPS 203 & X-Wing)
+
+| Fungsi (Bahasa Indonesia) | Alias Universal (Inggris) | Parameter Masukan | Tipe Kembalian | Deskripsi Singkat |
+| :--- | :--- | :--- | :--- | :--- |
+| `kripto.pqc_buat_kunci()` | `crypto.pqc_generate_keypair()` | `-` | `Peta` (`Map`) | Pembangkit kunci NIST FIPS 203 ML-KEM-768 (`kunci_enkapsulasi`, `kunci_dekapsulasi`) |
+| `kripto.pqc_enkapsulasi(kunci_enkapsulasi)` | `crypto.pqc_encapsulate(...)` | `kunci_enkapsulasi`: `Teks`/`Bita` | `Peta` (`Map`) | Mengenkapsulasi kunci bersama pasca-kuantum: mengembalikan `{ ciphertext, kunci_bersama }` |
+| `kripto.pqc_dekapsulasi(ciphertext, kunci_dekapsulasi)` | `crypto.pqc_decapsulate(...)` | `ciphertext`, `kunci_dekapsulasi` | `Bita` | Mendekapsulasi shared secret 32-byte dari ciphertext ML-KEM-768 |
+| `kripto.xwing_buat_kunci()` | `crypto.xwing_generate_keypair()` | `-` | `Peta` (`Map`) | Pembangkit kunci hibrida X-Wing (kombinasi X25519 klasik + ML-KEM-768 kuantum) |
+| `kripto.xwing_enkapsulasi(kunci_publik)` | `crypto.xwing_encapsulate(...)` | `kunci_publik`: `Teks`/`Bita` | `Peta` (`Map`) | Enkapsulasi kunci hibrida tahan kuantum: mengembalikan `{ ciphertext, kunci_bersama }` |
+| `kripto.xwing_dekapsulasi(ciphertext, kunci_privat)` | `crypto.xwing_decapsulate(...)` | `ciphertext`, `kunci_privat` | `Bita` | Dekapsulasi shared secret hibrida 32-byte dari ciphertext X-Wing |
+
 
 ---
 
@@ -352,6 +411,133 @@ cetak("User ID (UUID v4):", userId)
 // Contoh: "4b848092-23c8-47a8-a53b-e85d996d9d1c"
 ```
 
+### 4. Hash Kinerja Tinggi Modern (SHA-3, BLAKE2, BLAKE3, dan Poly1305)
+
+Celang menyediakan fungsi hash modern dan message authentication code dengan perlindungan terhadap serangan length extension:
+
+```celang
+buat payload = "Pesan berharga untuk diverifikasi"
+
+// 1. Keccak SHA-3 & SHAKE XOF
+buat h3_256 = kripto.sha3_256(payload)
+buat h3_512 = kripto.sha3_512(payload)
+buat shake = kripto.shake128(payload, 32) // Output 32 bita dinamis
+
+// 2. BLAKE2 & BLAKE3
+buat b2b = kripto.blake2b(payload)
+buat b3 = kripto.blake3(payload)
+
+// Keyed MAC menggunakan BLAKE3 (32 bita)
+buat kunciMac = "kunci-rahasia-32-karakter-tepat!"
+buat macB3 = kripto.blake3(payload, kunciMac)
+
+// 3. Poly1305 MAC satu-kali
+buat kunciPoly = kripto.buat_kunci()
+buat tagPoly = kripto.poly1305_buat_mac(payload, kunciPoly)
+buat tagCocok = kripto.poly1305_verifikasi(payload, tagPoly, kunciPoly)
+```
+
+### 5. Password Hashing Modern (Argon2id) & Key Derivation (HKDF)
+
+Untuk pengamanan kata sandi berstandar ketat yang tahan serangan komputasi GPU/ASIC:
+
+```celang
+// 1. Argon2id Password Hashing (Format Standar PHC)
+buat sandi = "KatasandiKuat#2026!"
+buat hashArgon = kripto.hash_sandi_argon2(sandi)
+// Output: "$argon2id$v=19$m=65536,t=3,p=4$..."
+
+// Opsi kustom dapat diberikan via Peta (Map):
+buat hashKustom = kripto.hash_sandi_argon2(sandi, {"waktu": 2, "memori": 65536, "threads": 2})
+
+buat sukses = kripto.verifikasi_sandi_argon2(sandi, hashArgon)
+cetak("Verifikasi sandi cocok:", sukses) // benar
+
+// 2. HKDF Key Derivation (RFC 5869 Extract-and-Expand)
+// Sesuai RFC 5869 (SHA-256), panjang kunci turunan dibatasi hingga 255 * 32 = 8.160 bita.
+buat masterEntropy = "seed-entropy-sangat-rahasia"
+buat salt = "garam-unik-sesi-123"
+buat appKey = kripto.hkdf(masterEntropy, salt, "celang-app-v1", 32)
+```
+
+> [!NOTE]
+> **Perlindungan DoS pada Verifikasi Argon2**:
+> Saat memverifikasi hash dari input luar, `kripto.verifikasi_sandi_argon2` membatasi alokasi memori maksimal 256 MB (`256 * 1024` KB) dan waktu iterasi $t \le 10$ guna mencegah kelumpuhan server akibat serangan *Denial of Service* (DoS / OOM).
+
+### 6. Enkripsi Simetris XChaCha20-Poly1305 & Mode Blok AES
+
+Pilihan enkripsi simetris modern tanpa akselerasi perangkat keras khusus serta mode standar:
+
+```celang
+buat pesan = "Payload rahasia protokol Celang"
+
+// 1. XChaCha20-Poly1305 AEAD (Nonce 24-byte / 192-bit)
+// Menggunakan nonce acak 24-byte untuk mengeliminasi risiko tabrakan nonce (birthday bound).
+// Fungsi dekripsi bersifat adaptif: mendukung ciphertext 24-byte baru dan kompatibel mundur dengan 12-byte lama.
+buat kunciChaCha = kripto.buat_kunci_chacha()
+buat aad = "header-metadata-id:101"
+buat ciphertext = kripto.enkripsi_chacha(pesan, kunciChaCha, aad)
+buat plaintext = kripto.dekripsi_chacha(ciphertext, kunciChaCha, aad)
+
+// 2. Mode Blok AES (CTR & CBC PKCS#7)
+// AES-CBC Celang menggunakan unpadding PKCS#7 dalam waktu konstan (constant-time)
+// untuk memitigasi serangan padding oracle.
+buat kunciAES = "01234567890123456789012345678901" // 32 bita (AES-256)
+buat iv = "0123456789012345"                     // 16 bita
+buat encCTR = kripto.aes_ctr(pesan, kunciAES, iv)
+buat decCTR = kripto.aes_ctr(encCTR, kunciAES, iv)
+
+buat encCBC = kripto.aes_cbc_enkripsi(pesan, kunciAES, iv)
+buat decCBC = kripto.aes_cbc_dekripsi(encCBC, kunciAES, iv)
+```
+
+### 7. Pertukaran Kunci Asimetris (X25519 & RSA)
+
+```celang
+// 1. Pertukaran Kunci X25519 ECDH (Alice & Bob)
+buat alice = kripto.buat_kunci_x25519()
+buat bob = kripto.buat_kunci_x25519()
+
+buat rahasiaAlice = kripto.x25519_hitung_rahasia(alice.kunci_privat, bob.kunci_publik)
+buat rahasiaBob = kripto.x25519_hitung_rahasia(bob.kunci_privat, alice.kunci_publik)
+buat rahasiaCocok = kripto.konstanta_sama(rahasiaAlice, rahasiaBob) // benar!
+
+// 2. RSA (2048/4096-bit) Enkripsi OAEP & Tanda Tangan PSS
+buat pasanganRSA = kripto.rsa_buat_kunci(2048)
+buat encRSA = kripto.rsa_enkripsi_oaep("Pesan Penting", pasanganRSA.kunci_publik)
+buat decRSA = kripto.rsa_dekripsi_oaep(encRSA, pasanganRSA.kunci_privat)
+
+// Penandatanganan PSS menggunakan SaltLength deterministik sesuai hash (SHA-256).
+// Verifikasi PSS mendukung SaltLengthAuto (menerima signature hex maupun Base64 dari OpenSSL, Java, Python).
+buat sigRSA = kripto.rsa_tanda_tangan_pss("Dokumen Sah", pasanganRSA.kunci_privat)
+buat validRSA = kripto.rsa_verifikasi_pss("Dokumen Sah", sigRSA, pasanganRSA.kunci_publik)
+```
+
+### 8. Kriptografi Pasca-Kuantum (Post-Quantum ML-KEM-768 & Hybrid X-Wing)
+
+Melindungi transmisi data jangka panjang dari ancaman komputer kuantum masa depan (*Harvest Now, Decrypt Later*):
+
+```celang
+// 1. NIST FIPS 203 ML-KEM-768 (Kyber)
+buat kunciPQC = kripto.pqc_buat_kunci()
+
+// Pengirim mengenkapsulasi kunci bersama menggunakan kunci publik penerima
+buat hasilEnkapsulasi = kripto.pqc_enkapsulasi(kunciPQC.kunci_enkapsulasi)
+buat kunciBersamaPengirim = hasilEnkapsulasi.kunci_bersama
+buat ciphertextKuantum = hasilEnkapsulasi.ciphertext
+
+// Penerima mendekapsulasi ciphertext menggunakan kunci dekapsulasi privat
+buat kunciBersamaPenerima = kripto.pqc_dekapsulasi(ciphertextKuantum, kunciPQC.kunci_dekapsulasi)
+buat cocokPQC = kripto.konstanta_sama(kunciBersamaPengirim, kunciBersamaPenerima) // benar!
+
+// 2. Hybrid KEM: X-Wing (X25519 Klasik + ML-KEM-768 Pasca-Kuantum)
+// Rekomendasi terkuat: Menggabungkan keamanan kriptografi klasik dan pasca-kuantum secara simultan
+buat kunciXWing = kripto.xwing_buat_kunci()
+buat resXW = kripto.xwing_enkapsulasi(kunciXWing.kunci_publik)
+buat kunciXWPenerima = kripto.xwing_dekapsulasi(resXW.ciphertext, kunciXWing.kunci_privat)
+buat cocokXW = kripto.konstanta_sama(resXW.kunci_bersama, kunciXWPenerima) // benar!
+```
+
 ---
 
 ## 🔒 Praktik Terbaik & Rekomendasi Keamanan
@@ -365,5 +551,14 @@ cetak("User ID (UUID v4):", userId)
 3. **Gunakan `kripto.hash_sandi` untuk Kredensial Pengguna**:
    Jangan pernah menggunakan fungsi hash digest seperti `kripto.sha256` atau `kripto.md5` untuk menyimpan kata sandi. Gunakan selalu `kripto.hash_sandi` yang menggunakan PBKDF2-HMAC-SHA256 dengan 100.000 iterasi dan salt acak unik.
 
-4. **Simpan Kunci Privat Ed25519 di Lingkungan yang Aman**:
-   Kunci privat Ed25519 yang dihasilkan dari `kripto.buat_pasangan_kunci()` tidak boleh disimpan di repositori publik atau dibagikan kepada klien. Cukup bagikan `kunci_publik` untuk proses verifikasi.
+4. **Simpan Kunci Privat Ed25519 & RSA di Lingkungan yang Aman**:
+   Kunci privat yang dihasilkan dari `kripto.buat_pasangan_kunci()` atau `kripto.rsa_buat_kunci()` tidak boleh disimpan di repositori publik atau dibagikan kepada klien. Cukup bagikan `kunci_publik` untuk proses verifikasi.
+
+5. **Utamakan Enkripsi Terotentikasi (AEAD) Dibandingkan Mode Mentah (CBC / CTR)**:
+   Mode `aes_cbc_enkripsi` dan `aes_ctr` tidak menyertakan kode autentikasi pesan bawaan. Penggunaan CBC mentah di lingkungan jaringan tanpa otentikasi dapat membuka risiko serangan *padding oracle*. Selalu utamakan `kripto.enkripsi` (AES-256-GCM) atau `kripto.enkripsi_chacha` (ChaCha20-Poly1305). Jika menggunakan CBC/CTR, selalu pasangkan dengan pola *Encrypt-then-MAC* (HMAC-SHA256).
+
+6. **Kunci Poly1305 Bersifat Sekali-Pakai (*One-Time Key*)**:
+   Jangan pernah menggunakan kunci 32-byte yang sama untuk membuat tag Poly1305 pada lebih dari satu pesan. Menggunakan kembali kunci pada Poly1305 mematahkan integritas otentikasi. Jika membutuhkan MAC dengan kunci statis berulang kali, gunakan `kripto.hmac_sha256` atau keyed `kripto.blake3(pesan, kunci)`.
+
+7. **Turunkan Kunci dari `x25519_hitung_rahasia` Melalui HKDF**:
+   Hasil *shared secret* mentah dari pertukaran kunci Diffie-Hellman X25519 sebaiknya tidak langsung digunakan sebagai kunci enkripsi simetris. Gunakan fungsi derivasi kunci `kripto.hkdf(sharedSecret, salt, "tujuan-protokol", 32)` untuk mengekstraksi material kunci enkripsi simetris yang seragam.

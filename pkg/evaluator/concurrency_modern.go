@@ -14,7 +14,7 @@ type Ticket struct {
 	mu     sync.Mutex
 	done   chan struct{}
 	result Object
-	err    *Error
+	err    Object
 	isDone bool
 }
 
@@ -39,7 +39,13 @@ func (t *Ticket) Inspect() string {
 		return "<Tiket: sedang berjalan>"
 	}
 	if t.err != nil {
-		return fmt.Sprintf("<Tiket: gagal (%s)>", t.err.Message)
+		errMsg := t.err.Inspect()
+		if e, ok := t.err.(*Error); ok {
+			errMsg = e.Message
+		} else if ae, ok := t.err.(*AssertionError); ok {
+			errMsg = ae.Message
+		}
+		return fmt.Sprintf("<Tiket: gagal (%s)>", errMsg)
 	}
 	resStr := "null"
 	if t.result != nil {
@@ -62,7 +68,7 @@ func (t *Ticket) Resolve(val Object) {
 	close(t.done)
 }
 
-func (t *Ticket) Fail(err *Error) {
+func (t *Ticket) Fail(err Object) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	if t.isDone {

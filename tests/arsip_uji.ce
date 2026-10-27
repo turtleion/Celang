@@ -221,3 +221,148 @@ uji "Penyaringan: Ekstrak arsip dengan filter callback" {
     berkas.hapus_semua("./temp_saring")
 }
 
+// ------------------------------------------------------------------------------
+// BAGIAN 8: FITUR LANJUTAN ZIP (UJI_ZIP, INFO_BERKAS, BUAT_MEMORI, METODE KOMPRESI)
+// ------------------------------------------------------------------------------
+
+uji "ZIP Lanjutan: Pengujian integritas arsip (uji_zip)" {
+    berkas.tulis("./temp_zip_uji/sehat.txt", "Berkas integritas valid 2026")
+    buat zipPath = "./temp_zip_uji/arsip_sehat.zip"
+
+    arsip.buat_zip("./temp_zip_uji", zipPath)
+
+    // Uji arsip sehat harus mengembalikan kosong (null)
+    buat statusUji = arsip.uji_zip(zipPath)
+    harus_sama(statusUji, kosong, "Arsip ZIP sehat harus mengembalikan nilai kosong (null)")
+
+    berkas.hapus_semua("./temp_zip_uji")
+}
+
+uji "ZIP Lanjutan: Metadata detail dan CRC32 (info_berkas_zip)" {
+    berkas.tulis("./temp_zip_info/dokumen.txt", "Teks untuk menguji CRC-32")
+    buat zipPath = "./temp_zip_info/dok.zip"
+
+    arsip.buat_zip("./temp_zip_info", zipPath)
+
+    buat info = arsip.info_berkas_zip(zipPath, "dokumen.txt")
+    harus_sama(info.nama, "dokumen.txt", "Nama entri harus cocok")
+    harus_benar(info.crc32 > 0, "CRC32 harus berupa bilangan positif non-nol")
+    harus_sama(info.metode_kompresi, "deflate", "Metode kompresi default harus deflate")
+    harus_sama(info.compression_method, "deflate", "Alias bahasa Inggris compression_method harus deflate")
+    harus_benar(info.ukuran > 0, "Ukuran uncompressed harus > 0")
+
+    berkas.hapus_semua("./temp_zip_info")
+}
+
+uji "ZIP Lanjutan: Pembuatan ZIP langsung dari memori (buat_zip_memori)" {
+    buat targetZip = "./temp_zip_mem/hasil_memori.zip"
+    buat targetDir = "./temp_zip_mem/hasil_ekstrak"
+
+    buat petaKonten = {
+        "pesan.txt": "Halo dari Map Celang!",
+        "aset/data.bin": bita([65, 66, 67, 68])
+    }
+
+    buat ok = arsip.buat_zip_memori(petaKonten, targetZip)
+    harus_benar(ok, "Pembuatan ZIP dari memori harus berhasil")
+
+    // Verifikasi dengan uji_zip
+    buat statusUji = arsip.uji_zip(targetZip)
+    harus_sama(statusUji, kosong, "Arsip hasil buat_zip_memori harus lulus uji_zip")
+
+    // Ekstrak dan cek hasil
+    arsip.ekstrak_zip(targetZip, targetDir)
+    buat isiPesan = berkas.baca(targetDir + "/pesan.txt")
+    harus_sama(isiPesan, "Halo dari Map Celang!", "Isi pesan.txt hasil buat_zip_memori harus cocok")
+
+    buat isiBin = berkas.baca_bita(targetDir + "/aset/data.bin")
+    harus_sama(isiBin.ke_teks(), "ABCD", "Isi binary hasil buat_zip_memori harus cocok")
+
+    berkas.hapus_semua("./temp_zip_mem")
+}
+
+uji "ZIP Lanjutan: Opsi metode kompresi store (tanpa kompresi)" {
+    berkas.tulis("./temp_zip_store/polos.txt", "Konten tersimpan tanpa kompresi Deflate")
+    buat zipPath = "./temp_zip_store/arsip_store.zip"
+
+    buat ok = arsip.buat_zip("./temp_zip_store", zipPath, { "metode": "store" })
+    harus_benar(ok, "Pembuatan ZIP dengan metode store harus berhasil")
+
+    buat info = arsip.info_berkas_zip(zipPath, "polos.txt")
+    harus_sama(info.metode_kompresi, "store", "Metode kompresi harus bernilai store")
+
+    // Uji juga via buat_zip_memori
+    buat zipMemStore = "./temp_zip_store/mem_store.zip"
+    arsip.buat_zip_memori({ "file.txt": "data memori" }, zipMemStore, { "metode": "store" })
+    buat infoMem = arsip.info_berkas_zip(zipMemStore, "file.txt")
+    harus_sama(infoMem.metode_kompresi, "store", "Metode kompresi memori harus bernilai store")
+
+    berkas.hapus_semua("./temp_zip_store")
+}
+
+// ------------------------------------------------------------------------------
+// BAGIAN 9: PENGUATAN KEAMANAN ARSIP (QUOTA, BATAS ENTRI, SANITASI NAMA)
+// ------------------------------------------------------------------------------
+
+uji "Keamanan: Batas ukuran dekompresi (anti decompression bomb)" {
+    buat targetZip = "./temp_sec/bomb_size.zip"
+    buat targetDir = "./temp_sec/hasil_bom"
+
+    arsip.buat_zip_memori({
+        "data.txt": "123456789012345678901234567890"
+    }, targetZip)
+
+    buat tertangkap = salah
+    coba {
+        arsip.ekstrak_zip(targetZip, targetDir, {
+            batas_ukuran: 10
+        })
+    } tangkap (e) {
+        tertangkap = benar
+    }
+
+    harus_benar(tertangkap, "Ekstraksi melebihi batas_ukuran harus melempar galat")
+    berkas.hapus_semua("./temp_sec")
+}
+
+uji "Keamanan: Batas jumlah entri arsip (anti resource exhaustion)" {
+    buat targetZip = "./temp_sec_entri/bomb_entries.zip"
+    buat targetDir = "./temp_sec_entri/hasil_bom"
+
+    arsip.buat_zip_memori({
+        "1.txt": "A",
+        "2.txt": "B",
+        "3.txt": "C"
+    }, targetZip)
+
+    buat tertangkap = salah
+    coba {
+        arsip.ekstrak_zip(targetZip, targetDir, {
+            max_entries: 2
+        })
+    } tangkap (e) {
+        tertangkap = benar
+    }
+
+    harus_benar(tertangkap, "Ekstraksi melebihi max_entries harus melempar galat")
+    berkas.hapus_semua("./temp_sec_entri")
+}
+
+uji "Keamanan: Penolakan karakter backslash pada buat_zip_memori" {
+    buat targetZip = "./temp_sec_bs/bs.zip"
+
+    buat tertangkap = salah
+    coba {
+        arsip.buat_zip_memori({
+            "folder\\berkas.txt": "isi berkas"
+        }, targetZip)
+    } tangkap (e) {
+        tertangkap = benar
+    }
+
+    harus_benar(tertangkap, "Entry name dengan backslash harus ditolak")
+    berkas.hapus_semua("./temp_sec_bs")
+}
+
+
+

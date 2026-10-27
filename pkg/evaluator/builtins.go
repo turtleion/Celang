@@ -527,7 +527,7 @@ func RegisterBuiltinsWithIO(env *Environment, in io.Reader, out io.Writer) {
 			}
 
 			results := make([]Object, len(tickets))
-			var firstErr *Error
+			var firstErr Object
 			var mu sync.Mutex
 			var wg sync.WaitGroup
 
@@ -541,7 +541,7 @@ func RegisterBuiltinsWithIO(env *Environment, in io.Reader, out io.Writer) {
 					mu.Lock()
 					defer mu.Unlock()
 					if isError(res) && firstErr == nil {
-						firstErr = res.(*Error)
+						firstErr = res
 					}
 					results[idx] = res
 				}()

@@ -1,0 +1,208 @@
+// ==============================================================================
+// Suite Pengujian Komprehensif Kriptografi Modern (kripto_komprehensif_uji.ce)
+// ==============================================================================
+
+// ------------------------------------------------------------------------------
+// BAGIAN 1: HASH FUNCTIONS & MESSAGE AUTHENTICATION CODES (MAC)
+// ------------------------------------------------------------------------------
+
+uji "Kripto Modern: SHA-3, SHAKE, BLAKE2, BLAKE3, dan Poly1305" {
+    buat pesan = "Celang 2026 - Bahasa Pemrograman Modern Berkinerja Tinggi"
+
+    // 1. SHA-3 & SHAKE
+    buat h_sha3_256 = kripto.sha3_256(pesan)
+    harus_sama(panjang(h_sha3_256), 64, "SHA3-256 harus menghasilkan hex 64-karakter")
+
+    buat h_sha3_512 = kripto.sha3_512(pesan)
+    harus_sama(panjang(h_sha3_512), 128, "SHA3-512 harus menghasilkan hex 128-karakter")
+
+    buat h_shake128 = kripto.shake128(pesan, 32)
+    harus_sama(panjang(h_shake128), 64, "SHAKE128 (32 bita) harus menghasilkan hex 64-karakter")
+
+    buat h_shake256 = kripto.shake256(pesan, 64)
+    harus_sama(panjang(h_shake256), 128, "SHAKE256 (64 bita) harus menghasilkan hex 128-karakter")
+
+    // 2. BLAKE2b & BLAKE2s
+    buat h_blake2b = kripto.blake2b(pesan)
+    harus_sama(panjang(h_blake2b), 128, "BLAKE2b default harus 512-bit (128 hex)")
+
+    buat h_blake2s = kripto.blake2s(pesan)
+    harus_sama(panjang(h_blake2s), 64, "BLAKE2s default harus 256-bit (64 hex)")
+
+    // Keyed BLAKE2b
+    buat kunciMac = "kunci-rahasia-32-karakter-tepat!"
+    buat h_blake2b_kunci = kripto.blake2b(pesan, kunciMac)
+    harus_benar(h_blake2b_kunci != h_blake2b, "Keyed BLAKE2b harus berbeda dari unkeyed")
+
+    // 3. BLAKE3
+    buat h_blake3 = kripto.blake3(pesan)
+    harus_sama(panjang(h_blake3), 64, "BLAKE3 default harus 256-bit (64 hex)")
+
+    buat h_blake3_kunci = kripto.blake3(pesan, kunciMac)
+    harus_benar(h_blake3_kunci != h_blake3, "Keyed BLAKE3 harus berbeda dari unkeyed")
+
+    // 4. Poly1305 MAC
+    buat kunciPoly = kripto.buat_kunci()
+    buat tagPoly = kripto.poly1305_buat_mac(pesan, kunciPoly)
+    harus_sama(panjang(tagPoly), 32, "Tag Poly1305 harus 16 bita (32 hex)")
+
+    buat cekValid = kripto.poly1305_verifikasi(pesan, tagPoly, kunciPoly)
+    harus_benar(cekValid, "Verifikasi Poly1305 data asli harus bernilai benar")
+
+    buat cekPalsu = kripto.poly1305_verifikasi("pesan diubah", tagPoly, kunciPoly)
+    harus_salah(cekPalsu, "Verifikasi Poly1305 data termutasi harus bernilai salah")
+}
+
+// ------------------------------------------------------------------------------
+// BAGIAN 2: KEY DERIVATION (HKDF) & ADVANCED PASSWORD HASHING (ARGON2ID)
+// ------------------------------------------------------------------------------
+
+uji "Kripto Modern: HKDF (RFC 5869) dan Argon2id" {
+    // 1. HKDF Extract-and-Expand
+    buat masterSecret = "seed-entropy-rahasia-utama"
+    buat salt = "garam-acak-unik-1234"
+    buat derived = kripto.hkdf(masterSecret, salt, "aplikasi-celang-v1", 32)
+    harus_sama(derived.panjang, 32, "HKDF harus menghasilkan kunci sepanjang 32 bita")
+
+    buat prk = kripto.hkdf_ekstrak(masterSecret, salt)
+    buat expanded = kripto.hkdf_ekspansi(prk, "aplikasi-celang-v1", 32)
+    harus_sama(expanded.panjang, 32, "HKDF expand harus menghasilkan kunci 32 bita")
+    harus_sama(derived.ke_heks(), expanded.ke_heks(), "Hasil hkdf dan hkdf_ekstrak+ekspansi harus identik")
+
+    // 2. Argon2id Password Hashing
+    buat sandiPengguna = "KatasandiKuat#2026!"
+    buat hashArgon = kripto.hash_sandi_argon2(sandiPengguna)
+    harus_benar(teks.dimulai_dengan(hashArgon, "$argon2id$v=19$"), "Format hash harus sesuai standar PHC argon2id")
+
+    buat verifikasiSukses = kripto.verifikasi_sandi_argon2(sandiPengguna, hashArgon)
+    harus_benar(verifikasiSukses, "Verifikasi sandi yang cocok pada Argon2id harus benar")
+
+    buat verifikasiGagal = kripto.verifikasi_sandi_argon2("SandiSalahTotal", hashArgon)
+    harus_salah(verifikasiGagal, "Verifikasi sandi keliru pada Argon2id harus salah")
+}
+
+// ------------------------------------------------------------------------------
+// BAGIAN 3: ENKRIPSI SIMETRIS CHACHA20-POLY1305 & AES BLOCK MODES
+// ------------------------------------------------------------------------------
+
+uji "Kripto Modern: ChaCha20-Poly1305, AES-CTR, dan AES-CBC" {
+    buat pesanRahasia = "Data payload rahasia untuk protokol transmisi aman Celang"
+
+    // 1. ChaCha20-Poly1305 AEAD
+    buat kunciChaCha = kripto.buat_kunci_chacha()
+    buat aad = "metadata-user-id:1001"
+    buat ciphertextChaCha = kripto.enkripsi_chacha(pesanRahasia, kunciChaCha, aad)
+    buat pulihChaCha = kripto.dekripsi_chacha(ciphertextChaCha, kunciChaCha, aad)
+    harus_sama(pulihChaCha, pesanRahasia, "Plaintext ChaCha20-Poly1305 harus dipulihkan secara utuh")
+
+    // 2. AES-CTR
+    buat kunciAES = "01234567890123456789012345678901"
+    buat iv = "0123456789012345"
+    buat encCTR = kripto.aes_ctr(pesanRahasia, kunciAES, iv)
+    buat decCTR = kripto.aes_ctr(encCTR, kunciAES, iv)
+    harus_sama(decCTR.ke_teks(), pesanRahasia, "AES-CTR round-trip harus cocok")
+
+    // 3. AES-CBC with PKCS#7 padding
+    buat encCBC = kripto.aes_cbc_enkripsi(pesanRahasia, kunciAES, iv)
+    harus_benar(encCBC.panjang % 16 == 0, "Ciphertext AES-CBC harus kelipatan 16 bita")
+    buat decCBC = kripto.aes_cbc_dekripsi(encCBC, kunciAES, iv)
+    harus_sama(decCBC.ke_teks(), pesanRahasia, "AES-CBC round-trip harus cocok")
+}
+
+// ------------------------------------------------------------------------------
+// BAGIAN 4: ASIMETRIS & PERTUKARAN KUNCI (X25519 & RSA)
+// ------------------------------------------------------------------------------
+
+uji "Kripto Modern: X25519 ECDH dan RSA (OAEP & PSS)" {
+    // 1. X25519 Diffie-Hellman Key Exchange
+    buat alice = kripto.buat_kunci_x25519()
+    buat bob = kripto.buat_kunci_x25519()
+
+    buat ssAlice = kripto.x25519_hitung_rahasia(alice.kunci_privat, bob.kunci_publik)
+    buat ssBob = kripto.x25519_hitung_rahasia(bob.kunci_privat, alice.kunci_publik)
+    harus_benar(kripto.konstanta_sama(ssAlice, ssBob), "Shared secret X25519 Alice dan Bob harus cocok")
+
+    // 2. RSA (2048-bit)
+    buat rsa = kripto.rsa_buat_kunci(2048)
+    buat teksDokumen = "Surat Perjanjian Digital Kriptografis Celang 2026"
+
+    // Enkripsi & Dekripsi OAEP
+    buat cipherRSA = kripto.rsa_enkripsi_oaep(teksDokumen, rsa.kunci_publik)
+    buat pulihRSA = kripto.rsa_dekripsi_oaep(cipherRSA, rsa.kunci_privat)
+    harus_sama(pulihRSA, teksDokumen, "Dekripsi RSA-OAEP harus memulihkan teks dokumen asli")
+
+    // Tanda Tangan & Verifikasi PSS
+    buat signaturePSS = kripto.rsa_tanda_tangan_pss(teksDokumen, rsa.kunci_privat)
+    buat validPSS = kripto.rsa_verifikasi_pss(teksDokumen, signaturePSS, rsa.kunci_publik)
+    harus_benar(validPSS, "Verifikasi RSA-PSS pada dokumen asli harus benar")
+
+    buat palsuPSS = kripto.rsa_verifikasi_pss("Dokumen yang dipalsukan!", signaturePSS, rsa.kunci_publik)
+    harus_salah(palsuPSS, "Verifikasi RSA-PSS pada dokumen palsu harus salah")
+}
+
+// ------------------------------------------------------------------------------
+// BAGIAN 5: POST-QUANTUM CRYPTOGRAPHY (ML-KEM-768 FIPS 203 & HYBRID X-WING)
+// ------------------------------------------------------------------------------
+
+uji "Kripto Modern: Post-Quantum ML-KEM-768 (Kyber) dan Hybrid X-Wing" {
+    // 1. NIST FIPS 203 ML-KEM-768
+    buat pqcKunci = kripto.pqc_buat_kunci()
+    harus_sama(pqcKunci.algoritma, "ML-KEM-768", "Algoritma harus ML-KEM-768")
+
+    // Enkapsulasi oleh pihak pengirim
+    buat resEnkapsulasi = kripto.pqc_enkapsulasi(pqcKunci.kunci_enkapsulasi)
+    buat sharedSecretPengirim = resEnkapsulasi.kunci_bersama
+    buat ciphertextPQC = resEnkapsulasi.ciphertext
+
+    // Dekapsulasi oleh pihak penerima
+    buat sharedSecretPenerima = kripto.pqc_dekapsulasi(ciphertextPQC, pqcKunci.kunci_dekapsulasi)
+    harus_benar(kripto.konstanta_sama(sharedSecretPengirim, sharedSecretPenerima), "Shared secret ML-KEM-768 pengirim dan penerima harus cocok")
+    harus_sama(sharedSecretPengirim.panjang, 32, "Kunci bersama ML-KEM-768 harus 32 bita")
+
+    // 2. Hybrid KEM X-Wing (X25519 + ML-KEM-768)
+    buat xwingKunci = kripto.xwing_buat_kunci()
+    buat resXwing = kripto.xwing_enkapsulasi(xwingKunci.kunci_publik)
+    buat ssXwingPengirim = resXwing.kunci_bersama
+    buat cipherXwing = resXwing.ciphertext
+
+    buat ssXwingPenerima = kripto.xwing_dekapsulasi(cipherXwing, xwingKunci.kunci_privat)
+    harus_benar(kripto.konstanta_sama(ssXwingPengirim, ssXwingPenerima), "Shared secret Hybrid X-Wing pengirim dan penerima harus cocok")
+    harus_sama(ssXwingPengirim.panjang, 32, "Kunci bersama X-Wing harus 32 bita")
+}
+
+// ------------------------------------------------------------------------------
+// BAGIAN 6: PENGUJIAN KEAMANAN TINGKAT LANJUT (HARDENING POIN 5 & POIN 6)
+// ------------------------------------------------------------------------------
+
+uji "Kripto Modern: Hardening Batas HKDF, DoS Argon2, XChaCha20, dan Constant-time PKCS#7" {
+    // 1. Batas HKDF 8160 bita (RFC 5869)
+    buat kHkdf = kripto.hkdf("seed-secret", "salt", "info", 8160)
+    harus_sama(kHkdf.panjang, 8160, "HKDF 8160 bita harus berhasil")
+
+    // 2. Argon2 DoS & opsi
+    buat hashCustom = kripto.hash_sandi_argon2("katasandi", {"waktu": 2, "memori": 65536, "threads": 2})
+    harus_benar(kripto.verifikasi_sandi_argon2("katasandi", hashCustom), "Argon2 dengan opsi Map harus berhasil diverifikasi")
+
+    // Tolak hash eksternal yang melebihi batas aman DoS (>256MB)
+    buat hashJahat = "$argon2id$v=19$m=307200,t=2,p=1$c2FsdHNhbHRzYWx0$aGFzaGhhc2hoYXNo"
+    harus_salah(kripto.verifikasi_sandi_argon2("katasandi", hashJahat), "Argon2 dengan memori >256MB harus ditolak")
+
+    // 3. XChaCha20-Poly1305 AEAD
+    buat kChaCha = kripto.buat_kunci_chacha()
+    buat cipherX = kripto.enkripsi_chacha("Pesan Rahasia XChaCha20", kChaCha, "header-aad")
+    buat pulihX = kripto.dekripsi_chacha(cipherX, kChaCha, "header-aad")
+    harus_sama(pulihX, "Pesan Rahasia XChaCha20", "XChaCha20-Poly1305 harus memulihkan plaintext utuh")
+
+    // 4. AES-CBC Constant-time unpadding & penanganan kesalahan
+    buat kAES = "01234567890123456789012345678901"
+    buat ivAES = "0123456789012345"
+    buat encCBC = kripto.aes_cbc_enkripsi("pesan berpadding", kAES, ivAES)
+    buat pulihCBC = kripto.aes_cbc_dekripsi(encCBC, kAES, ivAES)
+    harus_sama(pulihCBC.ke_teks(), "pesan berpadding", "AES-CBC PKCS#7 unpadding harus memulihkan data asli")
+
+    // 5. RSA-PSS Interoperabilitas Verifikasi
+    buat rsaKey = kripto.rsa_buat_kunci(2048)
+    buat ttd = kripto.rsa_tanda_tangan_pss("data penting", rsaKey.kunci_privat)
+    buat cekTtd = kripto.rsa_verifikasi_pss("data penting", ttd, rsaKey.kunci_publik)
+    harus_benar(cekTtd, "Verifikasi PSS tanda tangan yang sah harus berhasil")
+}

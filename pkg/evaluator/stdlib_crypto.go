@@ -133,12 +133,18 @@ func PBKDF2SHA256(password, salt []byte, iter, keyLen int) []byte {
 	return pbkdf2SHA256(password, salt, iter, keyLen)
 }
 
-// decodeBase64Flex tries unpadded RawStdEncoding first, then standard StdEncoding.
+// decodeBase64Flex tries standard and URL-safe base64 decodings (both unpadded and padded).
 func decodeBase64Flex(s string) ([]byte, error) {
 	if b, err := base64.RawStdEncoding.DecodeString(s); err == nil {
 		return b, nil
 	}
-	return base64.StdEncoding.DecodeString(s)
+	if b, err := base64.StdEncoding.DecodeString(s); err == nil {
+		return b, nil
+	}
+	if b, err := base64.RawURLEncoding.DecodeString(s); err == nil {
+		return b, nil
+	}
+	return base64.URLEncoding.DecodeString(s)
 }
 
 // validateEd25519ExpandedKey memverifikasi konsistensi internal kunci privat 64-byte (seed vs public key).
@@ -955,4 +961,10 @@ func initStdlibKripto(env *Environment) {
 	definePublicFunction(env, "verifikasi_ttd", verifikasiTandaTanganFn)
 	definePublicFunction(env, "verify", verifikasiTandaTanganFn)
 	definePublicFunction(env, "verify_signature", verifikasiTandaTanganFn)
+
+	// =============================================================
+	// 8. Kriptografi Modern (Pilar 1 - 4) & Post-Quantum (Pilar 5)
+	// =============================================================
+	registerModernCrypto(env)
+	registerPQCCrypto(env)
 }

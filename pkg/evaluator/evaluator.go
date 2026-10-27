@@ -1274,17 +1274,23 @@ func Eval(node uast.Node, env *Environment) Object {
 			Order: make([]string, 0, len(n.Properties)),
 		}
 		for _, prop := range n.Properties {
-			keyVal := Eval(prop.Key, env)
-			if isError(keyVal) {
-				return keyVal
+			var keyStr string
+			if id, ok := prop.Key.(*uast.Identifier); ok {
+				keyStr = id.Name
+			} else {
+				keyVal := Eval(prop.Key, env)
+				if isError(keyVal) {
+					return keyVal
+				}
+				if strObj, ok := keyVal.(*String); ok {
+					keyStr = strObj.Value
+				} else {
+					keyStr = keyVal.Inspect()
+				}
 			}
 			valVal := Eval(prop.Value, env)
 			if isError(valVal) {
 				return valVal
-			}
-			keyStr := keyVal.Inspect()
-			if strObj, ok := keyVal.(*String); ok {
-				keyStr = strObj.Value
 			}
 			if _, exists := m.Pairs[keyStr]; !exists {
 				m.Order = append(m.Order, keyStr)
@@ -1299,7 +1305,7 @@ func Eval(node uast.Node, env *Environment) Object {
 		go func() {
 			res := Eval(n.Argument, subEnv)
 			if isError(res) {
-				ticket.Fail(res.(*Error))
+				ticket.Fail(res)
 			} else {
 				ticket.Resolve(res)
 			}
@@ -1989,17 +1995,22 @@ func applyFunctionWithASTArgs(fn *Function, argNodes []uast.Expression, callerEn
 }
 
 func evalMemberAccess(obj Object, n *uast.MemberExpression, env *Environment) Object {
+	var computedObj Object
+	propName := n.Property
+	if n.Computed && n.PropertyExpr != nil {
+		computedObj = Eval(n.PropertyExpr, env)
+		if isError(computedObj) {
+			return computedObj
+		}
+		if s, ok := computedObj.(*String); ok {
+			propName = s.Value
+		} else {
+			propName = computedObj.Inspect()
+		}
+	}
+
 	// 1. Array index access, slicing, or built-in methods (arr.push, arr.pop, arr.insert, etc.)
 	if arr, ok := obj.(*Array); ok {
-		propName := n.Property
-		if n.Computed && n.PropertyExpr != nil {
-			pObj := Eval(n.PropertyExpr, env)
-			if !isError(pObj) {
-				if s, ok := pObj.(*String); ok {
-					propName = s.Value
-				}
-			}
-		}
 		if methodObj, ok := EvalArrayMethod(arr, propName, env, n.GetMetadata()); ok {
 			return methodObj
 		}
@@ -2008,17 +2019,19 @@ func evalMemberAccess(obj Object, n *uast.MemberExpression, env *Environment) Ob
 		}
 		var intIdx int64
 		var hasInt bool
-		if n.Computed && n.PropertyExpr != nil {
-			idxObj := Eval(n.PropertyExpr, env)
-			if iVal, _, isInt, ok := CoerceToNumeric(idxObj); ok && isInt {
+		if computedObj != nil {
+			if iVal, _, isInt, ok := CoerceToNumeric(computedObj); ok && isInt {
 				intIdx = iVal
 				hasInt = true
 			}
-		} else if parsed, err := strconv.ParseInt(n.Property, 10, 64); err == nil {
+		} else if parsed, err := strconv.ParseInt(propName, 10, 64); err == nil {
 			intIdx = parsed
 			hasInt = true
-		} else if n.Computed {
-			idxObj := Eval(uast.NewIdentifier(n.Property), env)
+		} else if n.Computed && propName != "" {
+			idxObj := Eval(uast.NewIdentifier(propName), env)
+			if isError(idxObj) {
+				return idxObj
+			}
 			if iVal, _, isInt, ok := CoerceToNumeric(idxObj); ok && isInt {
 				intIdx = iVal
 				hasInt = true
@@ -2039,15 +2052,23 @@ func evalMemberAccess(obj Object, n *uast.MemberExpression, env *Environment) Ob
 		}
 		var intIdx int64
 		var hasInt bool
-		if n.Computed && n.PropertyExpr != nil {
-			idxObj := Eval(n.PropertyExpr, env)
+		if computedObj != nil {
+			if iVal, _, isInt, ok := CoerceToNumeric(computedObj); ok && isInt {
+				intIdx = iVal
+				hasInt = true
+			}
+		} else if parsed, err := strconv.ParseInt(propName, 10, 64); err == nil {
+			intIdx = parsed
+			hasInt = true
+		} else if n.Computed && propName != "" {
+			idxObj := Eval(uast.NewIdentifier(propName), env)
+			if isError(idxObj) {
+				return idxObj
+			}
 			if iVal, _, isInt, ok := CoerceToNumeric(idxObj); ok && isInt {
 				intIdx = iVal
 				hasInt = true
 			}
-		} else if parsed, err := strconv.ParseInt(n.Property, 10, 64); err == nil {
-			intIdx = parsed
-			hasInt = true
 		}
 		if hasInt {
 			runes := []rune(str.Value)
@@ -2060,15 +2081,6 @@ func evalMemberAccess(obj Object, n *uast.MemberExpression, env *Environment) Ob
 
 	// 1c. Bytes index access, slicing, and methods (e.g. b[0], b[0..2], b.ke_teks())
 	if b, ok := obj.(*Bytes); ok {
-		propName := n.Property
-		if n.Computed && n.PropertyExpr != nil {
-			pObj := Eval(n.PropertyExpr, env)
-			if !isError(pObj) {
-				if s, ok := pObj.(*String); ok {
-					propName = s.Value
-				}
-			}
-		}
 		if methodObj, ok := EvalBytesMethod(b, propName, env, n.GetMetadata()); ok {
 			return methodObj
 		}
@@ -2077,17 +2089,19 @@ func evalMemberAccess(obj Object, n *uast.MemberExpression, env *Environment) Ob
 		}
 		var intIdx int64
 		var hasInt bool
-		if n.Computed && n.PropertyExpr != nil {
-			idxObj := Eval(n.PropertyExpr, env)
-			if iVal, _, isInt, ok := CoerceToNumeric(idxObj); ok && isInt {
+		if computedObj != nil {
+			if iVal, _, isInt, ok := CoerceToNumeric(computedObj); ok && isInt {
 				intIdx = iVal
 				hasInt = true
 			}
-		} else if parsed, err := strconv.ParseInt(n.Property, 10, 64); err == nil {
+		} else if parsed, err := strconv.ParseInt(propName, 10, 64); err == nil {
 			intIdx = parsed
 			hasInt = true
-		} else if n.Computed {
-			idxObj := Eval(uast.NewIdentifier(n.Property), env)
+		} else if n.Computed && propName != "" {
+			idxObj := Eval(uast.NewIdentifier(propName), env)
+			if isError(idxObj) {
+				return idxObj
+			}
 			if iVal, _, isInt, ok := CoerceToNumeric(idxObj); ok && isInt {
 				intIdx = iVal
 				hasInt = true
@@ -2106,18 +2120,7 @@ func evalMemberAccess(obj Object, n *uast.MemberExpression, env *Environment) Ob
 
 	// 2. Struct instance field or method access
 	if inst, ok := obj.(*StructInstance); ok {
-		prop := n.Property
-		if n.Computed && n.PropertyExpr != nil {
-			keyObj := Eval(n.PropertyExpr, env)
-			if isError(keyObj) {
-				return keyObj
-			}
-			if s, ok := keyObj.(*String); ok {
-				prop = s.Value
-			} else {
-				prop = keyObj.Inspect()
-			}
-		}
+		prop := propName
 		if val, exists := inst.Fields[prop]; exists {
 			if inst.Def.PrivateFields[prop] && !isInternalAccess(inst, env) {
 				return newError(n.GetMetadata(),
@@ -2147,18 +2150,7 @@ func evalMemberAccess(obj Object, n *uast.MemberExpression, env *Environment) Ob
 
 	// 3. Map property access and built-in methods (mp.keys, mp.values, mp.get, etc.)
 	if mp, ok := obj.(*Map); ok {
-		key := n.Property
-		if n.Computed && n.PropertyExpr != nil {
-			keyObj := Eval(n.PropertyExpr, env)
-			if isError(keyObj) {
-				return keyObj
-			}
-			if s, ok := keyObj.(*String); ok {
-				key = s.Value
-			} else {
-				key = keyObj.Inspect()
-			}
-		}
+		key := propName
 		if val, exists := mp.Pairs[key]; exists {
 			return val
 		}
@@ -2251,34 +2243,13 @@ func evalMemberAccess(obj Object, n *uast.MemberExpression, env *Environment) Ob
 	}
 
 	// 3d. Numeric cultural, nominal, terbilang, data size & duration helpers (e.g. 50.ribu, 3.detik, 10.mb, 15000.rupiah, 50000.terbilang, 50.k, 25.usd)
-	numProp := n.Property
-	if n.Computed && n.PropertyExpr != nil {
-		pObj := Eval(n.PropertyExpr, env)
-		if !isError(pObj) {
-			if s, ok := pObj.(*String); ok {
-				numProp = s.Value
-			} else {
-				numProp = pObj.Inspect()
-			}
-		}
-	}
+	numProp := propName
 	if res, ok := EvalNumericMemberWithEnv(obj, numProp, env); ok {
 		return res
 	}
 
 	// 3e. Builtin static properties / methods access (e.g. bita.dari_base64, bytes.from_hex)
 	if b, ok := obj.(*Builtin); ok {
-		propName := n.Property
-		if n.Computed && n.PropertyExpr != nil {
-			pObj := Eval(n.PropertyExpr, env)
-			if !isError(pObj) {
-				if s, ok := pObj.(*String); ok {
-					propName = s.Value
-				} else {
-					propName = pObj.Inspect()
-				}
-			}
-		}
 		if env.IsUniversal {
 			switch propName {
 			case "dari_base64":

@@ -56,12 +56,59 @@ const restored = gunzip(compressed).to_string()
 
 ### 1. ZIP Archives
 
-#### `archive.create_zip(source, destZipPath)`
+#### `archive.create_zip(source, destZipPath, [options])`
 Packages files or directories into a `.zip` archive.
 - **Parameters**:
   - `source`: `String` (path to folder or file) or `Array` of file paths.
   - `destZipPath`: `String` (output file path).
+  - `options` (optional): `Map` with key `"method"`: `"deflate"` (default) or `"store"` (uncompressed).
 - **Returns**: `Boolean` (`true` on success).
+
+#### `archive.create_zip_from_memory(contentMap, destZipPath, [options])`
+Creates a `.zip` archive on disk directly from an in-memory `Map` of strings or `Bytes` without generating temporary files. Includes built-in Zip Slip path traversal mitigation.
+- **Parameters**:
+  - `contentMap`: `Map` containing `entryName: content` (`String` or `Bytes`).
+  - `destZipPath`: `String` (output file path).
+  - `options` (optional): `Map` with key `"method"`: `"deflate"` or `"store"`.
+- **Returns**: `Boolean` (`true` on success).
+
+```celang
+"use universal"
+import { create_zip_from_memory } from "archive"
+
+const memoryFiles = {
+    "manifest.json": "{\"version\": \"1.0.0\"}",
+    "readme.txt": "Packaged straight from Celang memory!"
+}
+create_zip_from_memory(memoryFiles, "dist.zip")
+```
+
+#### `archive.test_zip(path)`
+Verifies CRC-32 checksums and header integrity for all members in a ZIP archive without extracting them to disk (analogous to Python's `ZipFile.testzip()`).
+- **Parameters**:
+  - `path`: `String` (path to `.zip` file).
+- **Returns**:
+  - `null`: If all archive members pass CRC-32 and decompression verification.
+  - `String`: Filename of the first corrupted member file found.
+
+```celang
+"use universal"
+import { test_zip } from "archive"
+
+const corruptedFile = test_zip("dist.zip")
+if (corruptedFile == null) {
+    print("Archive is 100% valid and verified!")
+} else {
+    print("Corrupted file detected:", corruptedFile)
+}
+```
+
+#### `archive.get_file_info_zip(zipPath, entryName)`
+Retrieves metadata for a single member file in a ZIP archive without extraction.
+- **Parameters**:
+  - `zipPath`: `String`.
+  - `entryName`: `String` (relative filename in archive).
+- **Returns**: `Map` with metadata keys: `name`, `size`, `compressed_size`, `crc32`, `compression_method` (`"deflate"` or `"store"`), `is_dir`, `type`, `modified`.
 
 #### `archive.extract_zip(zipPath, targetDir, [options])`
 Extracts all files from a ZIP archive into `targetDir`.
@@ -104,7 +151,7 @@ if (archive.is_zip("download.pkg")) {
 
 #### `archive.list_zip(zipPath)`
 Lists archive contents without disk extraction.
-- **Returns**: `Array` of `Map` objects with properties: `name`, `size`, `compressed_size`, `is_dir`, `is_symlink`, `type` (`"file"`, `"directory"`, `"symlink"`), `mode`, `modified`.
+- **Returns**: `Array` of `Map` objects with properties: `name`, `size`, `compressed_size`, `crc32`, `compression_method`, `is_dir`, `is_symlink`, `type` (`"file"`, `"directory"`, `"symlink"`), `mode`, `modified`.
 
 #### `archive.read_file_zip(zipPath, fileName)`
 Directly reads a single file from within the ZIP archive into `Bytes`.
@@ -145,8 +192,14 @@ Directly reads a single file from within the ZIP archive into `Bytes`.
 
 ---
 
-## 🛡️ Security & Slip Mitigation
+## 🛡️ Security & Hardening Features
 
 > [!IMPORTANT]
-> **Zip Slip & Tar Slip Defense**:
-> Malicious packages could craft paths attempting to overwrite critical system files outside the target directory. Celang automatically computes canonical target boundaries and halts extraction immediately upon detecting any traversal escape, reporting an empathetic diagnostic error.
+> **Comprehensive Archive Protection (Hardened by Default)**:
+> 1. **Zip Slip & Tar Slip Defense**: Traversal paths containing `../` or root paths (`/`) are blocked before disk operations.
+> 2. **In-Target Symlink Traversal Protection**: Directory components within the target folder are verified against symlink hopping, preventing writes outside the extraction root even if existing symlinks exist in the destination.
+> 3. **Decompression Bomb Protection**: Unbounded archive inflation is mitigated by strict byte quotas (`max_size` / `batas_ukuran`, default 4 GB) and entry quotas (`max_entries` / `batas_entri`, default 100,000 entries). Memory reads have an automated 256 MB safety ceiling.
+> 4. **Privilege & Permission Sanitization**: Extraction masks permissions with `.Perm()`, stripping dangerous POSIX `setuid` / `setgid` bits, while enforcing directory owner writability (`| 0700`).
+> 5. **Exfiltration Defense**: Symlinks and special device files are safely skipped during archive creation to prevent leaking sensitive system files.
+> 6. **Clean Cross-Platform Sanitization**: Paths are normalized to forward slashes; Windows backslashes are rejected in entry names for consistent cross-platform extraction.
+

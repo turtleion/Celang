@@ -10,9 +10,94 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 )
+
+const (
+	// DefaultMaxDecompressMem adalah batas dekompresi data di memori (256 MB)
+	DefaultMaxDecompressMem int64 = 256 * 1024 * 1024
+
+	// DefaultMaxExtractTotalSize adalah batas total ukuran berkas hasil ekstraksi ke disk (4 GB)
+	DefaultMaxExtractTotalSize int64 = 4 * 1024 * 1024 * 1024
+
+	// DefaultMaxExtractEntries adalah batas jumlah entri maksimal yang diekstrak (100.000 entri)
+	DefaultMaxExtractEntries int = 100_000
+)
+
+// copyLimited menyalin data dari src ke dst dengan membatasi total bita yang dapat disalin
+// guna mencegah serangan Denial of Service melalui decompression bomb.
+func copyLimited(dst io.Writer, src io.Reader, remaining *int64) error {
+	if *remaining <= 0 {
+		return fmt.Errorf("ukuran hasil ekstraksi melebihi batas maksimal yang diizinkan")
+	}
+	n, err := io.Copy(dst, io.LimitReader(src, *remaining+1))
+	*remaining -= n
+	if err != nil {
+		return err
+	}
+	if *remaining < 0 {
+		return fmt.Errorf("ukuran hasil ekstraksi melebihi batas maksimal yang diizinkan")
+	}
+	return nil
+}
+
+// readAllLimited membaca seluruh isi pembaca dengan batas memori tertentu untuk mencegah bom dekompresi di RAM.
+func readAllLimited(r io.Reader, maxBytes int64) ([]byte, error) {
+	data, err := io.ReadAll(io.LimitReader(r, maxBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(data)) > maxBytes {
+		return nil, fmt.Errorf("ukuran data dekompresi melebihi batas memori maksimal (%d bita)", maxBytes)
+	}
+	return data, nil
+}
+
+// ensureSafePathWithinTarget memeriksa bahwa destPath dan setiap leluhur foldernya
+// tidak meloloskan diri ke luar cleanTarget melalui symbolic link yang sudah ada di dalam direktori target.
+func ensureSafePathWithinTarget(cleanTarget, destPath string) error {
+	realTarget, err := filepath.EvalSymlinks(cleanTarget)
+	if err != nil {
+		realTarget = cleanTarget
+	}
+
+	rel, err := filepath.Rel(cleanTarget, destPath)
+	if err != nil {
+		return fmt.Errorf("jalur ekstraksi tidak valid: %w", err)
+	}
+
+	parts := strings.Split(filepath.ToSlash(rel), "/")
+	curr := cleanTarget
+	for i := 0; i < len(parts)-1; i++ {
+		curr = filepath.Join(curr, parts[i])
+		fi, err := os.Lstat(curr)
+		if err != nil {
+			if os.IsNotExist(err) {
+				break
+			}
+			return err
+		}
+		if fi.Mode()&os.ModeSymlink != 0 {
+			realDir, err := filepath.EvalSymlinks(curr)
+			if err != nil {
+				return fmt.Errorf("tautan simbolik tidak valid '%s': %w", curr, err)
+			}
+			if !strings.HasPrefix(realDir, realTarget+string(filepath.Separator)) && realDir != realTarget {
+				return fmt.Errorf("terdeteksi ancaman symlink traversal: '%s' menunjuk ke luar target (%s)", curr, realDir)
+			}
+		}
+	}
+
+	if fi, err := os.Lstat(destPath); err == nil {
+		if fi.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("terdeteksi ancaman penulisan ke tautan simbolik yang ada: '%s'", destPath)
+		}
+	}
+
+	return nil
+}
 
 // sanitizeExtractPath memvalidasi bahwa jalur ekstraksi berkas berada di dalam direktori tujuan
 // dan tidak mengalami path traversal (pencegahan kerentanan Zip Slip / Tar Slip).
@@ -78,10 +163,12 @@ func resolveSingleDest(destPath, entryName string) (string, error) {
 	return cleanDest, nil
 }
 
-// parseExtractOptions mengurai opsi timpa (overwrite) dan fungsi saring (filter) dari argumen Map opsional.
-func parseExtractOptions(opts Object) (bool, Object) {
+// parseExtractOptions mengurai opsi timpa (overwrite), fungsi saring (filter), batas ukuran, dan batas entri dari argumen Map opsional.
+func parseExtractOptions(opts Object) (bool, Object, int64, int) {
 	overwrite := true
 	var filterFn Object
+	maxSize := DefaultMaxExtractTotalSize
+	maxEntries := DefaultMaxExtractEntries
 
 	if m, ok := opts.(*Map); ok {
 		if val, exists := m.Pairs["timpa"]; exists {
@@ -94,22 +181,66 @@ func parseExtractOptions(opts Object) (bool, Object) {
 			filterFn = val
 		} else if val, exists := m.Pairs["filter"]; exists {
 			filterFn = val
-		} else if val, exists := m.Pairs["<builtin function: saring>"]; exists {
-			filterFn = val
-		} else if val, exists := m.Pairs["<builtin function: filter>"]; exists {
-			filterFn = val
+		}
+
+		if val, exists := m.Pairs["batas_ukuran"]; exists {
+			if intVal, ok := val.(*Integer); ok && intVal.Value > 0 {
+				maxSize = intVal.Value
+			}
+		} else if val, exists := m.Pairs["max_size"]; exists {
+			if intVal, ok := val.(*Integer); ok && intVal.Value > 0 {
+				maxSize = intVal.Value
+			}
+		}
+
+		if val, exists := m.Pairs["batas_entri"]; exists {
+			if intVal, ok := val.(*Integer); ok && intVal.Value > 0 {
+				maxEntries = int(intVal.Value)
+			}
+		} else if val, exists := m.Pairs["max_entries"]; exists {
+			if intVal, ok := val.(*Integer); ok && intVal.Value > 0 {
+				maxEntries = int(intVal.Value)
+			}
 		}
 	}
-	return overwrite, filterFn
+	return overwrite, filterFn, maxSize, maxEntries
 }
 
+// parseZipOptions mengurai opsi kompresi ZIP (misalnya {"metode": "store"} atau {"metode": "deflate"}).
+func parseZipOptions(opts Object) uint16 {
+	method := uint16(zip.Deflate)
+	if m, ok := opts.(*Map); ok {
+		var methodVal Object
+		if val, exists := m.Pairs["metode"]; exists {
+			methodVal = val
+		} else if val, exists := m.Pairs["method"]; exists {
+			methodVal = val
+		} else if val, exists := m.Pairs["kompresi"]; exists {
+			methodVal = val
+		} else if val, exists := m.Pairs["compression"]; exists {
+			methodVal = val
+		}
+		if methodVal != nil {
+			if str, ok := methodVal.(*String); ok {
+				lower := strings.ToLower(strings.TrimSpace(str.Value))
+				if lower == "store" || lower == "simpan" || lower == "none" || lower == "tanpa" {
+					return zip.Store
+				}
+				if lower == "deflate" {
+					return zip.Deflate
+				}
+			}
+		}
+	}
+	return method
+}
 
 // ==============================================================================
 // 1. ENGINE ZIP (archive/zip)
 // ==============================================================================
 
-// createZipArchive mengemas berkas atau folder menjadi file ZIP.
-func createZipArchive(sourceArg Object, destZipPath string) error {
+// createZipArchive mengemas berkas atau folder menjadi file ZIP dengan metode kompresi tertentu.
+func createZipArchive(sourceArg Object, destZipPath string, method uint16) error {
 	var srcStringAbs string
 	var srcStringIsDir bool
 	var fileListAbs []string
@@ -121,9 +252,12 @@ func createZipArchive(sourceArg Object, destZipPath string) error {
 		if err != nil {
 			return fmt.Errorf("jalur sumber tidak valid: %w", err)
 		}
-		info, err := os.Stat(srcStringAbs)
+		info, err := os.Lstat(srcStringAbs)
 		if err != nil {
 			return fmt.Errorf("sumber '%s' tidak ditemukan: %w", src.Value, err)
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("sumber '%s' berupa tautan simbolik (symlink) yang dilewati untuk keamanan", src.Value)
 		}
 		srcStringIsDir = info.IsDir()
 
@@ -139,9 +273,12 @@ func createZipArchive(sourceArg Object, destZipPath string) error {
 			if err != nil {
 				return fmt.Errorf("jalur berkas '%s' tidak valid: %w", strEl.Value, err)
 			}
-			info, err := os.Stat(filePath)
+			info, err := os.Lstat(filePath)
 			if err != nil {
 				return fmt.Errorf("berkas '%s' tidak ditemukan: %w", strEl.Value, err)
+			}
+			if info.Mode()&os.ModeSymlink != 0 {
+				continue // Lewati symlink untuk mencegah kebocoran data
 			}
 			if info.IsDir() {
 				return fmt.Errorf("entri '%s' berupa folder; untuk folder gunakan path folder langsung", strEl.Value)
@@ -166,68 +303,86 @@ func createZipArchive(sourceArg Object, destZipPath string) error {
 	if err != nil {
 		return fmt.Errorf("gagal membuat berkas ZIP '%s': %w", destAbs, err)
 	}
-	defer zipFile.Close()
+
+	closed := false
+	defer func() {
+		if !closed {
+			zipFile.Close()
+			os.Remove(destAbs)
+		}
+	}()
 
 	zw := zip.NewWriter(zipFile)
-	defer zw.Close()
 
 	if len(fileListAbs) > 0 {
 		for _, filePath := range fileListAbs {
-			if err := addFileToZip(zw, filePath, filepath.Base(filePath)); err != nil {
-				os.Remove(destAbs)
+			if err := addFileToZip(zw, filePath, filepath.Base(filePath), method); err != nil {
 				return err
 			}
 		}
-		return nil
-	}
-
-	if !srcStringIsDir {
-		return addFileToZip(zw, srcStringAbs, filepath.Base(srcStringAbs))
-	}
-
-	// Folder rekursif
-	err = filepath.Walk(srcStringAbs, func(path string, fi os.FileInfo, err error) error {
-		if err != nil {
+	} else if !srcStringIsDir {
+		if err := addFileToZip(zw, srcStringAbs, filepath.Base(srcStringAbs), method); err != nil {
 			return err
 		}
-		absItem, _ := filepath.Abs(path)
-		if absItem == destAbs {
-			return nil
-		}
-		relPath, err := filepath.Rel(srcStringAbs, path)
-		if err != nil {
-			return err
-		}
-		if relPath == "." {
-			return nil
-		}
-
-		headerName := filepath.ToSlash(relPath)
-		if fi.IsDir() {
-			headerName += "/"
-			header, err := zip.FileInfoHeader(fi)
+	} else {
+		// Folder rekursif
+		err = filepath.Walk(srcStringAbs, func(path string, fi os.FileInfo, err error) error {
 			if err != nil {
 				return err
 			}
-			header.Name = headerName
-			_, err = zw.CreateHeader(header)
-			return err
-		}
+			// Lewati symlink untuk mencegah pembocoran berkas di luar folder
+			if fi.Mode()&os.ModeSymlink != 0 || (!fi.Mode().IsRegular() && !fi.IsDir()) {
+				return nil
+			}
+			absItem, _ := filepath.Abs(path)
+			if absItem == destAbs {
+				return nil
+			}
+			relPath, err := filepath.Rel(srcStringAbs, path)
+			if err != nil {
+				return err
+			}
+			if relPath == "." {
+				return nil
+			}
 
-		return addFileToZip(zw, path, headerName)
-	})
-	if err != nil {
-		os.Remove(destAbs)
-		return fmt.Errorf("gagal mengemas folder ke ZIP: %w", err)
+			headerName := filepath.ToSlash(relPath)
+			if fi.IsDir() {
+				headerName += "/"
+				header, err := zip.FileInfoHeader(fi)
+				if err != nil {
+					return err
+				}
+				header.Name = headerName
+				_, err = zw.CreateHeader(header)
+				return err
+			}
+
+			return addFileToZip(zw, path, headerName, method)
+		})
+		if err != nil {
+			return fmt.Errorf("gagal mengemas folder ke ZIP: %w", err)
+		}
 	}
 
+	if err := zw.Close(); err != nil {
+		return fmt.Errorf("gagal menutup arsip ZIP (penulisan central directory gagal): %w", err)
+	}
+	if err := zipFile.Close(); err != nil {
+		return fmt.Errorf("gagal menyimpan berkas ZIP '%s': %w", destAbs, err)
+	}
+	closed = true
 	return nil
 }
 
-func addFileToZip(zw *zip.Writer, absPath, headerName string) error {
-	fi, err := os.Stat(absPath)
+func addFileToZip(zw *zip.Writer, absPath, headerName string, method uint16) error {
+	fi, err := os.Lstat(absPath)
 	if err != nil {
 		return err
+	}
+	// Lewati symlink dan berkas non-reguler
+	if fi.Mode()&os.ModeSymlink != 0 || !fi.Mode().IsRegular() {
+		return nil
 	}
 
 	header, err := zip.FileInfoHeader(fi)
@@ -235,7 +390,7 @@ func addFileToZip(zw *zip.Writer, absPath, headerName string) error {
 		return err
 	}
 	header.Name = filepath.ToSlash(headerName)
-	header.Method = zip.Deflate
+	header.Method = method
 
 	writer, err := zw.CreateHeader(header)
 	if err != nil {
@@ -250,6 +405,115 @@ func addFileToZip(zw *zip.Writer, absPath, headerName string) error {
 
 	_, err = io.Copy(writer, file)
 	return err
+}
+
+// createZipFromMemory mengemas kamus string/Bytes langsung menjadi berkas ZIP tanpa membuat berkas sementara di disk.
+func createZipFromMemory(contentMap *Map, destZipPath string, method uint16) error {
+	destAbs, err := filepath.Abs(destZipPath)
+	if err != nil {
+		return fmt.Errorf("jalur berkas ZIP tujuan tidak valid: %w", err)
+	}
+
+	if err := os.MkdirAll(filepath.Dir(destAbs), 0755); err != nil {
+		return fmt.Errorf("gagal membuat direktori induk tujuan: %w", err)
+	}
+
+	zipFile, err := os.Create(destAbs)
+	if err != nil {
+		return fmt.Errorf("gagal membuat berkas ZIP '%s': %w", destAbs, err)
+	}
+
+	closed := false
+	defer func() {
+		if !closed {
+			zipFile.Close()
+			os.Remove(destAbs)
+		}
+	}()
+
+	zw := zip.NewWriter(zipFile)
+
+	keys := make([]string, len(contentMap.Order))
+	copy(keys, contentMap.Order)
+	if len(keys) == 0 {
+		for k := range contentMap.Pairs {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys) // Urutkan kunci untuk hasil deterministik
+	}
+
+	now := time.Now()
+	for _, rawKey := range keys {
+		val, exists := contentMap.Pairs[rawKey]
+		if !exists {
+			continue
+		}
+
+		if strings.Contains(rawKey, "\\") {
+			return fmt.Errorf("nama entri tidak boleh mengandung karakter backslash ('\\'): '%s'", rawKey)
+		}
+
+		cleanKey := filepath.Clean(filepath.ToSlash(rawKey))
+		if filepath.IsAbs(cleanKey) || strings.HasPrefix(cleanKey, "../") || cleanKey == ".." {
+			return fmt.Errorf("terdeteksi ancaman path traversal pada entri memori: '%s'", rawKey)
+		}
+
+		isDir := strings.HasSuffix(rawKey, "/")
+		headerName := strings.TrimPrefix(cleanKey, "/")
+		if isDir && !strings.HasSuffix(headerName, "/") {
+			headerName += "/"
+		}
+
+		if isDir {
+			header := &zip.FileHeader{
+				Name:     headerName,
+				Method:   zip.Store,
+				Modified: now,
+			}
+			header.SetMode(0755 | os.ModeDir)
+			if _, err := zw.CreateHeader(header); err != nil {
+				return fmt.Errorf("gagal membuat header folder '%s' di dalam ZIP: %w", headerName, err)
+			}
+			continue
+		}
+
+		var payload []byte
+		switch v := val.(type) {
+		case *String:
+			payload = []byte(v.Value)
+		case *Bytes:
+			payload = v.Elements
+		default:
+			return fmt.Errorf("nilai entri '%s' harus berupa String atau Bita (Bytes), menerima %s", rawKey, val.Type())
+		}
+
+		header := &zip.FileHeader{
+			Name:     headerName,
+			Method:   method,
+			Modified: now,
+		}
+		header.SetMode(0644)
+
+		writer, err := zw.CreateHeader(header)
+		if err != nil {
+			return fmt.Errorf("gagal membuat header entri '%s': %w", headerName, err)
+		}
+
+		if len(payload) > 0 {
+			if _, err := writer.Write(payload); err != nil {
+				return fmt.Errorf("gagal menulis data ke entri '%s': %w", headerName, err)
+			}
+		}
+	}
+
+	if err := zw.Close(); err != nil {
+		return fmt.Errorf("gagal menutup arsip ZIP memori: %w", err)
+	}
+	if err := zipFile.Close(); err != nil {
+		return fmt.Errorf("gagal menyimpan berkas ZIP '%s': %w", destAbs, err)
+	}
+	closed = true
+	return nil
 }
 
 // isZipArchive memeriksa apakah berkas merupakan arsip ZIP yang valid.
@@ -284,6 +548,13 @@ func createZipEntryInfo(f *zip.File) *Map {
 		typeStrEN = "symlink"
 	}
 
+	methodStr := "store"
+	if f.Method == zip.Deflate {
+		methodStr = "deflate"
+	} else if f.Method != zip.Store {
+		methodStr = fmt.Sprintf("%d", f.Method)
+	}
+
 	pairs := map[string]Object{
 		"nama":               &String{Value: f.Name},
 		"name":               &String{Value: f.Name},
@@ -300,13 +571,34 @@ func createZipEntryInfo(f *zip.File) *Map {
 		"mode":               &Integer{Value: int64(f.Mode())},
 		"waktu_modifikasi":   &String{Value: f.Modified.Format(time.RFC3339)},
 		"modified":           &String{Value: f.Modified.Format(time.RFC3339)},
+		"crc32":              &Integer{Value: int64(f.CRC32)},
+		"metode_kompresi":    &String{Value: methodStr},
+		"compression_method": &String{Value: methodStr},
 	}
-	order := []string{"nama", "name", "ukuran", "size", "ukuran_terkompresi", "compressed_size", "apakah_direktori", "is_dir", "apakah_tautan", "is_symlink", "tipe", "type", "mode", "waktu_modifikasi", "modified"}
+	order := []string{
+		"nama", "name",
+		"ukuran", "size",
+		"ukuran_terkompresi", "compressed_size",
+		"apakah_direktori", "is_dir",
+		"apakah_tautan", "is_symlink",
+		"tipe", "type",
+		"mode",
+		"waktu_modifikasi", "modified",
+		"crc32",
+		"metode_kompresi", "compression_method",
+	}
 	return &Map{Pairs: pairs, Order: order}
 }
 
-// extractZipArchive mengekstrak seluruh arsip ZIP ke targetDir dengan proteksi Zip Slip dan opsi penyaring.
-func extractZipArchive(zipPath, targetDir string, overwrite bool, filterFn Object) (int, error) {
+// extractZipArchive mengekstrak seluruh arsip ZIP ke targetDir dengan proteksi Zip Slip, batas dekompresi, dan opsi penyaring.
+func extractZipArchive(zipPath, targetDir string, overwrite bool, filterFn Object, maxSize int64, maxEntries int) (int, error) {
+	if maxSize <= 0 {
+		maxSize = DefaultMaxExtractTotalSize
+	}
+	if maxEntries <= 0 {
+		maxEntries = DefaultMaxExtractEntries
+	}
+
 	cleanZip, err := filepath.Abs(zipPath)
 	if err != nil {
 		return 0, fmt.Errorf("jalur berkas ZIP tidak valid: %w", err)
@@ -323,13 +615,24 @@ func extractZipArchive(zipPath, targetDir string, overwrite bool, filterFn Objec
 	}
 	defer zr.Close()
 
+	remainingBytes := maxSize
 	count := 0
 	for _, f := range zr.File {
+		if count >= maxEntries {
+			return count, fmt.Errorf("jumlah entri melebihi batas maksimal yang diizinkan (%d entri)", maxEntries)
+		}
+
 		if filterFn != nil && filterFn != NULL {
 			infoMap := createZipEntryInfo(f)
 			res := applyFunction(filterFn, []Object{infoMap}, nil)
 			if isError(res) {
-				return count, fmt.Errorf("kesalahan pada fungsi saring: %s", res.(*Error).Message)
+				errMsg := res.Inspect()
+				if errObj, ok := res.(*Error); ok {
+					errMsg = errObj.Message
+				} else if aErr, ok := res.(*AssertionError); ok {
+					errMsg = aErr.Message
+				}
+				return count, fmt.Errorf("kesalahan pada fungsi saring: %s", errMsg)
 			}
 			if !CoerceToBoolean(res) {
 				continue
@@ -341,8 +644,13 @@ func extractZipArchive(zipPath, targetDir string, overwrite bool, filterFn Objec
 			return count, err
 		}
 
+		if err := ensureSafePathWithinTarget(cleanTarget, destPath); err != nil {
+			return count, err
+		}
+
 		if f.FileInfo().IsDir() {
-			if err := os.MkdirAll(destPath, f.Mode()); err != nil {
+			// Cegah bit setuid/setgid dan pastikan izin tulis direktori untuk entri berikutnya
+			if err := os.MkdirAll(destPath, f.Mode().Perm()|0700); err != nil {
 				return count, fmt.Errorf("gagal membuat direktori '%s': %w", destPath, err)
 			}
 			continue
@@ -364,18 +672,22 @@ func extractZipArchive(zipPath, targetDir string, overwrite bool, filterFn Objec
 			return count, fmt.Errorf("gagal membuka entri '%s' di dalam ZIP: %w", f.Name, err)
 		}
 
-		outFile, err := os.OpenFile(destPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
+		// Gunakan Perm() murni untuk mencegah eskalasi hak akses (setuid/setgid)
+		outFile, err := os.OpenFile(destPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode().Perm())
 		if err != nil {
 			rc.Close()
 			return count, fmt.Errorf("gagal menulis berkas target '%s': %w", destPath, err)
 		}
 
-		_, copyErr := io.Copy(outFile, rc)
+		copyErr := copyLimited(outFile, rc, &remainingBytes)
 		rc.Close()
-		outFile.Close()
+		closeErr := outFile.Close()
 
 		if copyErr != nil {
 			return count, fmt.Errorf("gagal mengekstrak isi entri '%s': %w", f.Name, copyErr)
+		}
+		if closeErr != nil {
+			return count, fmt.Errorf("gagal menutup berkas target '%s': %w", destPath, closeErr)
 		}
 		count++
 	}
@@ -384,7 +696,11 @@ func extractZipArchive(zipPath, targetDir string, overwrite bool, filterFn Objec
 }
 
 // extractSingleFileFromZip mengekstrak satu berkas spesifik dari ZIP ke lokasi tujuan.
-func extractSingleFileFromZip(zipPath, entryName, destPath string, overwrite bool) error {
+func extractSingleFileFromZip(zipPath, entryName, destPath string, overwrite bool, maxSize int64) error {
+	if maxSize <= 0 {
+		maxSize = DefaultMaxExtractTotalSize
+	}
+
 	cleanZip, err := filepath.Abs(zipPath)
 	if err != nil {
 		return fmt.Errorf("jalur berkas ZIP tidak valid: %w", err)
@@ -418,6 +734,10 @@ func extractSingleFileFromZip(zipPath, entryName, destPath string, overwrite boo
 		return err
 	}
 
+	if err := ensureSafePathWithinTarget(filepath.Dir(finalDest), finalDest); err != nil {
+		return err
+	}
+
 	if !overwrite {
 		if _, err := os.Stat(finalDest); err == nil {
 			return fmt.Errorf("berkas tujuan '%s' sudah ada dan opsi timpa bernilai salah", finalDest)
@@ -434,14 +754,20 @@ func extractSingleFileFromZip(zipPath, entryName, destPath string, overwrite boo
 	}
 	defer rc.Close()
 
-	outFile, err := os.OpenFile(finalDest, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, targetFile.Mode())
+	outFile, err := os.OpenFile(finalDest, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, targetFile.Mode().Perm())
 	if err != nil {
 		return fmt.Errorf("gagal membuat berkas tujuan '%s': %w", finalDest, err)
 	}
-	defer outFile.Close()
 
-	if _, err := io.Copy(outFile, rc); err != nil {
-		return fmt.Errorf("gagal menulis isi berkas ke '%s': %w", finalDest, err)
+	remainingBytes := maxSize
+	copyErr := copyLimited(outFile, rc, &remainingBytes)
+	closeErr := outFile.Close()
+
+	if copyErr != nil {
+		return fmt.Errorf("gagal menulis isi berkas ke '%s': %w", finalDest, copyErr)
+	}
+	if closeErr != nil {
+		return fmt.Errorf("gagal menutup berkas tujuan '%s': %w", finalDest, closeErr)
 	}
 
 	return nil
@@ -468,7 +794,7 @@ func listZipArchive(zipPath string) (Object, error) {
 	return &Array{Elements: entries}, nil
 }
 
-// readFileFromZip membaca satu berkas dari dalam ZIP dan mengembalikan *Bytes.
+// readFileFromZip membaca satu berkas dari dalam ZIP dan mengembalikan *Bytes dengan batas memori aman.
 func readFileFromZip(zipPath, targetFile string) (Object, error) {
 	cleanZip, err := filepath.Abs(zipPath)
 	if err != nil {
@@ -490,7 +816,7 @@ func readFileFromZip(zipPath, targetFile string) (Object, error) {
 			}
 			defer rc.Close()
 
-			data, err := io.ReadAll(rc)
+			data, err := readAllLimited(rc, DefaultMaxDecompressMem)
 			if err != nil {
 				return nil, fmt.Errorf("gagal membaca isi entri '%s': %w", f.Name, err)
 			}
@@ -499,6 +825,74 @@ func readFileFromZip(zipPath, targetFile string) (Object, error) {
 	}
 
 	return nil, fmt.Errorf("berkas '%s' tidak ditemukan di dalam arsip ZIP", targetFile)
+}
+
+// testZipArchive memverifikasi integritas checksum CRC-32 dan dekompresi seluruh anggota arsip ZIP.
+// Mengembalikan NULL jika seluruh anggota sehat, atau nama berkas pertama yang rusak.
+func testZipArchive(zipPath string) (Object, error) {
+	cleanZip, err := filepath.Abs(zipPath)
+	if err != nil {
+		return nil, fmt.Errorf("jalur berkas ZIP tidak valid: %w", err)
+	}
+
+	info, err := os.Stat(cleanZip)
+	if err != nil {
+		return nil, fmt.Errorf("berkas ZIP '%s' tidak ditemukan: %w", cleanZip, err)
+	}
+	if info.IsDir() {
+		return nil, fmt.Errorf("jalur '%s' berupa direktori, bukan berkas ZIP", cleanZip)
+	}
+
+	zr, err := zip.OpenReader(cleanZip)
+	if err != nil {
+		return nil, fmt.Errorf("gagal membuka berkas ZIP '%s': %w", filepath.Base(cleanZip), err)
+	}
+	defer zr.Close()
+
+	for _, f := range zr.File {
+		if f.FileInfo().IsDir() {
+			continue
+		}
+
+		rc, err := f.Open()
+		if err != nil {
+			return &String{Value: f.Name}, nil
+		}
+
+		// Batasi dekompresi uji per entri berkas (maksimal 512 MB) untuk mencegah DoS CPU exhaustion
+		var remainingBytes int64 = DefaultMaxDecompressMem * 2 // 512 MB
+		copyErr := copyLimited(io.Discard, rc, &remainingBytes)
+		rc.Close()
+
+		if copyErr != nil {
+			return &String{Value: f.Name}, nil
+		}
+	}
+
+	return NULL, nil
+}
+
+// getZipFileInfo mengambil metadata detail satu entri berkas di dalam arsip ZIP.
+func getZipFileInfo(zipPath, entryName string) (Object, error) {
+	cleanZip, err := filepath.Abs(zipPath)
+	if err != nil {
+		return nil, fmt.Errorf("jalur berkas ZIP tidak valid: %w", err)
+	}
+
+	zr, err := zip.OpenReader(cleanZip)
+	if err != nil {
+		return nil, fmt.Errorf("gagal membuka berkas ZIP '%s': %w", filepath.Base(cleanZip), err)
+	}
+	defer zr.Close()
+
+	normTarget := filepath.ToSlash(filepath.Clean(entryName))
+	for _, f := range zr.File {
+		if filepath.ToSlash(filepath.Clean(f.Name)) == normTarget {
+			return createZipEntryInfo(f), nil
+		}
+	}
+
+	return nil, fmt.Errorf("entri '%s' tidak ditemukan di dalam arsip ZIP", entryName)
 }
 
 // ==============================================================================
@@ -518,9 +912,12 @@ func createTarArchive(sourceArg Object, destPath string, isGzip bool) error {
 		if err != nil {
 			return fmt.Errorf("jalur sumber tidak valid: %w", err)
 		}
-		info, err := os.Stat(srcStringAbs)
+		info, err := os.Lstat(srcStringAbs)
 		if err != nil {
 			return fmt.Errorf("sumber '%s' tidak ditemukan: %w", src.Value, err)
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("sumber '%s' berupa tautan simbolik (symlink) yang dilewati untuk keamanan", src.Value)
 		}
 		srcStringIsDir = info.IsDir()
 
@@ -536,9 +933,12 @@ func createTarArchive(sourceArg Object, destPath string, isGzip bool) error {
 			if err != nil {
 				return fmt.Errorf("jalur berkas '%s' tidak valid: %w", strEl.Value, err)
 			}
-			info, err := os.Stat(filePath)
+			info, err := os.Lstat(filePath)
 			if err != nil {
 				return fmt.Errorf("berkas '%s' tidak ditemukan: %w", strEl.Value, err)
+			}
+			if info.Mode()&os.ModeSymlink != 0 {
+				continue // Lewati symlink untuk mencegah kebocoran data
 			}
 			if info.IsDir() {
 				return fmt.Errorf("entri '%s' berupa folder; untuk folder gunakan path folder langsung", strEl.Value)
@@ -563,75 +963,103 @@ func createTarArchive(sourceArg Object, destPath string, isGzip bool) error {
 	if err != nil {
 		return fmt.Errorf("gagal membuat berkas arsip '%s': %w", destAbs, err)
 	}
-	defer tarFile.Close()
 
 	var tw *tar.Writer
 	var gw *gzip.Writer
 
 	if isGzip {
 		gw = gzip.NewWriter(tarFile)
-		defer gw.Close()
 		tw = tar.NewWriter(gw)
 	} else {
 		tw = tar.NewWriter(tarFile)
 	}
-	defer tw.Close()
+
+	closed := false
+	defer func() {
+		if !closed {
+			if tw != nil {
+				tw.Close()
+			}
+			if gw != nil {
+				gw.Close()
+			}
+			tarFile.Close()
+			os.Remove(destAbs)
+		}
+	}()
 
 	if len(fileListAbs) > 0 {
 		for _, filePath := range fileListAbs {
 			if err := addFileToTar(tw, filePath, filepath.Base(filePath)); err != nil {
-				os.Remove(destAbs)
 				return err
 			}
 		}
-		return nil
-	}
-
-	if !srcStringIsDir {
-		return addFileToTar(tw, srcStringAbs, filepath.Base(srcStringAbs))
-	}
-
-	err = filepath.Walk(srcStringAbs, func(path string, fi os.FileInfo, err error) error {
-		if err != nil {
+	} else if !srcStringIsDir {
+		if err := addFileToTar(tw, srcStringAbs, filepath.Base(srcStringAbs)); err != nil {
 			return err
 		}
-		absItem, _ := filepath.Abs(path)
-		if absItem == destAbs {
-			return nil
-		}
-		relPath, err := filepath.Rel(srcStringAbs, path)
-		if err != nil {
-			return err
-		}
-		if relPath == "." {
-			return nil
-		}
-
-		headerName := filepath.ToSlash(relPath)
-		if fi.IsDir() {
-			headerName += "/"
-			header, err := tar.FileInfoHeader(fi, "")
+	} else {
+		err = filepath.Walk(srcStringAbs, func(path string, fi os.FileInfo, err error) error {
 			if err != nil {
 				return err
 			}
-			header.Name = headerName
-			return tw.WriteHeader(header)
-		}
+			// Lewati symlink untuk mencegah pembocoran berkas di luar folder
+			if fi.Mode()&os.ModeSymlink != 0 || (!fi.Mode().IsRegular() && !fi.IsDir()) {
+				return nil
+			}
+			absItem, _ := filepath.Abs(path)
+			if absItem == destAbs {
+				return nil
+			}
+			relPath, err := filepath.Rel(srcStringAbs, path)
+			if err != nil {
+				return err
+			}
+			if relPath == "." {
+				return nil
+			}
 
-		return addFileToTar(tw, path, headerName)
-	})
-	if err != nil {
-		os.Remove(destAbs)
-		return fmt.Errorf("gagal mengemas folder ke TAR: %w", err)
+			headerName := filepath.ToSlash(relPath)
+			if fi.IsDir() {
+				headerName += "/"
+				header, err := tar.FileInfoHeader(fi, "")
+				if err != nil {
+					return err
+				}
+				header.Name = headerName
+				return tw.WriteHeader(header)
+			}
+
+			return addFileToTar(tw, path, headerName)
+		})
+		if err != nil {
+			return fmt.Errorf("gagal mengemas folder ke TAR: %w", err)
+		}
 	}
 
+	if err := tw.Close(); err != nil {
+		return fmt.Errorf("gagal menutup arsip TAR: %w", err)
+	}
+	if gw != nil {
+		if err := gw.Close(); err != nil {
+			return fmt.Errorf("gagal menutup kompresi GZIP: %w", err)
+		}
+	}
+	if err := tarFile.Close(); err != nil {
+		return fmt.Errorf("gagal menyimpan berkas arsip '%s': %w", destAbs, err)
+	}
+	closed = true
 	return nil
 }
 
 func addFileToTar(tw *tar.Writer, absPath, headerName string) error {
-	fi, err := os.Stat(absPath)
+	fi, err := os.Lstat(absPath)
 	if err != nil {
 		return err
+	}
+	// Lewati symlink dan berkas non-reguler
+	if fi.Mode()&os.ModeSymlink != 0 || !fi.Mode().IsRegular() {
+		return nil
 	}
 
 	header, err := tar.FileInfoHeader(fi, "")
@@ -770,8 +1198,15 @@ func createTarEntryInfo(header *tar.Header) *Map {
 	return &Map{Pairs: pairs, Order: order}
 }
 
-// extractTarArchive mengekstrak arsip TAR atau TAR.GZ ke targetDir dengan proteksi Tar Slip dan opsi penyaring.
-func extractTarArchive(archivePath, targetDir string, isGzip bool, overwrite bool, filterFn Object) (int, error) {
+// extractTarArchive mengekstrak arsip TAR atau TAR.GZ ke targetDir dengan proteksi Tar Slip, batas dekompresi, dan opsi penyaring.
+func extractTarArchive(archivePath, targetDir string, isGzip bool, overwrite bool, filterFn Object, maxSize int64, maxEntries int) (int, error) {
+	if maxSize <= 0 {
+		maxSize = DefaultMaxExtractTotalSize
+	}
+	if maxEntries <= 0 {
+		maxEntries = DefaultMaxExtractEntries
+	}
+
 	cleanArchive, err := filepath.Abs(archivePath)
 	if err != nil {
 		return 0, fmt.Errorf("jalur berkas arsip tidak valid: %w", err)
@@ -800,6 +1235,7 @@ func extractTarArchive(archivePath, targetDir string, isGzip bool, overwrite boo
 		tr = tar.NewReader(file)
 	}
 
+	remainingBytes := maxSize
 	count := 0
 	for {
 		header, err := tr.Next()
@@ -814,7 +1250,13 @@ func extractTarArchive(archivePath, targetDir string, isGzip bool, overwrite boo
 			infoMap := createTarEntryInfo(header)
 			res := applyFunction(filterFn, []Object{infoMap}, nil)
 			if isError(res) {
-				return count, fmt.Errorf("kesalahan pada fungsi saring: %s", res.(*Error).Message)
+				errMsg := res.Inspect()
+				if errObj, ok := res.(*Error); ok {
+					errMsg = errObj.Message
+				} else if aErr, ok := res.(*AssertionError); ok {
+					errMsg = aErr.Message
+				}
+				return count, fmt.Errorf("kesalahan pada fungsi saring: %s", errMsg)
 			}
 			if !CoerceToBoolean(res) {
 				continue
@@ -826,12 +1268,21 @@ func extractTarArchive(archivePath, targetDir string, isGzip bool, overwrite boo
 			return count, err
 		}
 
+		if err := ensureSafePathWithinTarget(cleanTarget, destPath); err != nil {
+			return count, err
+		}
+
 		switch header.Typeflag {
 		case tar.TypeDir:
-			if err := os.MkdirAll(destPath, os.FileMode(header.Mode)); err != nil {
+			// Masking mode dan pastikan direktori dapat ditulisi (0700)
+			if err := os.MkdirAll(destPath, os.FileMode(header.Mode).Perm()|0700); err != nil {
 				return count, fmt.Errorf("gagal membuat direktori '%s': %w", destPath, err)
 			}
-		case tar.TypeReg, tar.TypeRegA:
+		case tar.TypeReg, '\x00': // Menghindari penggunaan tar.TypeRegA yang deprecated
+			if count >= maxEntries {
+				return count, fmt.Errorf("jumlah entri melebihi batas maksimal yang diizinkan (%d entri)", maxEntries)
+			}
+
 			if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
 				return count, fmt.Errorf("gagal membuat direktori induk '%s': %w", filepath.Dir(destPath), err)
 			}
@@ -842,16 +1293,21 @@ func extractTarArchive(archivePath, targetDir string, isGzip bool, overwrite boo
 				}
 			}
 
-			outFile, err := os.OpenFile(destPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, os.FileMode(header.Mode))
+			// Gunakan Perm() murni untuk mencegah eskalasi hak akses (setuid/setgid)
+			outFile, err := os.OpenFile(destPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, os.FileMode(header.Mode).Perm())
 			if err != nil {
 				return count, fmt.Errorf("gagal membuat berkas target '%s': %w", destPath, err)
 			}
 
-			if _, err := io.Copy(outFile, tr); err != nil {
-				outFile.Close()
-				return count, fmt.Errorf("gagal mengekstrak isi entri '%s': %w", header.Name, err)
+			copyErr := copyLimited(outFile, tr, &remainingBytes)
+			closeErr := outFile.Close()
+
+			if copyErr != nil {
+				return count, fmt.Errorf("gagal mengekstrak isi entri '%s': %w", header.Name, copyErr)
 			}
-			outFile.Close()
+			if closeErr != nil {
+				return count, fmt.Errorf("gagal menutup berkas target '%s': %w", destPath, closeErr)
+			}
 			count++
 		}
 	}
@@ -860,7 +1316,11 @@ func extractTarArchive(archivePath, targetDir string, isGzip bool, overwrite boo
 }
 
 // extractSingleFileFromTar mengekstrak satu berkas spesifik dari TAR atau TAR.GZ ke lokasi tujuan.
-func extractSingleFileFromTar(archivePath, entryName, destPath string, isGzip bool, overwrite bool) error {
+func extractSingleFileFromTar(archivePath, entryName, destPath string, isGzip bool, overwrite bool, maxSize int64) error {
+	if maxSize <= 0 {
+		maxSize = DefaultMaxExtractTotalSize
+	}
+
 	cleanArchive, err := filepath.Abs(archivePath)
 	if err != nil {
 		return fmt.Errorf("jalur arsip tidak valid: %w", err)
@@ -904,6 +1364,10 @@ func extractSingleFileFromTar(archivePath, entryName, destPath string, isGzip bo
 				return err
 			}
 
+			if err := ensureSafePathWithinTarget(filepath.Dir(finalDest), finalDest); err != nil {
+				return err
+			}
+
 			if !overwrite {
 				if _, err := os.Stat(finalDest); err == nil {
 					return fmt.Errorf("berkas tujuan '%s' sudah ada dan opsi timpa bernilai salah", finalDest)
@@ -914,14 +1378,20 @@ func extractSingleFileFromTar(archivePath, entryName, destPath string, isGzip bo
 				return fmt.Errorf("gagal membuat direktori induk '%s': %w", filepath.Dir(finalDest), err)
 			}
 
-			outFile, err := os.OpenFile(finalDest, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, os.FileMode(header.Mode))
+			outFile, err := os.OpenFile(finalDest, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, os.FileMode(header.Mode).Perm())
 			if err != nil {
 				return fmt.Errorf("gagal membuat berkas tujuan '%s': %w", finalDest, err)
 			}
-			defer outFile.Close()
 
-			if _, err := io.Copy(outFile, tr); err != nil {
-				return fmt.Errorf("gagal menulis isi berkas ke '%s': %w", finalDest, err)
+			remainingBytes := maxSize
+			copyErr := copyLimited(outFile, tr, &remainingBytes)
+			closeErr := outFile.Close()
+
+			if copyErr != nil {
+				return fmt.Errorf("gagal menulis isi berkas ke '%s': %w", finalDest, copyErr)
+			}
+			if closeErr != nil {
+				return fmt.Errorf("gagal menutup berkas tujuan '%s': %w", finalDest, closeErr)
 			}
 
 			return nil
@@ -972,7 +1442,7 @@ func listTarArchive(archivePath string, isGzip bool) (Object, error) {
 	return &Array{Elements: entries}, nil
 }
 
-// readFileFromTar membaca satu berkas dari dalam TAR atau TAR.GZ dan mengembalikan *Bytes.
+// readFileFromTar membaca satu berkas dari dalam TAR atau TAR.GZ dan mengembalikan *Bytes dengan batas memori aman.
 func readFileFromTar(archivePath, targetFile string, isGzip bool) (Object, error) {
 	cleanArchive, err := filepath.Abs(archivePath)
 	if err != nil {
@@ -1008,7 +1478,7 @@ func readFileFromTar(archivePath, targetFile string, isGzip bool) (Object, error
 		}
 
 		if filepath.ToSlash(filepath.Clean(header.Name)) == normTarget {
-			data, err := io.ReadAll(tr)
+			data, err := readAllLimited(tr, DefaultMaxDecompressMem)
 			if err != nil {
 				return nil, fmt.Errorf("gagal membaca isi entri '%s': %w", header.Name, err)
 			}
@@ -1042,7 +1512,7 @@ func gzipDecompressBytes(compressed []byte) ([]byte, error) {
 	}
 	defer zr.Close()
 
-	data, err := io.ReadAll(zr)
+	data, err := readAllLimited(zr, DefaultMaxDecompressMem)
 	if err != nil {
 		return nil, fmt.Errorf("gagal mendekompresi payload gzip: %w", err)
 	}
@@ -1068,7 +1538,7 @@ func zlibDecompressBytes(compressed []byte) ([]byte, error) {
 	}
 	defer zr.Close()
 
-	data, err := io.ReadAll(zr)
+	data, err := readAllLimited(zr, DefaultMaxDecompressMem)
 	if err != nil {
 		return nil, fmt.Errorf("gagal mendekompresi payload zlib: %w", err)
 	}
@@ -1100,17 +1570,21 @@ func initStdlibArsip(env *Environment) {
 	definePublicFunction(env, "apakah_zip", apakahZipFn)
 	definePublicFunction(env, "is_zip", apakahZipFn)
 
-	// buat_zip(sumber, tujuanZip) / create_zip
+	// buat_zip(sumber, tujuanZip, [opsi]) / create_zip
 	buatZipFn := &Builtin{
 		Fn: func(args ...Object) Object {
 			if len(args) < 2 {
-				return newError(nil, "arsip.buat_zip membutuhkan minimal 2 argumen: (sumber, tujuan_zip)", "Contoh: arsip.buat_zip(\"./projek\", \"projek.zip\")")
+				return newError(nil, "arsip.buat_zip membutuhkan minimal 2 argumen: (sumber, tujuan_zip, [opsi])", "Contoh: arsip.buat_zip(\"./projek\", \"projek.zip\", {\"metode\": \"store\"})")
 			}
 			destStr, ok := args[1].(*String)
 			if !ok {
 				return newError(nil, "arsip.buat_zip: argumen kedua (tujuan) harus berupa teks (String)", "")
 			}
-			if err := createZipArchive(args[0], destStr.Value); err != nil {
+			method := uint16(zip.Deflate)
+			if len(args) >= 3 {
+				method = parseZipOptions(args[2])
+			}
+			if err := createZipArchive(args[0], destStr.Value, method); err != nil {
 				return newError(nil, fmt.Sprintf("arsip.buat_zip gagal: %v", err), "")
 			}
 			return TRUE
@@ -1136,11 +1610,13 @@ func initStdlibArsip(env *Environment) {
 
 			overwrite := true
 			var filterFn Object
+			maxSize := DefaultMaxExtractTotalSize
+			maxEntries := DefaultMaxExtractEntries
 			if len(args) >= 3 {
-				overwrite, filterFn = parseExtractOptions(args[2])
+				overwrite, filterFn, maxSize, maxEntries = parseExtractOptions(args[2])
 			}
 
-			count, err := extractZipArchive(zipStr.Value, targetStr.Value, overwrite, filterFn)
+			count, err := extractZipArchive(zipStr.Value, targetStr.Value, overwrite, filterFn, maxSize, maxEntries)
 			if err != nil {
 				return newError(nil, fmt.Sprintf("arsip.ekstrak_zip gagal: %v", err), "")
 			}
@@ -1169,10 +1645,11 @@ func initStdlibArsip(env *Environment) {
 				return newError(nil, "arsip.ekstrak_berkas_zip: argumen ketiga harus berupa String", "")
 			}
 			overwrite := true
+			maxSize := DefaultMaxExtractTotalSize
 			if len(args) >= 4 {
-				overwrite, _ = parseExtractOptions(args[3])
+				overwrite, _, maxSize, _ = parseExtractOptions(args[3])
 			}
-			if err := extractSingleFileFromZip(zipStr.Value, fileStr.Value, destStr.Value, overwrite); err != nil {
+			if err := extractSingleFileFromZip(zipStr.Value, fileStr.Value, destStr.Value, overwrite, maxSize); err != nil {
 				return newError(nil, fmt.Sprintf("arsip.ekstrak_berkas_zip gagal: %v", err), "")
 			}
 			return TRUE
@@ -1224,6 +1701,77 @@ func initStdlibArsip(env *Environment) {
 	}
 	definePublicFunction(env, "baca_berkas_zip", bacaBerkasZipFn)
 	definePublicFunction(env, "read_file_zip", bacaBerkasZipFn)
+
+	// uji_zip(jalur) / test_zip
+	ujiZipFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) < 1 {
+				return newError(nil, "arsip.uji_zip membutuhkan 1 argumen: (jalur_berkas)", "Contoh: arsip.uji_zip(\"arsip.zip\")")
+			}
+			pathStr, ok := args[0].(*String)
+			if !ok {
+				return newError(nil, "arsip.uji_zip: argumen harus berupa teks (String)", "")
+			}
+			res, err := testZipArchive(pathStr.Value)
+			if err != nil {
+				return newError(nil, fmt.Sprintf("arsip.uji_zip gagal: %v", err), "")
+			}
+			return res
+		},
+	}
+	definePublicFunction(env, "uji_zip", ujiZipFn)
+	definePublicFunction(env, "test_zip", ujiZipFn)
+
+	// info_berkas_zip(arsipZip, namaBerkas) / get_file_info_zip
+	infoBerkasZipFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) < 2 {
+				return newError(nil, "arsip.info_berkas_zip membutuhkan 2 argumen: (arsip_zip, nama_berkas)", "Contoh: arsip.info_berkas_zip(\"arsip.zip\", \"berkas.txt\")")
+			}
+			zipStr, ok := args[0].(*String)
+			if !ok {
+				return newError(nil, "arsip.info_berkas_zip: argumen pertama harus berupa String", "")
+			}
+			fileStr, ok := args[1].(*String)
+			if !ok {
+				return newError(nil, "arsip.info_berkas_zip: argumen kedua harus berupa String", "")
+			}
+			info, err := getZipFileInfo(zipStr.Value, fileStr.Value)
+			if err != nil {
+				return newError(nil, fmt.Sprintf("arsip.info_berkas_zip gagal: %v", err), "")
+			}
+			return info
+		},
+	}
+	definePublicFunction(env, "info_berkas_zip", infoBerkasZipFn)
+	definePublicFunction(env, "get_file_info_zip", infoBerkasZipFn)
+
+	// buat_zip_memori(petaKonten, tujuanZip, [opsi]) / create_zip_from_memory
+	buatZipMemoriFn := &Builtin{
+		Fn: func(args ...Object) Object {
+			if len(args) < 2 {
+				return newError(nil, "arsip.buat_zip_memori membutuhkan minimal 2 argumen: (peta_konten, tujuan_zip, [opsi])", "Contoh: arsip.buat_zip_memori({\"halo.txt\": \"isi teks\"}, \"arsip.zip\")")
+			}
+			contentMap, ok := args[0].(*Map)
+			if !ok {
+				return newError(nil, "arsip.buat_zip_memori: argumen pertama harus berupa Kamus/Peta (Map)", "")
+			}
+			destStr, ok := args[1].(*String)
+			if !ok {
+				return newError(nil, "arsip.buat_zip_memori: argumen kedua harus berupa teks (String)", "")
+			}
+			method := uint16(zip.Deflate)
+			if len(args) >= 3 {
+				method = parseZipOptions(args[2])
+			}
+			if err := createZipFromMemory(contentMap, destStr.Value, method); err != nil {
+				return newError(nil, fmt.Sprintf("arsip.buat_zip_memori gagal: %v", err), "")
+			}
+			return TRUE
+		},
+	}
+	definePublicFunction(env, "buat_zip_memori", buatZipMemoriFn)
+	definePublicFunction(env, "create_zip_from_memory", buatZipMemoriFn)
 
 	// ==========================================
 	// 2. FORMAT TAR.GZ
@@ -1281,11 +1829,13 @@ func initStdlibArsip(env *Environment) {
 
 			overwrite := true
 			var filterFn Object
+			maxSize := DefaultMaxExtractTotalSize
+			maxEntries := DefaultMaxExtractEntries
 			if len(args) >= 3 {
-				overwrite, filterFn = parseExtractOptions(args[2])
+				overwrite, filterFn, maxSize, maxEntries = parseExtractOptions(args[2])
 			}
 
-			count, err := extractTarArchive(archiveStr.Value, targetStr.Value, true, overwrite, filterFn)
+			count, err := extractTarArchive(archiveStr.Value, targetStr.Value, true, overwrite, filterFn, maxSize, maxEntries)
 			if err != nil {
 				return newError(nil, fmt.Sprintf("arsip.ekstrak_tar_gz gagal: %v", err), "")
 			}
@@ -1314,10 +1864,11 @@ func initStdlibArsip(env *Environment) {
 				return newError(nil, "arsip.ekstrak_berkas_tar_gz: argumen ketiga harus berupa String", "")
 			}
 			overwrite := true
+			maxSize := DefaultMaxExtractTotalSize
 			if len(args) >= 4 {
-				overwrite, _ = parseExtractOptions(args[3])
+				overwrite, _, maxSize, _ = parseExtractOptions(args[3])
 			}
-			if err := extractSingleFileFromTar(tarStr.Value, fileStr.Value, destStr.Value, true, overwrite); err != nil {
+			if err := extractSingleFileFromTar(tarStr.Value, fileStr.Value, destStr.Value, true, overwrite, maxSize); err != nil {
 				return newError(nil, fmt.Sprintf("arsip.ekstrak_berkas_tar_gz gagal: %v", err), "")
 			}
 			return TRUE
@@ -1426,11 +1977,13 @@ func initStdlibArsip(env *Environment) {
 
 			overwrite := true
 			var filterFn Object
+			maxSize := DefaultMaxExtractTotalSize
+			maxEntries := DefaultMaxExtractEntries
 			if len(args) >= 3 {
-				overwrite, filterFn = parseExtractOptions(args[2])
+				overwrite, filterFn, maxSize, maxEntries = parseExtractOptions(args[2])
 			}
 
-			count, err := extractTarArchive(archiveStr.Value, targetStr.Value, false, overwrite, filterFn)
+			count, err := extractTarArchive(archiveStr.Value, targetStr.Value, false, overwrite, filterFn, maxSize, maxEntries)
 			if err != nil {
 				return newError(nil, fmt.Sprintf("arsip.ekstrak_tar gagal: %v", err), "")
 			}
@@ -1459,10 +2012,11 @@ func initStdlibArsip(env *Environment) {
 				return newError(nil, "arsip.ekstrak_berkas_tar: argumen ketiga harus berupa String", "")
 			}
 			overwrite := true
+			maxSize := DefaultMaxExtractTotalSize
 			if len(args) >= 4 {
-				overwrite, _ = parseExtractOptions(args[3])
+				overwrite, _, maxSize, _ = parseExtractOptions(args[3])
 			}
-			if err := extractSingleFileFromTar(tarStr.Value, fileStr.Value, destStr.Value, false, overwrite); err != nil {
+			if err := extractSingleFileFromTar(tarStr.Value, fileStr.Value, destStr.Value, false, overwrite, maxSize); err != nil {
 				return newError(nil, fmt.Sprintf("arsip.ekstrak_berkas_tar gagal: %v", err), "")
 			}
 			return TRUE
