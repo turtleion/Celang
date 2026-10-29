@@ -1,0 +1,64 @@
+{
+  "metadata": {
+    "name": "nama_dialek",
+    "display_name": "Nama Dialek Kustom",
+    "version": "1.0.0",
+    "author": "Nama Anda / Komunitas Anda",
+    "description": "Template berkas gaya sintaks kustom untuk bahasa Celang"
+  },
+  "deklarasi": {
+    "var": "buat",
+    "const": "konstanta",
+    "type_assign": "itu",
+    "struct": "bentuk",
+    "ref": "rujuk",
+    "as": "sebagai"
+  },
+  "percabangan": {
+    "if": "jika",
+    "else_if": "selain jika",
+    "else": "selain",
+    "then": "maka",
+    "switch": "pilih",
+    "case": "bila",
+    "default": "lainnya"
+  },
+  "perulangan": {
+    "while": "selama",
+    "for": "untuk",
+    "in": "dalam"
+  },
+  "fungsi": {
+    "def": "fungsi",
+    "return": "kembalikan",
+    "return_type": "mengembalikan",
+    "defer": "saat_selesai"
+  },
+  "penanganan_galat": {
+    "try": "coba",
+    "catch": "tangkap",
+    "finally": "akhirnya",
+    "throw": "lempar"
+  },
+  "operator_logika": {
+    "and": "dan",
+    "or": "atau",
+    "not": "bukan",
+    "null_coalesce": "kalau kosong",
+    "maybe": "mungkin"
+  },
+  "literal": {
+    "true": "benar",
+    "false": "salah",
+    "null": "kosong"
+  },
+  "konkurensi": {
+    "async": "sambil",
+    "parallel": "bersamaan"
+  },
+  "format": {
+    "block_style": "brace",
+    "indent_width": 4,
+    "quote_style": "double"
+  }
+}

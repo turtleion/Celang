@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"celang/pkg/parser"
 	"celang/pkg/syntax"
 )
 
@@ -133,5 +134,28 @@ func TestProfile_MarshalCategorizedJSON(t *testing.T) {
 		!strings.Contains(str, `"percabangan"`) ||
 		!strings.Contains(str, `"fungsi"`) {
 		t.Fatalf("Marshaled JSON missing expected categories:\n%s", str)
+	}
+}
+
+func TestProfile_ApplyToLexer(t *testing.T) {
+	prof := &syntax.StyleProfile{
+		VarDecl: "gawe, bikin",
+		If:      "lamun_bener, lamun-bener",
+	}
+	l := parser.NewLexer("gawe x = 10\nlamun_bener x == 10 {\n}")
+	prof.ApplyToLexer(l)
+
+	tok1 := l.NextToken()
+	if tok1.Type != parser.VAR_DECL || tok1.Literal != "gawe" {
+		t.Fatalf("Expected VAR_DECL 'gawe', got %v (%s)", tok1.Type, tok1.Literal)
+	}
+
+	l.NextToken() // 'x'
+	l.NextToken() // '='
+	l.NextToken() // '10'
+
+	tok2 := l.NextToken()
+	if tok2.Type != parser.IF || tok2.Literal != "lamun_bener" {
+		t.Fatalf("Expected IF 'lamun_bener', got %v (%s)", tok2.Type, tok2.Literal)
 	}
 }

@@ -95,10 +95,11 @@ func main() {
 
 	case "run":
 		if len(os.Args) < 3 {
-			fmt.Println("❌ Penggunaan: celang run <file.ce | file.ast> [--ast] [-- argumen1 argumen2 ...]")
+			fmt.Println("❌ Penggunaan: celang run <file.ce | file.ast> [--style=nama|path] [--ast] [-- argumen1 argumen2 ...]")
 			os.Exit(1)
 		}
 		filePath := ""
+		styleName := ""
 		useAST := false
 		var scriptArgs []string
 
@@ -108,7 +109,12 @@ func main() {
 				scriptArgs = os.Args[i+1:]
 				break
 			}
-			if arg == "--ast" || arg == "--legacy" || arg == "--tree-walk" {
+			if strings.HasPrefix(arg, "--style=") {
+				styleName = strings.TrimPrefix(arg, "--style=")
+			} else if (arg == "-s" || arg == "--style") && i+1 < len(os.Args) {
+				styleName = os.Args[i+1]
+				i++
+			} else if arg == "--ast" || arg == "--legacy" || arg == "--tree-walk" {
 				useAST = true
 			} else if arg == "--vm" {
 				useAST = false // explicit VM confirmation
@@ -121,7 +127,7 @@ func main() {
 			fmt.Println("❌ Mohon sertakan berkas kode yang ingin dijalankan.")
 			os.Exit(1)
 		}
-		runFile(filePath, scriptArgs, useAST)
+		runFile(filePath, styleName, scriptArgs, useAST)
 
 	case "disasm", "disassemble":
 		if len(os.Args) < 3 {
@@ -264,7 +270,7 @@ func printHelp() {
 	fmt.Println("  celang bantuan, --help, -h              Menampilkan bantuan ini")
 }
 
-func loadProgram(filePath string) (*uast.Program, string, error) {
+func loadProgram(filePath string, styleOpt ...string) (*uast.Program, string, error) {
 	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, "", fmt.Errorf("gagal membaca file '%s': %w", filePath, err)
@@ -282,6 +288,15 @@ func loadProgram(filePath string) (*uast.Program, string, error) {
 
 	// Otherwise, parse as source text
 	l := parser.NewLexer(sourceStr)
+	styleName := ""
+	if len(styleOpt) > 0 && styleOpt[0] != "" {
+		styleName = styleOpt[0]
+	}
+	if styleName != "" {
+		if prof := syntax.GetProfile(styleName); prof != nil {
+			prof.ApplyToLexer(l)
+		}
+	}
 	p := parser.NewParser(l)
 	prog, err := p.ParseProgram()
 	if err != nil {
@@ -297,8 +312,8 @@ func handleSyntaxError(err error, sourceStr string) {
 	os.Exit(1)
 }
 
-func runFile(filePath string, scriptArgs []string, useAST bool) {
-	prog, sourceStr, err := loadProgram(filePath)
+func runFile(filePath string, styleName string, scriptArgs []string, useAST bool) {
+	prog, sourceStr, err := loadProgram(filePath, styleName)
 	if err != nil {
 		handleSyntaxError(err, sourceStr)
 	}

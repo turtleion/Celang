@@ -164,25 +164,89 @@ var keywords = map[string]TokenType{
 	"test": TEST,
 }
 
+// GlobalStyleResolver resolves a style name or file path to its token mappings.
+// Initialized by pkg/syntax to avoid circular imports.
+var GlobalStyleResolver func(nameOrPath string) map[string]TokenType
+
 type Lexer struct {
-	input        string
-	position     int  // current character position
-	readPosition int  // next character position
-	ch           byte // current character
-	line         int
-	column       int
-	IsUniversal  bool
+	input           string
+	position        int  // current character position
+	readPosition    int  // next character position
+	ch              byte // current character
+	line            int
+	column          int
+	IsUniversal     bool
+	StyleName       string
+	customKeywords  map[string]TokenType
+	customCompounds map[string]map[string]TokenType
 }
 
 func NewLexer(input string) *Lexer {
 	l := &Lexer{
-		input:       input,
-		line:        1,
-		column:      0,
-		IsUniversal: DetectUniversalDirective(input),
+		input:           input,
+		line:            1,
+		column:          0,
+		IsUniversal:     DetectUniversalDirective(input),
+		StyleName:       DetectStyleDirective(input),
+		customKeywords:  make(map[string]TokenType),
+		customCompounds: make(map[string]map[string]TokenType),
+	}
+	if l.StyleName != "" {
+		l.ApplyStyle(l.StyleName)
 	}
 	l.readChar()
 	return l
+}
+
+// RegisterKeyword registers a custom keyword or comma/pipe-separated alias list for a given token type.
+func (l *Lexer) RegisterKeyword(rawWord string, tok TokenType) {
+	if l.customKeywords == nil {
+		l.customKeywords = make(map[string]TokenType)
+	}
+	if l.customCompounds == nil {
+		l.customCompounds = make(map[string]map[string]TokenType)
+	}
+
+	for _, item := range strings.FieldsFunc(rawWord, func(r rune) bool {
+		return r == ',' || r == '|' || r == ';'
+	}) {
+		word := strings.TrimSpace(item)
+		if word == "" {
+			continue
+		}
+
+		parts := strings.Fields(word)
+		if len(parts) >= 2 {
+			first := parts[0]
+			second := strings.Join(parts[1:], " ")
+			if _, ok := l.customCompounds[first]; !ok {
+				l.customCompounds[first] = make(map[string]TokenType)
+			}
+			l.customCompounds[first][second] = tok
+			continue
+		}
+
+		l.customKeywords[word] = tok
+
+		// If word contains hyphens ("lato-lato"), also register underscore version ("lato_lato")
+		if strings.Contains(word, "-") {
+			l.customKeywords[strings.ReplaceAll(word, "-", "_")] = tok
+		}
+		// If word contains underscores ("lato_lato"), also register hyphen version ("lato-lato")
+		if strings.Contains(word, "_") {
+			l.customKeywords[strings.ReplaceAll(word, "_", "-")] = tok
+		}
+	}
+}
+
+// ApplyStyle resolves and applies a style by name or file path if GlobalStyleResolver is set.
+func (l *Lexer) ApplyStyle(nameOrPath string) {
+	if GlobalStyleResolver != nil && nameOrPath != "" {
+		kws := GlobalStyleResolver(nameOrPath)
+		for word, tok := range kws {
+			l.RegisterKeyword(word, tok)
+		}
+	}
 }
 
 func (l *Lexer) readChar() {
@@ -345,7 +409,48 @@ func (l *Lexer) NextToken() Token {
 	default:
 		if isLetter(l.ch) {
 			tok.Literal = l.readIdentifier()
-			tok.Type = lookupIdent(tok.Literal)
+
+			// Check custom compound keywords with hyphen if applicable (e.g. lato-lato)
+			if l.ch == '-' && l.customKeywords != nil {
+				savedPos := l.position
+				savedReadPos := l.readPosition
+				savedCh := l.ch
+				savedLine := l.line
+				savedCol := l.column
+
+				l.readChar() // eat '-'
+				if isLetter(l.ch) {
+					second := l.readIdentifier()
+					hyphenated := tok.Literal + "-" + second
+					if targetTok, ok := l.customKeywords[hyphenated]; ok {
+						tok.Literal = hyphenated
+						tok.Type = targetTok
+						return tok
+					}
+				}
+				// restore state if not matched
+				l.position = savedPos
+				l.readPosition = savedReadPos
+				l.ch = savedCh
+				l.line = savedLine
+				l.column = savedCol
+			}
+
+			// Check custom multi-word compound keywords with space
+			if l.customCompounds != nil {
+				if seconds, ok := l.customCompounds[tok.Literal]; ok {
+					nextWord := l.peekNextWord()
+					if targetType, exists := seconds[nextWord]; exists {
+						l.skipWhitespaceAndComments()
+						secondWord := l.readIdentifier()
+						tok.Type = targetType
+						tok.Literal = tok.Literal + " " + secondWord
+						return tok
+					}
+				}
+			}
+
+			tok.Type = l.lookupIdent(tok.Literal)
 
 			// Handle compound keywords: "selain jika", "lain jika", "else if", "atawa lamun"
 			if ((tok.Literal == "selain" || tok.Literal == "lain" || tok.Literal == "else") && l.peekNextWord() == "jika") ||
@@ -558,6 +663,18 @@ func (l *Lexer) peekNextWord() string {
 	l.column = savedCol
 
 	return word
+}
+
+func (l *Lexer) lookupIdent(ident string) TokenType {
+	if l != nil && l.customKeywords != nil {
+		if tok, ok := l.customKeywords[ident]; ok {
+			return tok
+		}
+	}
+	if tok, ok := keywords[ident]; ok {
+		return tok
+	}
+	return IDENT
 }
 
 func lookupIdent(ident string) TokenType {

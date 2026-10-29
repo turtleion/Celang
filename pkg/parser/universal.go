@@ -25,6 +25,51 @@ func DetectUniversalDirective(source string) bool {
 	return false
 }
 
+// DetectStyleDirective inspects the beginning lines of source code to detect an in-code style directive.
+// Supports:
+// // @style: nama_style.style
+// # style: nama_style
+// "use style nama_style", "gaya nama_style.style"
+func DetectStyleDirective(source string) string {
+	lines := strings.Split(source, "\n")
+	for i, line := range lines {
+		if i > 10 { // Only look at top of file
+			break
+		}
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+		// Comment directives: // @style: xxx or # style: xxx
+		if strings.HasPrefix(trimmed, "//") {
+			commentContent := strings.TrimSpace(strings.TrimPrefix(trimmed, "//"))
+			if strings.HasPrefix(commentContent, "@style:") {
+				return strings.TrimSpace(strings.TrimPrefix(commentContent, "@style:"))
+			}
+			if strings.HasPrefix(commentContent, "style:") {
+				return strings.TrimSpace(strings.TrimPrefix(commentContent, "style:"))
+			}
+			continue
+		}
+		if strings.HasPrefix(trimmed, "#") {
+			commentContent := strings.TrimSpace(strings.TrimPrefix(trimmed, "#"))
+			if strings.HasPrefix(commentContent, "style:") || strings.HasPrefix(commentContent, "@style:") {
+				return strings.TrimSpace(strings.TrimPrefix(strings.TrimPrefix(commentContent, "@style:"), "style:"))
+			}
+			continue
+		}
+		// String literal directives: "use style xxx" or "gaya xxx"
+		clean := strings.Trim(strings.TrimSuffix(trimmed, ";"), "\"'`")
+		if strings.HasPrefix(clean, "use style ") {
+			return strings.TrimSpace(strings.TrimPrefix(clean, "use style "))
+		}
+		if strings.HasPrefix(clean, "gaya ") {
+			return strings.TrimSpace(strings.TrimPrefix(clean, "gaya "))
+		}
+	}
+	return ""
+}
+
 // IndonesianToEnglishKeywords maps Indonesian Celang keywords to their English equivalents in Universal Mode.
 var IndonesianToEnglishKeywords = map[string]string{
 	"buat":          "let",

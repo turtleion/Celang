@@ -1033,7 +1033,7 @@ func Eval(node uast.Node, env *Environment) Object {
 			switch n.Name {
 			case "cetak":
 				return newError(n.GetMetadata(), "Indonesian built-in 'cetak' is not allowed in Universal Mode.", "Use 'print' instead.")
-			case "masukan":
+			case "masukan", "masukkan":
 				return newError(n.GetMetadata(), "Indonesian built-in 'masukan' is not allowed in Universal Mode.", "Use 'input' instead.")
 			case "panjang":
 				return newError(n.GetMetadata(), "Indonesian built-in 'panjang' is not allowed in Universal Mode.", "Use 'len' or 'length' instead.")

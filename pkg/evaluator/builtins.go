@@ -64,6 +64,7 @@ func RegisterBuiltinsWithIO(env *Environment, in io.Reader, out io.Writer) {
 		},
 	}
 	env.Define("masukan", masukanFn, false, "function")
+	env.Define("masukkan", masukanFn, false, "function")
 	env.Define("input", masukanFn, false, "function")
 
 	// 'panjang' / 'len' calculates length of strings or arrays

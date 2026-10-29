@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"celang/pkg/parser"
 )
 
 // StyleProfile defines how keywords and block structures are mapped to U-AST.
@@ -128,6 +130,15 @@ func (p *StyleProfile) UnmarshalJSON(data []byte) error {
 			if v, ok := sec[k]; ok {
 				if s, ok := v.(string); ok {
 					return s
+				}
+				if arr, ok := v.([]interface{}); ok {
+					var parts []string
+					for _, item := range arr {
+						if s, ok := item.(string); ok {
+							parts = append(parts, s)
+						}
+					}
+					return strings.Join(parts, ", ")
 				}
 			}
 		}
@@ -469,5 +480,91 @@ func GetProfile(nameOrPath string) *StyleProfile {
 			}
 		}
 		return IndonesianProfile()
+	}
+}
+
+func init() {
+	// Register global style resolver with the parser package so any Lexer can dynamically resolve styles.
+	parser.GlobalStyleResolver = func(nameOrPath string) map[string]parser.TokenType {
+		prof := GetProfile(nameOrPath)
+		if prof == nil {
+			return nil
+		}
+		return prof.ExportKeywords()
+	}
+}
+
+// ExportKeywords maps all declared keywords in the StyleProfile to their corresponding parser.TokenType.
+func (p *StyleProfile) ExportKeywords() map[string]parser.TokenType {
+	m := make(map[string]parser.TokenType)
+	if p == nil {
+		return m
+	}
+	reg := func(field string, tok parser.TokenType) {
+		if field == "" {
+			return
+		}
+		for _, item := range strings.FieldsFunc(field, func(r rune) bool {
+			return r == ',' || r == '|' || r == ';'
+		}) {
+			word := strings.TrimSpace(item)
+			if word != "" {
+				m[word] = tok
+			}
+		}
+	}
+
+	reg(p.VarDecl, parser.VAR_DECL)
+	reg(p.ConstDecl, parser.CONST_DECL)
+	reg(p.TypeAssign, parser.TYPE_ASSIGN)
+	reg(p.Struct, parser.STRUCT_DECL)
+	reg(p.Ref, parser.REF_DECL)
+	reg(p.As, parser.AS)
+
+	reg(p.If, parser.IF)
+	reg(p.ElseIf, parser.ELSE_IF)
+	reg(p.Else, parser.ELSE)
+	reg(p.Then, parser.MAKA)
+	reg(p.Switch, parser.SWITCH)
+	reg(p.Case, parser.CASE)
+	reg(p.Default, parser.DEFAULT)
+
+	reg(p.While, parser.WHILE)
+	reg(p.For, parser.FOR)
+	reg(p.In, parser.IN)
+
+	reg(p.Func, parser.FUNC)
+	reg(p.Return, parser.RETURN)
+	reg(p.ReturnArrow, parser.RETURN_TYPE)
+	reg(p.Defer, parser.DEFER)
+
+	reg(p.Try, parser.TRY)
+	reg(p.Catch, parser.CATCH)
+	reg(p.Finally, parser.FINALLY)
+	reg(p.Throw, parser.THROW)
+
+	reg(p.And, parser.AND)
+	reg(p.Or, parser.OR)
+	reg(p.Not, parser.NOT)
+	reg(p.NullCoalesce, parser.NULL_COALESCE)
+	reg(p.Maybe, parser.MAYBE)
+
+	reg(p.True, parser.TRUE)
+	reg(p.False, parser.FALSE)
+	reg(p.Null, parser.NULL)
+
+	reg(p.Async, parser.ASYNC)
+	reg(p.Parallel, parser.PARALLEL)
+
+	return m
+}
+
+// ApplyToLexer registers this style's keywords directly onto a Lexer instance.
+func (p *StyleProfile) ApplyToLexer(l *parser.Lexer) {
+	if p == nil || l == nil {
+		return
+	}
+	for word, tok := range p.ExportKeywords() {
+		l.RegisterKeyword(word, tok)
 	}
 }

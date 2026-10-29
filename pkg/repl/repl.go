@@ -268,6 +268,9 @@ func printHelp(out io.Writer) {
 
 func evaluateInput(input string, env *evaluator.Environment, profile *syntax.StyleProfile, out io.Writer) {
 	l := parser.NewLexer(input)
+	if profile != nil {
+		profile.ApplyToLexer(l)
+	}
 	p := parser.NewParser(l)
 	prog, err := p.ParseProgram()
 	if err != nil {
