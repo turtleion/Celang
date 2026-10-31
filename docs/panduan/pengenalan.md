@@ -25,7 +25,7 @@ Program bukan sekadar instruksi dingin untuk mesin, melainkan jembatan komunikas
 
 ### 2. Tampilan Gaya yang Bebas Berganti
 Celang memisahkan antara **makna ide program** dan **cara tulisan tersebut ditampilkan**:
-- Program yang ditulis dalam Bahasa Indonesia dapat diubah tampilannya dalam sekejap menjadi Basa Sunda, gaya JavaScript, atau gaya Python.
+- Program yang ditulis dalam Bahasa Indonesia dapat diubah tampilannya dalam sekejap menjadi Basa Jawa, gaya JavaScript, atau gaya Python.
 - Setiap orang dalam tim dapat membaca kode dalam gaya favorit masing-masing tanpa mengubah cara kerja program tersebut.
 
 ### 3. Variabel yang Mengingat Masa Lalunya

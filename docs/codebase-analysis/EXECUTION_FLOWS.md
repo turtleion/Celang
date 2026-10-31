@@ -73,14 +73,14 @@ There are two directions, and they do not mirror each other via a shared abstrac
 
 ### Forward: source text → token → U-AST (lex/parse)
 
-The lexer ignores profiles. Every dialect keyword is in `lexer.go:keywords` (Indo + Sunda + English). `NextToken()` maps the current word via `keywords[word]` or `IDENT`. Two-word compounds (`selain jika`→`ELSE_IF`, `kalau kosong`→`NULL_COALESCE`) are handled by a peek-ahead after emitting the first word. Numbers consume `.` for floats; strings handle `"`, `\\`, `\n`, and `${` interpolation holes by returning multiple `STRING` tokens. Result: a single token stream regardless of intended display dialect.
+The lexer ignores profiles. Every dialect keyword is in `lexer.go:keywords` (Indo + Jawa + English). `NextToken()` maps the current word via `keywords[word]` or `IDENT`. Two-word compounds (`selain jika`→`ELSE_IF`, `kalau kosong`→`NULL_COALESCE`) are handled by a peek-ahead after emitting the first word. Numbers consume `.` for floats; strings handle `"`, `\\`, `\n`, and `${` interpolation holes by returning multiple `STRING` tokens. Result: a single token stream regardless of intended display dialect.
 
 The parser is dialect-free: it switches on `TokenType` constants (`VAR_DECL`, `IF`, etc.), not on spelling. Every valid spelling parses identically.
 
 ### Reverse: U-AST → dialect text (formatter)
 
 ```
-celang format file.ce --style=sunda|path/to/custom.style
+celang format file.ce --style=jawa|path/to/custom.style
   LoadProfile(nameOrPath)  // syntax/profile.go:UnmarshalJSON — flat OR categorized JSON
   l := parser.NewLexer(source) → p := parser.NewParser(l) → program := p.ParseProgram()
   fmt := syntax.NewFormatter(profile)

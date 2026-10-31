@@ -22,7 +22,7 @@ hero:
 features:
   - icon: 🎨
     title: Gaya Bahasa Fleksibel
-    details: Satu program dapat dibaca dan diubah tampilannya dengan bebas ke gaya Bahasa Indonesia, Basa Sunda, JavaScript, atau Python tanpa merusak kode.
+    details: Satu program dapat dibaca dan diubah tampilannya dengan bebas ke gaya Bahasa Indonesia, Basa Jawa, JavaScript, atau Python tanpa merusak kode.
   - icon: ⏳
     title: Variabel yang Mengingat Masa Lalu
     details: Mengetahui nilai sebelumnya, nilai awal, dan riwayat perubahan variabel secara instan, tetap ringan dan aman untuk komputer Anda.
@@ -64,23 +64,23 @@ buat hasil = angka
 cetak("Hasil akhir     :", hasil) // [20, 40, 60]
 ```
 
-```celang [🌾 Gaya Sunda]
-// Wangun data sareng Riwayat Nilai
-jieun gaji = 5000000
+```celang [🌾 Gaya Jawa]
+// Wujud data lan Riwayat Nilai
+gawe gaji = 5000000
 gaji = 7500000
 gaji = 9500000
 
-cetak("Gaji ayeuna     :", gaji)
-cetak("Gaji sateuacanna:", gaji.sebelumnya)
-cetak("Gaji mimitina   :", gaji.awal)
+cetak("Bayaran saiki       :", gaji)
+cetak("Bayaran sadurunge   :", gaji.sebelumnya)
+cetak("Bayaran kawitan     :", gaji.awal)
 
 // Transformasi Koléksi
-jieun angka = [1, 2, 3, 4, 5, 6]
-jieun hasil = angka
-    |> saring(fungsi(x) { balikkeun x % 2 == 0 })
-    |> petakan(fungsi(x) { balikkeun x * 10 })
+gawe angka = [1, 2, 3, 4, 5, 6]
+gawe hasil = angka
+    |> saring(fungsi(x) { balekna x % 2 == 0 })
+    |> petakan(fungsi(x) { balekna x * 10 })
 
-cetak("Hasilna         :", hasil)
+cetak("Hasil pungkasan     :", hasil)
 ```
 
 ```celang [⚡ Gaya JavaScript]

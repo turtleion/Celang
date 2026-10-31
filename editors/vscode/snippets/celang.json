@@ -306,7 +306,7 @@
   "In-Code Styling Block": {
     "prefix": "gaya",
     "body": [
-      "gaya \"${1|javascript,pythonic,sunda|}\" {",
+      "gaya \"${1|javascript,pythonic,jawa|}\" {",
       "\t${2:// kode dengan gaya sintaks terpilih}",
       "}"
     ],

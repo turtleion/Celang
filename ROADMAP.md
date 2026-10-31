@@ -31,7 +31,7 @@ Seluruh fitur di bawah ini telah teruji penuh dan siap digunakan di versi Celang
 - [x] **Diagnostik Empati Manusiawi**: Pesan kesalahan yang menampilkan kotak petunjuk ramah dan saran perbaikan praktis.
 
 ### 4. Ekosistem Gaya Bahasa & Perkakas
-- [x] **Gaya Bahasa Fleksibel (Multi-Dialek)**: Profil bawaan Bahasa Indonesia, Basa Sunda, JavaScript, dan Pythonic.
+- [x] **Gaya Bahasa Fleksibel (Multi-Dialek)**: Profil bawaan Bahasa Indonesia, Basa Jawa, JavaScript, dan Pythonic.
 - [x] **Format Ulang Kode Otomatis**: Perintah `celang format` untuk menerjemahkan tampilan kode antar gaya.
 - [x] **Mengubah Gaya di Tengah Kode**: Blok `gaya "..." { ... }`.
 - [x] **Jendela Interaktif (REPL)**: Sesi interaktif terminal dengan riwayat, dukungan banyak baris, dan perintah khusus.

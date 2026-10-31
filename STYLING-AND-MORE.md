@@ -42,8 +42,8 @@ Anda dapat menerjemahkan tampilan berkas kode ke gaya lain secara instan:
 # 3. Menampilkan berkas dalam gaya JavaScript:
 ./celang format program.ce --style=javascript
 
-# 4. Menampilkan berkas dalam dialek Basa Sunda kustom:
-./celang format program.ce --style=examples/sunda.style
+# 4. Menampilkan berkas dalam dialek Basa Jawa kustom:
+./celang format program.ce --style=examples/jawa.style
 
 # 5. Langsung menimpa isi berkas dengan gaya baru secara permanen (opsi -w):
 ./celang format -w program.ce --style=javascript
@@ -92,22 +92,22 @@ Seluruh variabel yang dibuat di dalam blok tersebut tetap hidup dan dapat diguna
 
 ## 4. Tabel Pemetaan Kata Kunci Antar-Gaya
 
-| Maksud Perintah | Bahasa Indonesia | Pythonic | JavaScript | Basa Sunda |
+| Maksud Perintah | Bahasa Indonesia | Pythonic | JavaScript | Basa Jawa |
 | :--- | :--- | :--- | :--- | :--- |
-| **Membuat Variabel** | `buat` | *(langsung nama)* | `let` / `var` | `jieun` |
+| **Membuat Variabel** | `buat` | *(langsung nama)* | `let` / `var` | `gawe` |
 | **Nilai Tetap** | `konstanta` | `const` | `const` | `tetep` |
-| **Pemeriksaan Syarat** | `jika` | `if` | `if` | `lamun` |
-| **Pilihan Syarat Kedua**| `selain jika` | `elif` | `else if` | `atawa lamun` |
-| **Pilihan Terakhir** | `selain` | `else` | `else` | `lamun henteu` |
-| **Perulangan Selama** | `selama` | `while` | `while` | `salami` |
-| **Perulangan Daftar** | `untuk ... dalam` | `for ... in` | `for ... of` | `pikeun ... dina` |
+| **Pemeriksaan Syarat** | `jika` | `if` | `if` | `yen` |
+| **Pilihan Syarat Kedua**| `selain jika` | `elif` | `else if` | `utawa yen` |
+| **Pilihan Terakhir** | `selain` | `else` | `else` | `yen ora` |
+| **Perulangan Selama** | `selama` | `while` | `while` | `sasuwene` |
+| **Perulangan Daftar** | `untuk ... dalam` | `for ... in` | `for ... of` | `kanggo ... ing` |
 | **Membuat Rumus/Fungsi**| `fungsi` | `def` | `function` | `fungsi` |
-| **Mengembalikan Nilai** | `kembalikan` | `return` | `return` | `balikkeun` |
-| **Tugas Latar Belakang**| `sambil` | `async` | `async` | `bari` |
-| **Tugas Serentak** | `bersamaan` | `parallel` | `parallel` | `babarengan` |
+| **Mengembalikan Nilai** | `kembalikan` | `return` | `return` | `balekna` |
+| **Tugas Latar Belakang**| `sambil` | `async` | `async` | `sinambi` |
+| **Tugas Serentak** | `bersamaan` | `parallel` | `parallel` | `bebarengan` |
 | **Nilai Benar** | `benar` | `True` | `true` | `bener` |
 | **Nilai Salah** | `salah` | `False` | `false` | `salah` |
-| **Nilai Kosong** | `kosong` | `None` | `null` | `kosong` |
+| **Nilai Kosong** | `kosong` | `None` | `null` | `suwung` |
 
 ---
 

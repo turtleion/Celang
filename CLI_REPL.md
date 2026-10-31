@@ -16,7 +16,7 @@ Format umum penulisan perintah:
 | Perintah | Contoh Perintah | Kegunaan |
 | :--- | :--- | :--- |
 | `celang` (tanpa perintah) | `./celang` | Langsung masuk ke jendela interaktif (REPL) |
-| `celang repl` | `./celang repl --style=sunda` | Membuka jendela interaktif dengan gaya bahasa tertentu |
+| `celang repl` | `./celang repl --style=jawa` | Membuka jendela interaktif dengan gaya bahasa tertentu |
 | `celang run` | `./celang run program.ce` | Menjalankan program Celang menggunakan mesin virtual cepat (bawaan) |
 | `celang run ... --ast` | `./celang run program.ce --ast` | Menjalankan program menggunakan penafsir pohon logika langsung |
 | `celang run ... -- args` | `./celang run program.ce -- a b` | Meneruskan argumen tambahan ke variabel `argumen` di dalam program |
@@ -56,7 +56,7 @@ celang> a + b
 | `:keluar` | `:q`, `:exit` | Menutup sesi interaktif dan kembali ke terminal |
 | `:bersih` | `:cls`, `:clear` | Membersihkan layar terminal agar kembali rapi |
 | `:lingkungan` | `:vars`, `:env` | Melihat daftar variabel yang sedang diingat komputer |
-| `:gaya <nama>` | `:style <nama>` | Mengganti gaya bahasa aktif seketika (misal `:gaya sunda` atau `:gaya javascript`) |
+| `:gaya <nama>` | `:style <nama>` | Mengganti gaya bahasa aktif seketika (misal `:gaya jawa` atau `:gaya javascript`) |
 | `:reset` | `:ulang` | Mengosongkan ingatan komputer kembali ke kondisi bersih |
 | `:ast <kode>` | `:uast <kode>` | Melihat bentuk pohon logika U-AST JSON dari baris kode |
 | `:bc <kode>` | `:disasm <kode>` | Melihat instruksi rakitan mesin dari baris kode |

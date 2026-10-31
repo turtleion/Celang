@@ -4,7 +4,7 @@
 
 Celang is a human-centric programming language implemented in Go. Source files use the `.ce` extension. The compiler and virtual machine ship as a single binary (`celang`) that runs programs, formats code, compiles to an intermediate tree, and packages standalone executables. A WebAssembly build (`cmd/celang-wasm`) powers a browser playground.
 
-The central idea is **Syntax Styling**: the logic of a program (its tree structure) is stored separately from how it looks on screen. One program can be displayed in Indonesian keywords (`buat`, `jika`, `fungsi`), in Sunda (`jieun`, `lamun`), or in English/JS/Python style without changing what it does. The tree is called the **Universal AST (U-AST)** and is serialised as JSON (`.ast` files).
+The central idea is **Syntax Styling**: the logic of a program (its tree structure) is stored separately from how it looks on screen. One program can be displayed in Indonesian keywords (`buat`, `jika`, `fungsi`), in Jawa (`gawe`, `yen`), or in English/JS/Python style without changing what it does. The tree is called the **Universal AST (U-AST)** and is serialised as JSON (`.ast` files).
 
 ## Primary Goals
 
@@ -29,7 +29,7 @@ All items below pass `go test ./...` (10 packages, ~203 tests) and run via `cela
 - **Types**: `tipe` aliases, generics `<T harus Angka>` / `sembarang`/`any`, `itu` type annotation, cast checked at runtime.
 - **Concurrency**: `titip` (spawn -> `Ticket`), `jemput`/`jemput_semua`/`jemput_pertama`, `saluran` (channel with `.kirim`/`.terima`/`.tutup`).
 - **Transactions & reactivity**: `transaksi` / `batalkan` / `pulihkan`, `reaktif`, `pantau`/`watch`.
-- **Syntax tools**: `gaya "nama" { ... }` in-code block, `celang format --style=...`, custom `.style` profiles (e.g., `examples/sunda.style`), `celang compile` to `.ast`, `celang disasm`.
+- **Syntax tools**: `gaya "nama" { ... }` in-code block, `celang format --style=...`, custom `.style` profiles (e.g., `examples/jawa.style`), `celang compile` to `.ast`, `celang disasm`.
 - **Stdlib + FFI**: `matematika`/`math`, `teks`/`strings`, `waktu`/`time`, `berkas`/`fs`, `json`, `sistem`/`os`, `http`/`jaringan`/`net`, `ffi` (dynamic C ABI via `purego`, platform-split loaders).
 - **Testing**: `celang uji` / `celang test` runner (`pkg/tester/runner.go`) plus embedded `uji "nama" { harus_sama(...) }` blocks; `celang bangun`/`build` produces a self-contained executable (runner + gzipped payload + trailer).
 - **Editor**: `editors/vscode/` extension with `celang.tmLanguage.json` and snippets.

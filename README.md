@@ -2,7 +2,7 @@
 
 Selamat datang di **Celang**! Celang adalah bahasa pemrograman yang dirancang agar terasa alami, ramah, dan mudah dipahami oleh manusia. 
 
-Di Celang, Anda dapat menulis instruksi untuk komputer menggunakan bahasa sehari-hari—seperti Bahasa Indonesia dan Basa Sunda—atau menggunakan gaya penulisan populer lainnya seperti JavaScript dan Python. Yang terpenting, Anda tidak perlu khawatir tentang perdebatan gaya penulisan, karena satu program dapat diubah tampilannya ke gaya apa pun secara otomatis tanpa mengubah cara kerjanya.
+Di Celang, Anda dapat menulis instruksi untuk komputer menggunakan bahasa sehari-hari—seperti Bahasa Indonesia dan Basa Jawa—atau menggunakan gaya penulisan populer lainnya seperti JavaScript dan Python. Yang terpenting, Anda tidak perlu khawatir tentang perdebatan gaya penulisan, karena satu program dapat diubah tampilannya ke gaya apa pun secara otomatis tanpa mengubah cara kerjanya.
 
 ---
 
@@ -353,7 +353,7 @@ Anda dapat menjalankan perintah berikut di terminal:
 | `celang` | `./celang` | Membuka sesi terminal interaktif secara langsung. |
 | `celang run` | `./celang run program.ce` | Menjalankan program menggunakan mesin virtual cepat. |
 | `celang run ... --ast` | `./celang run program.ce --ast` | Menjalankan program menggunakan penafsir pohon AST langsung (opsi pembanding). |
-| `celang format` | `./celang format program.ce --style=sunda` | Menampilkan atau menata ulang format kode sesuai gaya bahasa yang dipilih. |
+| `celang format` | `./celang format program.ce --style=jawa` | Menampilkan atau menata ulang format kode sesuai gaya bahasa yang dipilih. |
 | `celang compile` | `./celang compile program.ce -o program.ast` | Mengubah kode teks menjadi berkas data logika U-AST berformat JSON. |
 | `celang init` | `./celang init toko_buku` | Membuat folder proyek baru lengkap dengan berkas pembukanya. |
 | `celang versi` | `./celang versi` | Memeriksa nomor versi Celang yang terpasang. |

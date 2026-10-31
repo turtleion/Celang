@@ -104,35 +104,47 @@ var keywords = map[string]TokenType{
 	"kalau_kosong":   NULL_COALESCE,
 	"bila_kosong":    NULL_COALESCE,
 
-	// Sunda Dialect keywords
-	"jieun":        VAR_DECL,
-	"tetep":        CONST_DECL,
-	"nyaeta":       TYPE_ASSIGN,
-	"wangun":       STRUCT_DECL,
-	"lamun":        IF,
-	"cocogkeun":    SWITCH,
-	"bisi":         CASE,
-	"lianna":       DEFAULT,
-	"salami":       WHILE,
-	"pikeun":       FOR,
-	"dina":         IN,
-	"balikkeun":    RETURN,
-	"eureun":       BREAK,
-	"teraskeun":    CONTINUE,
-	"ngahasilkeun": RETURN_TYPE,
-	"pas_rengse":   DEFER,
-	"cobi":         TRY,
-	"tewak":        CATCH,
-	"pamungkas":    FINALLY,
-	"alungkeun":    THROW,
-	"sareng":       AND,
-	"sanes":        NOT,
-	"mun_kosong":   NULL_COALESCE,
-	"meureun":      MAYBE,
-	"bener":        TRUE,
-	"bari":         ASYNC,
-	"babarengan":   PARALLEL,
-	"salaku":       AS,
+	// Jawa Dialect keywords
+	"gawe":          VAR_DECL,
+	"tetep":         CONST_DECL,
+	"ajeg":          CONST_DECL,
+	"yaiku":         TYPE_ASSIGN,
+	"wujud":         STRUCT_DECL,
+	"yen":           IF,
+	"menawa":        IF,
+	"cocogna":       SWITCH,
+	"nalika":        CASE,
+	"liyane":        DEFAULT,
+	"sasuwene":      WHILE,
+	"suwene":        WHILE,
+	"kanggo":        FOR,
+	"ing":           IN,
+	"balekna":       RETURN,
+	"leren":         BREAK,
+	"mandheg":       BREAK,
+	"terusna":       CONTINUE,
+	"ngasilakeun":   RETURN_TYPE,
+	"pas_bubar":     DEFER,
+	"sawise_rampung": DEFER,
+	"jajal":         TRY,
+	"cekel":         CATCH,
+	"tangkep":       CATCH,
+	"pungkasan":     FINALLY,
+	"uncalna":       THROW,
+	"balangna":      THROW,
+	"lan":           AND,
+	"dudu":          NOT,
+	"ora":           NOT,
+	"yen_suwung":    NULL_COALESCE,
+	"yen_kosong":    NULL_COALESCE,
+	"mbokmenawa":    MAYBE,
+	"bener":         TRUE,
+	"suwung":        NULL,
+	"sinambi":       ASYNC,
+	"karo":          ASYNC,
+	"bebarengan":    PARALLEL,
+	"minangka":      AS,
+	"mula":          MAKA,
 
 	// Modern Concurrency & Generics
 	"titip":     TITIP,
@@ -420,7 +432,7 @@ func (l *Lexer) NextToken() Token {
 		if isStart {
 			tok.Literal = l.readIdentifier()
 
-			// Check custom or built-in hyphenated keywords (e.g. "laba-laba-sunda", "privat-modul!", "lato-lato")
+			// Check custom or built-in hyphenated keywords (e.g. "laba-laba-jawa", "privat-modul!", "lato-lato")
 			if matchedTok, ok := l.matchHyphenatedKeyword(tok.Literal); ok {
 				return matchedTok
 			}
@@ -432,34 +444,37 @@ func (l *Lexer) NextToken() Token {
 
 			tok.Type = l.lookupIdent(tok.Literal)
 
-			// Handle compound keywords: "selain jika", "lain jika", "else if", "atawa lamun"
+			// Handle compound keywords: "selain jika", "lain jika", "else if", "utawa yen", "utawa menawa"
 			if ((tok.Literal == "selain" || tok.Literal == "lain" || tok.Literal == "else") && l.peekNextWord() == "jika") ||
 				(tok.Literal == "else" && l.peekNextWord() == "if") ||
-				(tok.Literal == "atawa" && l.peekNextWord() == "lamun") {
+				(tok.Literal == "utawa" && (l.peekNextWord() == "yen" || l.peekNextWord() == "menawa")) {
 				l.skipWhitespaceAndComments()
 				secondWord := l.readIdentifier()
 				tok.Type = ELSE_IF
 				tok.Literal = tok.Literal + " " + secondWord
 			}
 
-			// Handle compound keywords: "lamun henteu" (ELSE)
-			if tok.Literal == "lamun" && l.peekNextWord() == "henteu" {
+			// Handle compound keywords: "yen ora" (ELSE)
+			if tok.Literal == "yen" && l.peekNextWord() == "ora" {
 				l.skipWhitespaceAndComments()
 				secondWord := l.readIdentifier()
 				tok.Type = ELSE
 				tok.Literal = tok.Literal + " " + secondWord
 			}
 
-			// Handle compound keywords: "kalau kosong", "bila kosong", "mun kosong"
-			if (tok.Literal == "kalau" || tok.Literal == "bila" || tok.Literal == "mun") && (l.peekNextWord() == "kosong" || l.peekNextWord() == "nihil" || l.peekNextWord() == "null") {
+			// Handle compound keywords: "kalau kosong", "bila kosong", "yen suwung", "yen kosong"
+			if ((tok.Literal == "kalau" || tok.Literal == "bila") && (l.peekNextWord() == "kosong" || l.peekNextWord() == "nihil" || l.peekNextWord() == "null")) ||
+				(tok.Literal == "yen" && (l.peekNextWord() == "suwung" || l.peekNextWord() == "kosong")) {
 				l.skipWhitespaceAndComments()
 				secondWord := l.readIdentifier()
 				tok.Type = NULL_COALESCE
 				tok.Literal = tok.Literal + " " + secondWord
 			}
 
-			// Handle compound keywords: "saat selesai", "pas rengse"
-			if (tok.Literal == "saat" && l.peekNextWord() == "selesai") || (tok.Literal == "pas" && l.peekNextWord() == "rengse") {
+			// Handle compound keywords: "saat selesai", "pas bubar", "pas rampung", "sawise rampung"
+			if (tok.Literal == "saat" && l.peekNextWord() == "selesai") ||
+				(tok.Literal == "pas" && (l.peekNextWord() == "bubar" || l.peekNextWord() == "rampung")) ||
+				(tok.Literal == "sawise" && l.peekNextWord() == "rampung") {
 				l.skipWhitespaceAndComments()
 				secondWord := l.readIdentifier()
 				tok.Type = DEFER

@@ -1,6 +1,6 @@
 # Pohon Sintaks Universal (Universal AST / U-AST)
 
-Pernahkah Anda memikirkan sebuah ide, lalu Anda bisa menceritakan ide tersebut dalam Bahasa Indonesia, Bahasa Inggris, atau Bahasa Sunda? 
+Pernahkah Anda memikirkan sebuah ide, lalu Anda bisa menceritakan ide tersebut dalam Bahasa Indonesia, Bahasa Inggris, atau Basa Jawa? 
 
 Idenya tetap sama, yang berganti hanyalah kata-kata yang keluar dari mulut Anda.
 
@@ -21,7 +21,7 @@ Celang memisahkan keduanya:
     <div class="uast-node-header">Dialek Masukan</div>
     <div class="uast-node input-node">🇮🇩 Bahasa Indonesia</div>
     <div class="uast-node input-node">🌐 JavaScript Style</div>
-    <div class="uast-node input-node">🌺 Basa Sunda</div>
+    <div class="uast-node input-node">🌾 Basa Jawa</div>
   </div>
   <div class="uast-flow-arrow">➔</div>
   <div class="uast-flow-col center-col">

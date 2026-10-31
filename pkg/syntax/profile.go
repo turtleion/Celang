@@ -471,8 +471,8 @@ func GetProfile(nameOrPath string) *StyleProfile {
 		return PythonicProfile()
 	case "javascript", "js", "classic", "ts":
 		return JavaScriptProfile()
-	case "sunda", "sundanese", "basa_sunda", "basa-sunda":
-		return SundaProfile()
+	case "jawa", "javanese", "jv", "basa_jawa", "basa-jawa":
+		return JawaProfile()
 	case "id", "indo", "indonesia", "indonesian":
 		return IndonesianProfile()
 	default:
@@ -485,49 +485,54 @@ func GetProfile(nameOrPath string) *StyleProfile {
 	}
 }
 
-// SundaProfile returns the Sundanese regional style profile.
-func SundaProfile() *StyleProfile {
+// JawaProfile returns the Javanese regional style profile.
+func JawaProfile() *StyleProfile {
 	return &StyleProfile{
-		Name:         "sunda",
-		DisplayName:  "Basa Sunda",
-		VarDecl:      "jieun",
+		Name:         "jawa",
+		DisplayName:  "Basa Jawa",
+		VarDecl:      "gawe",
 		ConstDecl:    "tetep",
-		TypeAssign:   "nyaeta",
-		Struct:       "wangun",
+		TypeAssign:   "yaiku",
+		Struct:       "wujud",
 		Ref:          "rujuk",
-		As:           "salaku",
-		If:           "lamun",
-		ElseIf:       "atawa lamun",
-		Else:         "lamun henteu",
-		Then:         "maka",
-		Switch:       "cocogkeun",
-		Case:         "bisi",
-		Default:      "lianna",
-		While:        "salami",
-		For:          "pikeun",
-		In:           "dina",
+		As:           "minangka",
+		If:           "yen",
+		ElseIf:       "utawa yen",
+		Else:         "yen ora",
+		Then:         "mula",
+		Switch:       "cocogna",
+		Case:         "nalika",
+		Default:      "liyane",
+		While:        "sasuwene",
+		For:          "kanggo",
+		In:           "ing",
 		Func:         "fungsi",
-		Return:       "balikkeun",
-		ReturnArrow:  "ngahasilkeun",
-		Defer:        "pas_rengse",
-		Try:          "cobi",
-		Catch:        "tewak",
-		Finally:      "pamungkas",
-		Throw:        "alungkeun",
-		And:          "sareng",
-		Or:           "atawa",
-		Not:          "sanes",
-		NullCoalesce: "mun_kosong",
-		Maybe:        "meureun",
+		Return:       "balekna",
+		ReturnArrow:  "ngasilakeun",
+		Defer:        "pas_bubar",
+		Try:          "jajal",
+		Catch:        "cekel",
+		Finally:      "pungkasan",
+		Throw:        "uncalna",
+		And:          "lan",
+		Or:           "utawa",
+		Not:          "dudu",
+		NullCoalesce: "yen_suwung",
+		Maybe:        "mbokmenawa",
 		True:         "bener",
 		False:        "salah",
-		Null:         "kosong",
-		Async:        "bari",
-		Parallel:     "babarengan",
+		Null:         "suwung",
+		Async:        "sinambi",
+		Parallel:     "bebarengan",
 		BlockStyle:   "brace",
 		IndentWidth:  4,
 		QuoteStyle:   "double",
 	}
+}
+
+// JavaneseProfile is an alias to JawaProfile.
+func JavaneseProfile() *StyleProfile {
+	return JawaProfile()
 }
 
 func init() {

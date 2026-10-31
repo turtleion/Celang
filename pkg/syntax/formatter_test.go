@@ -92,19 +92,19 @@ func TestFormatter_StyleTransformations(t *testing.T) {
 		t.Fatalf("JavaScript formatted code missing expected keywords:\n%s", jsText)
 	}
 
-	// 5. Reverse Parse into Custom SDL Profile (Bahasa Sunda from file)
-	sundaProfile, err := syntax.LoadProfileFromFile("../../examples/sunda.style")
+	// 5. Reverse Parse into Custom SDL Profile (Bahasa Jawa from file)
+	jawaProfile, err := syntax.LoadProfileFromFile("../../examples/jawa.style")
 	if err == nil {
-		sundaFormatter := syntax.NewFormatter(sundaProfile)
-		sundaText := sundaFormatter.Format(prog)
-		t.Logf("Formatted Sunda:\n%s", sundaText)
+		jawaFormatter := syntax.NewFormatter(jawaProfile)
+		jawaText := jawaFormatter.Format(prog)
+		t.Logf("Formatted Jawa:\n%s", jawaText)
 
-		if !strings.Contains(sundaText, "jieun harga = 50000") ||
-			!strings.Contains(sundaText, "balikkeun \"Diskon\"") ||
-			!strings.Contains(sundaText, "cocogkeun harga {") ||
-			!strings.Contains(sundaText, "bisi 75000:") ||
-			!strings.Contains(sundaText, "bari {") {
-			t.Fatalf("Sunda formatted code missing expected keywords:\n%s", sundaText)
+		if !strings.Contains(jawaText, "gawe harga = 50000") ||
+			!strings.Contains(jawaText, "balekna \"Diskon\"") ||
+			!strings.Contains(jawaText, "cocogna harga {") ||
+			!strings.Contains(jawaText, "nalika 75000:") ||
+			!strings.Contains(jawaText, "sinambi {") {
+			t.Fatalf("Jawa formatted code missing expected keywords:\n%s", jawaText)
 		}
 	}
 }

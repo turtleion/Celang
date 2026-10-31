@@ -11,7 +11,7 @@ Jalankan `./celang bantuan` di terminal Anda untuk melihat daftar perintah yang 
 | Perintah | Contoh Penggunaan | Kegunaan |
 | :--- | :--- | :--- |
 | `celang` | `./celang` | Langsung membuka jendela interaktif untuk mencoba kode seketika. |
-| `celang repl` | `./celang repl --style=sunda` | Membuka jendela interaktif dengan gaya bahasa tertentu. |
+| `celang repl` | `./celang repl --style=jawa` | Membuka jendela interaktif dengan gaya bahasa tertentu. |
 | `celang run` | `./celang run program.ce` | Menjalankan program berkas `.ce` atau `.ast`. |
 | `celang bangun` | `./celang bangun game.ce -o GameKeren.exe` | Membangun aplikasi mandiri (*standalone executable*) siap pakai tanpa butuh instalasi Celang/Go. |
 | `celang format` | `./celang format program.ce --style=javascript` | Menata ulang tampilan kode ke gaya lain di layar (tambahkan `-w` untuk langsung menimpa berkas). |
@@ -52,7 +52,7 @@ Anda dapat mengatur sesi Anda menggunakan perintah yang diawali dengan tanda tit
 
 - `:bantuan` (atau `:?`) — Menampilkan petunjuk perintah di jendela interaktif.
 - `:lingkungan` (atau `:vars`) — Melihat daftar semua variabel dan nilainya yang sedang diingat komputer saat ini.
-- `:gaya <nama>` — Mengganti gaya bahasa aktif seketika (contoh: `:gaya sunda` atau `:gaya javascript`).
+- `:gaya <nama>` — Mengganti gaya bahasa aktif seketika (contoh: `:gaya jawa` atau `:gaya javascript`).
 - `:bersih` (atau `:cls`) — Membersihkan layar terminal agar kembali rapi.
 - `:reset` (atau `:ulang`) — Mengosongkan ingatan komputer kembali ke kondisi bersih seperti saat baru dibuka.
 - `:keluar` (atau `:q`) — Menutup jendela interaktif dan kembali ke terminal biasa.

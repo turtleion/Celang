@@ -87,68 +87,68 @@ Atau salin langsung template JSON di bawah ini (seluruh nilai awal telah diisi d
 
 ---
 
-## 2. Contoh Nyata: Dialek Basa Sunda (`sunda.style`)
+## 2. Contoh Nyata: Dialek Basa Jawa (`jawa.style`)
 
-Berikut adalah contoh implementasi nyata dialek Basa Sunda dari berkas [examples/sunda.style](file:///home/yosatsu/Coding/Celang/examples/sunda.style):
+Berikut adalah contoh implementasi nyata dialek Basa Jawa dari berkas [examples/jawa.style](file:///home/yosatsu/Coding/Celang/examples/jawa.style):
 
 ```json
 {
   "metadata": {
-    "name": "sunda",
-    "display_name": "Basa Sunda",
+    "name": "jawa",
+    "display_name": "Basa Jawa",
     "version": "1.0.0",
     "author": "Komunitas Celang",
-    "description": "Dialek basa Sunda pikeun basa pamrograman Celang"
+    "description": "Dialek basa Jawa kanggo basa pamrograman Celang"
   },
   "deklarasi": {
-    "var": "jieun",
+    "var": "gawe",
     "const": "tetep",
-    "type_assign": "nyaeta",
-    "struct": "wangun",
+    "type_assign": "yaiku",
+    "struct": "wujud",
     "ref": "rujuk",
-    "as": "salaku"
+    "as": "minangka"
   },
   "percabangan": {
-    "if": "lamun",
-    "else_if": "atawa lamun",
-    "else": "lamun henteu",
-    "then": "maka",
-    "switch": "cocogkeun",
-    "case": "bisi",
-    "default": "lianna"
+    "if": "yen",
+    "else_if": "utawa yen",
+    "else": "yen ora",
+    "then": "mula",
+    "switch": "cocogna",
+    "case": "nalika",
+    "default": "liyane"
   },
   "perulangan": {
-    "while": "salami",
-    "for": "pikeun",
-    "in": "dina"
+    "while": "sasuwene",
+    "for": "kanggo",
+    "in": "ing"
   },
   "fungsi": {
     "def": "fungsi",
-    "return": "balikkeun",
-    "return_type": "ngahasilkeun",
-    "defer": "pas_rengse"
+    "return": "balekna",
+    "return_type": "ngasilakeun",
+    "defer": "pas_bubar"
   },
   "penanganan_galat": {
-    "try": "cobi",
-    "catch": "tewak",
-    "finally": "pamungkas",
-    "throw": "alungkeun"
+    "try": "jajal",
+    "catch": "cekel",
+    "finally": "pungkasan",
+    "throw": "uncalna"
   },
   "operator_logika": {
-    "and": "sareng",
-    "or": "atawa",
-    "not": "sanes",
-    "null_coalesce": "mun_kosong",
-    "maybe": "meureun"
+    "and": "lan",
+    "or": "utawa",
+    "not": "dudu",
+    "null_coalesce": "yen_suwung",
+    "maybe": "mbokmenawa"
   },
   "literal": {
     "true": "bener",
     "false": "salah",
-    "null": "kosong"
+    "null": "suwung"
   },
   "konkurensi": {
-    "async": "bari",
-    "parallel": "babarengan"
+    "async": "sinambi",
+    "parallel": "bebarengan"
   },
   "format": {
     "block_style": "brace",
@@ -164,42 +164,42 @@ Berikut adalah contoh implementasi nyata dialek Basa Sunda dari berkas [examples
 
 Setiap kunci dalam berkas `.style` mewakili elemen sintaksis bahasa Celang:
 
-| Kategori JSON | Kunci JSON | Nilai Bawaan Celang | Contoh Basa Sunda | Keterangan & Penggunaan |
+| Kategori JSON | Kunci JSON | Nilai Bawaan Celang | Contoh Basa Jawa | Keterangan & Penggunaan |
 |---|---|---|---|---|
-| **deklarasi** | `var` | `buat` | `jieun` | Deklarasi variabel yang dapat diubah nilainya |
+| **deklarasi** | `var` | `buat` | `gawe` | Deklarasi variabel yang dapat diubah nilainya |
 | | `const` | `konstanta` | `tetep` | Deklarasi nilai konstan yang tidak dapat diubah |
-| | `type_assign` | `itu` | `nyaeta` | Anotasi tipe data statis (`x itu Angka`) |
-| | `struct` | `bentuk` | `wangun` | Pendefinisian struktur data objek / tipe bentukan |
+| | `type_assign` | `itu` | `yaiku` | Anotasi tipe data statis (`x itu Angka`) |
+| | `struct` | `bentuk` | `wujud` | Pendefinisian struktur data objek / tipe bentukan |
 | | `ref` | `rujuk` | `rujuk` | Kata kunci referensi / pointer |
-| | `as` | `sebagai` | `salaku` | Alias impor atau casting tipe |
-| **percabangan** | `if` | `jika` | `lamun` | Kondisi percabangan utama |
-| | `else_if` | `selain jika` | `atawa lamun` | Cabang alternatif bersyarat |
-| | `else` | `selain` | `lamun henteu` | Cabang alternatif terakhir |
-| | `then` | `maka` | `maka` | Kata kunci pembuka aksi kondisi |
-| | `switch` | `pilih` | `cocogkeun` | Pemilihan multi-kasus |
-| | `case` | `bila` | `bisi` | Klausa pencocokan kasus |
-| | `default` | `lainnya` | `lianna` | Kasus default bila tidak ada yang cocok |
-| **perulangan** | `while` | `selama` | `salami` | Perulangan berbasis kondisi benar |
-| | `for` | `untuk` | `pikeun` | Perulangan iterasi koleksi atau rentang |
-| | `in` | `dalam` | `dina` | Operator keanggotaan koleksi perulangan |
+| | `as` | `sebagai` | `minangka` | Alias impor atau casting tipe |
+| **percabangan** | `if` | `jika` | `yen` | Kondisi percabangan utama |
+| | `else_if` | `selain jika` | `utawa yen` | Cabang alternatif bersyarat |
+| | `else` | `selain` | `yen ora` | Cabang alternatif terakhir |
+| | `then` | `maka` | `mula` | Kata kunci pembuka aksi kondisi |
+| | `switch` | `pilih` | `cocogna` | Pemilihan multi-kasus |
+| | `case` | `bila` | `nalika` | Klausa pencocokan kasus |
+| | `default` | `lainnya` | `liyane` | Kasus default bila tidak ada yang cocok |
+| **perulangan** | `while` | `selama` | `sasuwene` | Perulangan berbasis kondisi benar |
+| | `for` | `untuk` | `kanggo` | Perulangan iterasi koleksi atau rentang |
+| | `in` | `dalam` | `ing` | Operator keanggotaan koleksi perulangan |
 | **fungsi** | `def` / `func` | `fungsi` | `fungsi` | Deklarasi fungsi / prosedur |
-| | `return` | `kembalikan` | `balikkeun` | Mengembalikan nilai hasil pemrosesan fungsi |
-| | `return_type` | `mengembalikan` | `ngahasilkeun` | Anotasi tipe data nilai kembalian fungsi |
-| | `defer` | `saat_selesai` | `pas_rengse` | Eksekusi tertunda di akhir cakupan blok |
-| **penanganan_galat** | `try` | `coba` | `cobi` | Memulai blok penanganan pengecualian |
-| | `catch` | `tangkap` | `tewak` | Menangkap galat yang terjadi dalam blok coba |
-| | `finally` | `akhirnya` | `pamungkas` | Blok pembersihan yang selalu dijalankan |
-| | `throw` | `lempar` | `alungkeun` | Memicu lemparan galat secara eksplisit |
-| **operator_logika** | `and` | `dan` | `sareng` | Operasi logika konjungsi (AND) |
-| | `or` | `atau` | `atawa` | Operasi logika disjungsi (OR) |
-| | `not` | `bukan` | `sanes` | Operasi logika negasi (NOT) |
-| | `null_coalesce` | `kalau kosong` | `mun_kosong` | Operator fallback nilai kosong (`a kalau kosong b`) |
-| | `maybe` | `mungkin` | `meureun` | Operator chaining aman (safe navigation) |
+| | `return` | `kembalikan` | `balekna` | Mengembalikan nilai hasil pemrosesan fungsi |
+| | `return_type` | `mengembalikan` | `ngasilakeun` | Anotasi tipe data nilai kembalian fungsi |
+| | `defer` | `saat_selesai` | `pas_bubar` | Eksekusi tertunda di akhir cakupan blok |
+| **penanganan_galat** | `try` | `coba` | `jajal` | Memulai blok penanganan pengecualian |
+| | `catch` | `tangkap` | `cekel` | Menangkap galat yang terjadi dalam blok coba |
+| | `finally` | `akhirnya` | `pungkasan` | Blok pembersihan yang selalu dijalankan |
+| | `throw` | `lempar` | `uncalna` | Memicu lemparan galat secara eksplisit |
+| **operator_logika** | `and` | `dan` | `lan` | Operasi logika konjungsi (AND) |
+| | `or` | `atau` | `utawa` | Operasi logika disjungsi (OR) |
+| | `not` | `bukan` | `dudu` | Operasi logika negasi (NOT) |
+| | `null_coalesce` | `kalau kosong` | `yen_suwung` | Operator fallback nilai kosong (`a kalau kosong b`) |
+| | `maybe` | `mungkin` | `mbokmenawa` | Operator chaining aman (safe navigation) |
 | **literal** | `true` | `benar` | `bener` | Nilai kebenaran positif |
 | | `false` | `salah` | `salah` | Nilai kebenaran negatif |
-| | `null` | `kosong` | `kosong` | Nilai ketiadaan objek / null pointer |
-| **konkurensi** | `async` | `sambil` | `bari` | Menjalankan blok tugas secara asinkron |
-| | `parallel` | `bersamaan` | `babarengan` | Menjalankan kumpulan tugas secara paralel |
+| | `null` | `kosong` | `suwung` | Nilai ketiadaan objek / null pointer |
+| **konkurensi** | `async` | `sambil` | `sinambi` | Menjalankan blok tugas secara asinkron |
+| | `parallel` | `bersamaan` | `bebarengan` | Menjalankan kumpulan tugas secara paralel |
 | **format** | `block_style` | `"brace"` | `"brace"` | Gaya pembungkus blok (`brace`, `python`, `ruby`) |
 | | `indent_width` | `4` | `4` | Lebar indentasi spasi saat kode ditata ulang |
 | | `quote_style` | `"double"` | `"double"` | Gaya tanda kutip teks (`double` atau `single`) |

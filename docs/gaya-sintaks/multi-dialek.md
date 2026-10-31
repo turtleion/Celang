@@ -2,7 +2,7 @@
 
 Pernahkah Anda berdebat dengan teman tentang mana yang lebih enak dibaca: gaya penulisan kurung kurawal atau gaya indentasi, kata kunci Bahasa Indonesia atau Bahasa Inggris?
 
-Di Celang, Anda tidak perlu lagi berdebat. Celang memisahkan antara **makna logika program** dan **gaya tulisan yang tampak di mata**. Anda bebas menulis dan membaca program yang sama dalam gaya Bahasa Indonesia, Basa Sunda, JavaScript, atau Python.
+Di Celang, Anda tidak perlu lagi berdebat. Celang memisahkan antara **makna logika program** dan **gaya tulisan yang tampak di mata**. Anda bebas menulis dan membaca program yang sama dalam gaya Bahasa Indonesia, Basa Jawa, JavaScript, atau Python.
 
 ---
 
@@ -43,14 +43,14 @@ if nama == "Budi" {
 }
 ```
 
-### D. Gaya Bahasa Daerah (Contoh: Basa Sunda via `sunda.style`)
-Bisa dimuat dari berkas gaya kustom:
+### D. Gaya Bahasa Daerah (Basa Jawa via `jawa` atau `jawa.style`)
+Bisa langsung dipanggil bawaan (`--style=jawa`) atau dimuat dari berkas gaya:
 ```celang
-jieun nama = "Budi"
-lamun nama == "Budi" {
-    cetak("Sampurasun Budi!")
-} lamun henteu {
-    cetak("Sampurasun semah!")
+gawe nama = "Budi"
+yen nama == "Budi" {
+    cetak("Sugeng rawuh Budi!")
+} yen ora {
+    cetak("Sugeng rawuh tamu!")
 }
 ```
 
@@ -60,22 +60,22 @@ lamun nama == "Budi" {
 
 Berikut perbandingan kata kunci di berbagai gaya:
 
-| Maksud Perintah | Bahasa Indonesia | JavaScript | Pythonic | Basa Sunda |
+| Maksud Perintah | Bahasa Indonesia | JavaScript | Pythonic | Basa Jawa |
 | :--- | :--- | :--- | :--- | :--- |
-| **Menyiapkan Variabel** | `buat` | `let` / `var` | *(langsung nama)* | `jieun` |
+| **Menyiapkan Variabel** | `buat` | `let` / `var` | *(langsung nama)* | `gawe` |
 | **Nilai Tetap (Konstanta)** | `konstanta` | `const` | `const` | `tetep` |
-| **Pemeriksaan Kondisi** | `jika` | `if` | `if` | `lamun` |
-| **Pilihan Kedua** | `selain jika` | `else if` | `elif` | `atawa lamun` |
-| **Pilihan Terakhir** | `selain` | `else` | `else` | `lamun henteu` |
-| **Perulangan Selama** | `selama` | `while` | `while` | `salami` |
-| **Perulangan Daftar** | `untuk ... dalam` | `for ... of` | `for ... in` | `pikeun ... dina` |
+| **Pemeriksaan Kondisi** | `jika` | `if` | `if` | `yen` |
+| **Pilihan Kedua** | `selain jika` | `else if` | `elif` | `utawa yen` |
+| **Pilihan Terakhir** | `selain` | `else` | `else` | `yen ora` |
+| **Perulangan Selama** | `selama` | `while` | `while` | `sasuwene` |
+| **Perulangan Daftar** | `untuk ... dalam` | `for ... of` | `for ... in` | `kanggo ... ing` |
 | **Membuat Rumus/Fungsi** | `fungsi` | `function` | `def` | `fungsi` |
-| **Mengembalikan Hasil** | `kembalikan` | `return` | `return` | `balikkeun` |
-| **Tugas Latar Belakang** | `sambil` | `async` | `async` | `bari` |
-| **Tugas Serentak** | `bersamaan` | `parallel` | `parallel` | `babarengan` |
+| **Mengembalikan Hasil** | `kembalikan` | `return` | `return` | `balekna` |
+| **Tugas Latar Belakang** | `sambil` | `async` | `async` | `sinambi` |
+| **Tugas Serentak** | `bersamaan` | `parallel` | `parallel` | `bebarengan` |
 | **Nilai Ya / Benar** | `benar` | `true` | `True` | `bener` |
 | **Nilai Tidak / Salah** | `salah` | `false` | `False` | `salah` |
-| **Nilai Kosong** | `kosong` | `null` | `None` | `kosong` |
+| **Nilai Kosong** | `kosong` | `null` | `None` | `suwung` |
 
 ---
 
@@ -90,8 +90,11 @@ Anda dapat menyuruh Celang menerjemahkan tampilan berkas kode ke gaya lain secar
 # Menampilkan kode dalam gaya JavaScript di layar:
 ./celang format program.ce --style=javascript
 
-# Menampilkan kode dalam dialek Sunda menggunakan berkas gaya kustom:
-./celang format program.ce --style=examples/sunda.style
+# Menampilkan kode dalam dialek Basa Jawa bawaan:
+./celang format program.ce --style=jawa
+
+# Menampilkan kode menggunakan berkas gaya kustom:
+./celang format program.ce --style=examples/jawa.style
 
 # Langsung mengubah isi berkas secara permanen (tambahkan opsi -w):
 ./celang format -w program.ce --style=javascript

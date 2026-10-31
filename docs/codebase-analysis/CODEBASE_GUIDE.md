@@ -19,7 +19,7 @@ Celang/
   pkg/repl/                   interactive shell
   pkg/tester/                 `celang uji/test` runner
   pkg/repl/  pkg/tester/  pkg/empathy/  pkg/syntax/  pkg/uast/ etc.
-  examples/*.ce               runnable samples; sunda.style is a profile example
+  examples/*.ce               runnable samples; jawa.style is a profile example
   editors/vscode/             TextMate grammar + snippets
   docs/                       VitePress site (Indonesian)
   Makefile  go.mod  package.json  tes.ce
@@ -35,7 +35,7 @@ Total Go: ~36k LOC across ~40 files (`wc -l pkg/**/*.go` confirms).
 | Run via evaluator | same `run` path with `--ast`/`--legacy`/`--tree-walk` flag | `evaluator.Eval(program, env)` |
 | REPL | `cmd/celang/main.go:38` (no args) or `case "repl"` | `repl.Start(Options{Style, In, Out})` — loop read→lex→parse→(compile→VM or eval)→print |
 | Test suite | `case "uji","test"` → `tester.Run` | `pkg/tester/runner.go:Run` discovers `*.ce` and `uji` blocks, `evaluator.Eval` each, `harus_sama` etc. as builtins |
-| Format | `case "format"` → `formatFile` | `syntax.LoadProfile` (or builtin names `indonesian`/`sunda`/`pythonic`/`javascript`) → `syntax.Formatter{profile}.Format(program)` |
+| Format | `case "format"` → `formatFile` | `syntax.LoadProfile` (or builtin names `indonesian`/`jawa`/`pythonic`/`javascript`) → `syntax.Formatter{profile}.Format(program)` |
 | Compile to AST JSON | `case "compile","parse"` → `compileFile` | `uast.ToJSON(program)` to `file.ast` |
 | Disassemble | `case "disasm"` → `disasmFile` | `compiler.Compile` → `chunk.Disassemble` |
 | Standalone bundle | `case "bangun","build"` → `buildFile` | `resolveRunnerPath` + `gzip` payload + trailer `CELANG_BUNDLE_OK`; `tryRunEmbedded()` reverses at startup |

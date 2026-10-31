@@ -1,0 +1,64 @@
+{
+  "metadata": {
+    "name": "jawa",
+    "display_name": "Basa Jawa",
+    "version": "1.0.0",
+    "author": "Komunitas Celang",
+    "description": "Dialek basa Jawa kanggo basa pamrograman Celang"
+  },
+  "deklarasi": {
+    "var": "gawe",
+    "const": "tetep",
+    "type_assign": "yaiku",
+    "struct": "wujud",
+    "ref": "rujuk",
+    "as": "minangka"
+  },
+  "percabangan": {
+    "if": "yen",
+    "else_if": "utawa yen",
+    "else": "yen ora",
+    "then": "mula",
+    "switch": "cocogna",
+    "case": "nalika",
+    "default": "liyane"
+  },
+  "perulangan": {
+    "while": "sasuwene",
+    "for": "kanggo",
+    "in": "ing"
+  },
+  "fungsi": {
+    "def": "fungsi",
+    "return": "balekna",
+    "return_type": "ngasilakeun",
+    "defer": "pas_bubar"
+  },
+  "penanganan_galat": {
+    "try": "jajal",
+    "catch": "cekel",
+    "finally": "pungkasan",
+    "throw": "uncalna"
+  },
+  "operator_logika": {
+    "and": "lan",
+    "or": "utawa",
+    "not": "dudu",
+    "null_coalesce": "yen_suwung",
+    "maybe": "mbokmenawa"
+  },
+  "literal": {
+    "true": "bener",
+    "false": "salah",
+    "null": "suwung"
+  },
+  "konkurensi": {
+    "async": "sinambi",
+    "parallel": "bebarengan"
+  },
+  "format": {
+    "block_style": "brace",
+    "indent_width": 4,
+    "quote_style": "double"
+  }
+}

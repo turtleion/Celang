@@ -83,12 +83,12 @@ bersamaan {
 }
 ```
 
-```celang [🌾 Basa Sunda]
-bari {
+```celang [🌾 Basa Jawa]
+sinambi {
     unduhData()
 }
 
-babarengan {
+bebarengan {
     prosesA()
     prosesB()
 }

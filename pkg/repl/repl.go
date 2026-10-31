@@ -194,7 +194,7 @@ func handleMetaCommand(cmd string, env *evaluator.Environment, profile **syntax.
 	case ":gaya", ":style":
 		if len(parts) < 2 {
 			fmt.Fprintf(out, "Gaya aktif saat ini: %s\n", (*profile).DisplayName)
-			fmt.Fprintln(out, "Gunakan: :gaya <indonesian | javascript | pythonic | sunda | path/ke/file.style>")
+			fmt.Fprintln(out, "Gunakan: :gaya <indonesian | javascript | pythonic | jawa | path/ke/file.style>")
 		} else {
 			target := parts[1]
 			newProf := syntax.GetProfile(target)
