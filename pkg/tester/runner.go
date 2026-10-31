@@ -11,6 +11,7 @@ import (
 
 	"celang/pkg/evaluator"
 	"celang/pkg/parser"
+	_ "celang/pkg/syntax"
 )
 
 // FileResult holds test outcomes for a single test file.

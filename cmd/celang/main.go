@@ -48,14 +48,15 @@ func main() {
 	switch command {
 	case "bangun", "build":
 		if len(os.Args) < 3 {
-			fmt.Println("❌ Penggunaan: celang bangun <file.ce> [-o nama_biner] [--target=windows|linux|darwin] [--runner=path]")
-			fmt.Println("   Alias:     celang build  <file.ce> [-o nama_biner] [--target=windows|linux|darwin] [--runner=path]")
+			fmt.Println("❌ Penggunaan: celang bangun <file.ce> [-o nama_biner] [--target=windows|linux|darwin] [--runner=path] [--style=nama|path]")
+			fmt.Println("   Alias:     celang build  <file.ce> [-o nama_biner] [--target=windows|linux|darwin] [--runner=path] [--style=nama|path]")
 			os.Exit(1)
 		}
 		inputFile := ""
 		outputFile := ""
 		targetOS := ""
 		runnerPath := ""
+		styleName := ""
 		useAST := false
 		for i := 2; i < len(os.Args); i++ {
 			arg := os.Args[i]
@@ -69,6 +70,11 @@ func main() {
 				i++
 			} else if strings.HasPrefix(arg, "--runner=") {
 				runnerPath = strings.TrimPrefix(arg, "--runner=")
+			} else if strings.HasPrefix(arg, "--style=") {
+				styleName = strings.TrimPrefix(arg, "--style=")
+			} else if (arg == "-s" || arg == "--style") && i+1 < len(os.Args) {
+				styleName = os.Args[i+1]
+				i++
 			} else if arg == "--ast" {
 				useAST = true
 			} else if inputFile == "" && !strings.HasPrefix(arg, "-") {
@@ -79,7 +85,7 @@ func main() {
 			fmt.Println("❌ Mohon tentukan berkas kode (.ce) yang ingin dibangun.")
 			os.Exit(1)
 		}
-		buildFile(inputFile, outputFile, targetOS, runnerPath, useAST)
+		buildFile(inputFile, outputFile, targetOS, runnerPath, useAST, styleName)
 
 	case "repl":
 		styleName := "indonesian"
@@ -131,43 +137,80 @@ func main() {
 
 	case "disasm", "disassemble":
 		if len(os.Args) < 3 {
-			fmt.Println("❌ Penggunaan: celang disasm <file.ce>")
+			fmt.Println("❌ Penggunaan: celang disasm <file.ce> [--style=nama|path]")
 			os.Exit(1)
 		}
-		disasmFile(os.Args[2])
+		filePath := ""
+		styleName := ""
+		for i := 2; i < len(os.Args); i++ {
+			arg := os.Args[i]
+			if strings.HasPrefix(arg, "--style=") {
+				styleName = strings.TrimPrefix(arg, "--style=")
+			} else if (arg == "-s" || arg == "--style") && i+1 < len(os.Args) {
+				styleName = os.Args[i+1]
+				i++
+			} else if filePath == "" && !strings.HasPrefix(arg, "-") {
+				filePath = arg
+			}
+		}
+		if filePath == "" {
+			fmt.Println("❌ Mohon sertakan berkas kode yang ingin dibongkar.")
+			os.Exit(1)
+		}
+		disasmFile(filePath, styleName)
 
 	case "compile", "parse":
 		if len(os.Args) < 3 {
-			fmt.Println("❌ Penggunaan: celang compile <file.ce> [-o output.ast]")
+			fmt.Println("❌ Penggunaan: celang compile <file.ce> [-o output.ast] [--style=nama|path]")
 			os.Exit(1)
 		}
-		inputFile := os.Args[2]
+		inputFile := ""
 		outputFile := ""
-		for i := 3; i < len(os.Args); i++ {
-			if os.Args[i] == "-o" && i+1 < len(os.Args) {
+		styleName := ""
+		for i := 2; i < len(os.Args); i++ {
+			arg := os.Args[i]
+			if (arg == "-o" || arg == "--output") && i+1 < len(os.Args) {
 				outputFile = os.Args[i+1]
-				break
+				i++
+			} else if strings.HasPrefix(arg, "--style=") {
+				styleName = strings.TrimPrefix(arg, "--style=")
+			} else if (arg == "-s" || arg == "--style") && i+1 < len(os.Args) {
+				styleName = os.Args[i+1]
+				i++
+			} else if inputFile == "" && !strings.HasPrefix(arg, "-") {
+				inputFile = arg
 			}
+		}
+		if inputFile == "" {
+			fmt.Println("❌ Mohon sertakan berkas kode yang ingin dikompilasi.")
+			os.Exit(1)
 		}
 		if outputFile == "" {
 			outputFile = strings.TrimSuffix(inputFile, ".ce") + ".ast"
 		}
-		compileFile(inputFile, outputFile)
+		compileFile(inputFile, outputFile, styleName)
 
 	case "format":
 		if len(os.Args) < 3 {
-			fmt.Println("❌ Penggunaan: celang format [-w | --write] <file.ce> [--style=nama_style | path/ke/style.style]")
+			fmt.Println("❌ Penggunaan: celang format [-w | --write] <file.ce> [--style=nama_style | path/ke/style.style] [--from-style=...]")
 			os.Exit(1)
 		}
 		isWrite := false
 		styleName := "indonesian"
+		fromStyle := ""
 		filePath := ""
 
-		for _, arg := range os.Args[2:] {
+		for i := 2; i < len(os.Args); i++ {
+			arg := os.Args[i]
 			if arg == "-w" || arg == "--write" {
 				isWrite = true
 			} else if strings.HasPrefix(arg, "--style=") {
 				styleName = strings.TrimPrefix(arg, "--style=")
+			} else if (arg == "-s" || arg == "--style") && i+1 < len(os.Args) {
+				styleName = os.Args[i+1]
+				i++
+			} else if strings.HasPrefix(arg, "--from-style=") {
+				fromStyle = strings.TrimPrefix(arg, "--from-style=")
 			} else if filePath == "" && !strings.HasPrefix(arg, "-") {
 				filePath = arg
 			}
@@ -177,7 +220,7 @@ func main() {
 			fmt.Println("❌ Mohon sertakan berkas kode yang ingin diformat.")
 			os.Exit(1)
 		}
-		formatFile(filePath, styleName, isWrite)
+		formatFile(filePath, styleName, isWrite, fromStyle)
 
 	case "init":
 		projectName := "projek_celang"
@@ -188,10 +231,27 @@ func main() {
 
 	case "ast", "uast":
 		if len(os.Args) < 3 {
-			fmt.Println("❌ Penggunaan: celang ast <file.ce>")
+			fmt.Println("❌ Penggunaan: celang ast <file.ce> [--style=nama|path]")
 			os.Exit(1)
 		}
-		dumpAST(os.Args[2])
+		filePath := ""
+		styleName := ""
+		for i := 2; i < len(os.Args); i++ {
+			arg := os.Args[i]
+			if strings.HasPrefix(arg, "--style=") {
+				styleName = strings.TrimPrefix(arg, "--style=")
+			} else if (arg == "-s" || arg == "--style") && i+1 < len(os.Args) {
+				styleName = os.Args[i+1]
+				i++
+			} else if filePath == "" && !strings.HasPrefix(arg, "-") {
+				filePath = arg
+			}
+		}
+		if filePath == "" {
+			fmt.Println("❌ Mohon sertakan berkas kode yang ingin dicetak AST-nya.")
+			os.Exit(1)
+		}
+		dumpAST(filePath, styleName)
 
 	case "uji", "test":
 		var targets []string
@@ -364,8 +424,8 @@ func runFile(filePath string, styleName string, scriptArgs []string, useAST bool
 	_ = result
 }
 
-func disasmFile(filePath string) {
-	prog, sourceStr, err := loadProgram(filePath)
+func disasmFile(filePath string, styleOpt ...string) {
+	prog, sourceStr, err := loadProgram(filePath, styleOpt...)
 	if err != nil {
 		handleSyntaxError(err, sourceStr)
 	}
@@ -380,8 +440,8 @@ func disasmFile(filePath string) {
 	fmt.Print(chunk.Disassemble(filepath.Base(filePath)))
 }
 
-func compileFile(inputFile, outputFile string) {
-	prog, sourceStr, err := loadProgram(inputFile)
+func compileFile(inputFile, outputFile string, styleOpt ...string) {
+	prog, sourceStr, err := loadProgram(inputFile, styleOpt...)
 	if err != nil {
 		handleSyntaxError(err, sourceStr)
 	}
@@ -400,8 +460,14 @@ func compileFile(inputFile, outputFile string) {
 	fmt.Printf("✅ Berhasil mengompilasi '%s' -> '%s' (U-AST)\n", inputFile, outputFile)
 }
 
-func formatFile(filePath, styleName string, isWrite bool) {
-	prog, sourceStr, err := loadProgram(filePath)
+func formatFile(filePath, styleName string, isWrite bool, fromStyleOpt ...string) {
+	fromStyle := ""
+	if len(fromStyleOpt) > 0 && fromStyleOpt[0] != "" {
+		fromStyle = fromStyleOpt[0]
+	} else if styleName != "indonesian" {
+		fromStyle = styleName
+	}
+	prog, sourceStr, err := loadProgram(filePath, fromStyle)
 	if err != nil {
 		handleSyntaxError(err, sourceStr)
 	}
@@ -477,8 +543,8 @@ Aplikasi berbasis bahasa pemrograman [Celang](https://github.com/celang).
 	}
 }
 
-func dumpAST(filePath string) {
-	prog, sourceStr, err := loadProgram(filePath)
+func dumpAST(filePath string, styleOpt ...string) {
+	prog, sourceStr, err := loadProgram(filePath, styleOpt...)
 	if err != nil {
 		handleSyntaxError(err, sourceStr)
 	}
@@ -702,9 +768,14 @@ func resolveRunnerPath(explicitRunner, targetOS string) (string, error) {
 }
 
 // buildFile mengompilasi berkas Celang menjadi biner aplikasi mandiri (standalone executable).
-func buildFile(inputFile, outputFile, targetOS, runnerPath string, useAST bool) {
+func buildFile(inputFile, outputFile, targetOS, runnerPath string, useAST bool, styleOpt ...string) {
+	styleName := ""
+	if len(styleOpt) > 0 && styleOpt[0] != "" {
+		styleName = styleOpt[0]
+	}
+
 	// 1. Validasi sintaks berkas sumber terlebih dahulu
-	prog, sourceStr, err := loadProgram(inputFile)
+	prog, sourceStr, err := loadProgram(inputFile, styleName)
 	if err != nil {
 		handleSyntaxError(err, sourceStr)
 	}
@@ -772,7 +843,11 @@ func buildFile(inputFile, outputFile, targetOS, runnerPath string, useAST bool) 
 	var payloadBuf bytes.Buffer
 	gw := gzip.NewWriter(&payloadBuf)
 	payloadHeader := filepath.Base(inputFile) + "\n"
-	if _, err := gw.Write([]byte(payloadHeader + sourceStr)); err != nil {
+	bundledSource := sourceStr
+	if styleName != "" && detectPragmaStyle(sourceStr) == "" {
+		bundledSource = "// @style: " + styleName + "\n" + sourceStr
+	}
+	if _, err := gw.Write([]byte(payloadHeader + bundledSource)); err != nil {
 		fmt.Printf("❌ Gagal mengompresi kode program: %v\n", err)
 		os.Exit(1)
 	}

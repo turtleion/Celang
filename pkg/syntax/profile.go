@@ -471,6 +471,8 @@ func GetProfile(nameOrPath string) *StyleProfile {
 		return PythonicProfile()
 	case "javascript", "js", "classic", "ts":
 		return JavaScriptProfile()
+	case "sunda", "sundanese", "basa_sunda", "basa-sunda":
+		return SundaProfile()
 	case "id", "indo", "indonesia", "indonesian":
 		return IndonesianProfile()
 	default:
@@ -480,6 +482,51 @@ func GetProfile(nameOrPath string) *StyleProfile {
 			}
 		}
 		return IndonesianProfile()
+	}
+}
+
+// SundaProfile returns the Sundanese regional style profile.
+func SundaProfile() *StyleProfile {
+	return &StyleProfile{
+		Name:         "sunda",
+		DisplayName:  "Basa Sunda",
+		VarDecl:      "jieun",
+		ConstDecl:    "tetep",
+		TypeAssign:   "nyaeta",
+		Struct:       "wangun",
+		Ref:          "rujuk",
+		As:           "salaku",
+		If:           "lamun",
+		ElseIf:       "atawa lamun",
+		Else:         "lamun henteu",
+		Then:         "maka",
+		Switch:       "cocogkeun",
+		Case:         "bisi",
+		Default:      "lianna",
+		While:        "salami",
+		For:          "pikeun",
+		In:           "dina",
+		Func:         "fungsi",
+		Return:       "balikkeun",
+		ReturnArrow:  "ngahasilkeun",
+		Defer:        "pas_rengse",
+		Try:          "cobi",
+		Catch:        "tewak",
+		Finally:      "pamungkas",
+		Throw:        "alungkeun",
+		And:          "sareng",
+		Or:           "atawa",
+		Not:          "sanes",
+		NullCoalesce: "mun_kosong",
+		Maybe:        "meureun",
+		True:         "bener",
+		False:        "salah",
+		Null:         "kosong",
+		Async:        "bari",
+		Parallel:     "babarengan",
+		BlockStyle:   "brace",
+		IndentWidth:  4,
+		QuoteStyle:   "double",
 	}
 }
 

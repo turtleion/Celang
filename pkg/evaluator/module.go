@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"celang/pkg/parser"
+	_ "celang/pkg/syntax"
 	"celang/pkg/uast"
 )
 

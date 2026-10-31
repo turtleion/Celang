@@ -3,6 +3,7 @@ package parser
 import (
 	"strings"
 	"unicode"
+	"unicode/utf8"
 )
 
 var keywords = map[string]TokenType{
@@ -92,6 +93,7 @@ var keywords = map[string]TokenType{
 	"bentuk":         STRUCT_DECL,
 	"struct":         STRUCT_DECL,
 	"privat":         PRIVATE,
+	"privat-modul!":  VIS_MODULE,
 	"rujuk":          REF_DECL,
 	"ref":            REF_DECL,
 	"tipe":           TYPE_DECL,
@@ -407,47 +409,25 @@ func (l *Lexer) NextToken() Token {
 		}
 		fallthrough
 	default:
-		if isLetter(l.ch) {
+		isStart := false
+		if l.ch < 0x80 {
+			isStart = isLetter(l.ch)
+		} else {
+			r, _ := utf8.DecodeRuneInString(l.input[l.position:])
+			isStart = isIdentifierStartRune(r)
+		}
+
+		if isStart {
 			tok.Literal = l.readIdentifier()
 
-			// Check custom compound keywords with hyphen if applicable (e.g. lato-lato)
-			if l.ch == '-' && l.customKeywords != nil {
-				savedPos := l.position
-				savedReadPos := l.readPosition
-				savedCh := l.ch
-				savedLine := l.line
-				savedCol := l.column
-
-				l.readChar() // eat '-'
-				if isLetter(l.ch) {
-					second := l.readIdentifier()
-					hyphenated := tok.Literal + "-" + second
-					if targetTok, ok := l.customKeywords[hyphenated]; ok {
-						tok.Literal = hyphenated
-						tok.Type = targetTok
-						return tok
-					}
-				}
-				// restore state if not matched
-				l.position = savedPos
-				l.readPosition = savedReadPos
-				l.ch = savedCh
-				l.line = savedLine
-				l.column = savedCol
+			// Check custom or built-in hyphenated keywords (e.g. "laba-laba-sunda", "privat-modul!", "lato-lato")
+			if matchedTok, ok := l.matchHyphenatedKeyword(tok.Literal); ok {
+				return matchedTok
 			}
 
-			// Check custom multi-word compound keywords with space
-			if l.customCompounds != nil {
-				if seconds, ok := l.customCompounds[tok.Literal]; ok {
-					nextWord := l.peekNextWord()
-					if targetType, exists := seconds[nextWord]; exists {
-						l.skipWhitespaceAndComments()
-						secondWord := l.readIdentifier()
-						tok.Type = targetType
-						tok.Literal = tok.Literal + " " + secondWord
-						return tok
-					}
-				}
+			// Check custom multi-word compound keywords with space (e.g. "tidak sama dengan", "selain jika")
+			if matchedTok, ok := l.matchCompoundKeyword(tok.Literal); ok {
+				return matchedTok
 			}
 
 			tok.Type = l.lookupIdent(tok.Literal)
@@ -486,17 +466,11 @@ func (l *Lexer) NextToken() Token {
 				tok.Literal = tok.Literal + " " + secondWord
 			}
 
-			// Handle visibility modifiers: publik!, privat-modul!, privat!, and privat-[...]
+			// Handle visibility modifiers: publik!, privat!, and privat-[...]
 			if tok.Literal == "publik" && l.ch == '!' {
 				l.readChar()
 				tok.Literal = "publik!"
 				tok.Type = VIS_PUBLIC
-				return tok
-			}
-			if tok.Literal == "privat-modul" && l.ch == '!' {
-				l.readChar()
-				tok.Literal = "privat-modul!"
-				tok.Type = VIS_MODULE
 				return tok
 			}
 			if tok.Literal == "privat" {
@@ -568,10 +542,196 @@ func (l *Lexer) skipWhitespaceAndComments() {
 	}
 }
 
+func (l *Lexer) matchHyphenatedKeyword(firstWord string) (Token, bool) {
+	if l.ch != '-' {
+		return Token{}, false
+	}
+
+	savedPos := l.position
+	savedReadPos := l.readPosition
+	savedCh := l.ch
+	savedLine := l.line
+	savedCol := l.column
+
+	accumulated := firstWord
+	bestMatchLit := ""
+	var bestMatchTok TokenType
+	var bestPos, bestReadPos int
+	var bestCh byte
+	var bestLine, bestCol int
+
+	for l.ch == '-' && (isLetter(l.peekChar()) || l.peekChar() >= 0x80) {
+		l.readChar() // eat '-'
+		part := l.readIdentifier()
+		if part == "" {
+			break
+		}
+		accumulated += "-" + part
+
+		// Check if accumulated matches a custom keyword
+		if l.customKeywords != nil {
+			if targetTok, ok := l.customKeywords[accumulated]; ok {
+				bestMatchLit = accumulated
+				bestMatchTok = targetTok
+				bestPos = l.position
+				bestReadPos = l.readPosition
+				bestCh = l.ch
+				bestLine = l.line
+				bestCol = l.column
+			}
+		}
+		// Also check built-in keywords
+		if targetTok, ok := keywords[accumulated]; ok {
+			bestMatchLit = accumulated
+			bestMatchTok = targetTok
+			bestPos = l.position
+			bestReadPos = l.readPosition
+			bestCh = l.ch
+			bestLine = l.line
+			bestCol = l.column
+		}
+
+		// Also check if followed by '!' (e.g. "privat-modul!")
+		if l.ch == '!' {
+			withBang := accumulated + "!"
+			if targetTok, ok := keywords[withBang]; ok {
+				l.readChar() // eat '!'
+				bestMatchLit = withBang
+				bestMatchTok = targetTok
+				bestPos = l.position
+				bestReadPos = l.readPosition
+				bestCh = l.ch
+				bestLine = l.line
+				bestCol = l.column
+				break
+			}
+			if l.customKeywords != nil {
+				if targetTok, ok := l.customKeywords[withBang]; ok {
+					l.readChar() // eat '!'
+					bestMatchLit = withBang
+					bestMatchTok = targetTok
+					bestPos = l.position
+					bestReadPos = l.readPosition
+					bestCh = l.ch
+					bestLine = l.line
+					bestCol = l.column
+					break
+				}
+			}
+		}
+	}
+
+	if bestMatchLit != "" {
+		l.position = bestPos
+		l.readPosition = bestReadPos
+		l.ch = bestCh
+		l.line = bestLine
+		l.column = bestCol
+		return Token{Type: bestMatchTok, Literal: bestMatchLit, Line: savedLine, Column: savedCol}, true
+	}
+
+	// Restore state if not matched
+	l.position = savedPos
+	l.readPosition = savedReadPos
+	l.ch = savedCh
+	l.line = savedLine
+	l.column = savedCol
+	return Token{}, false
+}
+
+func (l *Lexer) matchCompoundKeyword(firstWord string) (Token, bool) {
+	if l.customCompounds == nil {
+		return Token{}, false
+	}
+	remainderMap, ok := l.customCompounds[firstWord]
+	if !ok {
+		return Token{}, false
+	}
+
+	savedPos := l.position
+	savedReadPos := l.readPosition
+	savedCh := l.ch
+	savedLine := l.line
+	savedCol := l.column
+
+	accumulated := ""
+	bestMatchLit := ""
+	var bestMatchTok TokenType
+	var bestPos, bestReadPos int
+	var bestCh byte
+	var bestLine, bestCol int
+
+	for {
+		if l.ch != ' ' && l.ch != '\t' {
+			break
+		}
+		// skip spaces and tabs only (not newlines)
+		for l.ch == ' ' || l.ch == '\t' {
+			l.readChar()
+		}
+		if !isLetter(l.ch) && l.ch < 0x80 {
+			break
+		}
+
+		word := l.readIdentifier()
+		if word == "" {
+			break
+		}
+		if accumulated == "" {
+			accumulated = word
+		} else {
+			accumulated += " " + word
+		}
+
+		if targetTok, exists := remainderMap[accumulated]; exists {
+			bestMatchLit = firstWord + " " + accumulated
+			bestMatchTok = targetTok
+			bestPos = l.position
+			bestReadPos = l.readPosition
+			bestCh = l.ch
+			bestLine = l.line
+			bestCol = l.column
+		}
+	}
+
+	if bestMatchLit != "" {
+		l.position = bestPos
+		l.readPosition = bestReadPos
+		l.ch = bestCh
+		l.line = bestLine
+		l.column = bestCol
+		return Token{Type: bestMatchTok, Literal: bestMatchLit, Line: savedLine, Column: savedCol}, true
+	}
+
+	l.position = savedPos
+	l.readPosition = savedReadPos
+	l.ch = savedCh
+	l.line = savedLine
+	l.column = savedCol
+	return Token{}, false
+}
+
 func (l *Lexer) readIdentifier() string {
 	startPos := l.position
-	for isLetter(l.ch) || isDigit(l.ch) || l.ch == '_' || (l.ch == '-' && isLetter(l.peekChar())) {
-		l.readChar()
+	for {
+		if l.ch == 0 {
+			break
+		}
+		if l.ch < 0x80 {
+			if isLetter(l.ch) || isDigit(l.ch) || l.ch == '_' {
+				l.readChar()
+				continue
+			}
+			break
+		}
+		// Multi-byte UTF-8 rune
+		r, width := utf8.DecodeRuneInString(l.input[l.position:])
+		if r == utf8.RuneError || !isIdentifierPartRune(r) {
+			break
+		}
+		for i := 0; i < width; i++ {
+			l.readChar()
+		}
 	}
 	return l.input[startPos:l.position]
 }
@@ -651,7 +811,14 @@ func (l *Lexer) peekNextWord() string {
 
 	l.skipWhitespaceAndComments()
 	word := ""
-	if isLetter(l.ch) {
+	isStart := false
+	if l.ch < 0x80 {
+		isStart = isLetter(l.ch)
+	} else {
+		r, _ := utf8.DecodeRuneInString(l.input[l.position:])
+		isStart = isIdentifierStartRune(r)
+	}
+	if isStart {
 		word = l.readIdentifier()
 	}
 
@@ -684,6 +851,23 @@ func lookupIdent(ident string) TokenType {
 	return IDENT
 }
 
+func isEmojiRune(r rune) bool {
+	return (r >= 0x1F000 && r <= 0x1FAFF) || // Miscellaneous Symbols and Pictographs, Emoticons, Transport, etc.
+		(r >= 0x2600 && r <= 0x27BF) ||  // Dingbats, Miscellaneous Symbols
+		(r >= 0x2B00 && r <= 0x2BFF) ||  // Miscellaneous Symbols and Arrows
+		(r >= 0x2300 && r <= 0x23FF) ||  // Miscellaneous Technical
+		(r >= 0xFE00 && r <= 0xFE0F) ||  // Variation Selectors
+		(r >= 0x200D && r <= 0x200D)     // Zero Width Joiner
+}
+
+func isIdentifierStartRune(r rune) bool {
+	return unicode.IsLetter(r) || r == '_' || isEmojiRune(r)
+}
+
+func isIdentifierPartRune(r rune) bool {
+	return unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_' || isEmojiRune(r)
+}
+
 func isLetter(ch byte) bool {
 	return unicode.IsLetter(rune(ch)) || ch == '_'
 }
@@ -691,3 +875,4 @@ func isLetter(ch byte) bool {
 func isDigit(ch byte) bool {
 	return '0' <= ch && ch <= '9'
 }
+
