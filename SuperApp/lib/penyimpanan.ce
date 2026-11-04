@@ -1,0 +1,113 @@
+impor json
+impor waktu
+impor arsip
+
+publik! fungsi akar_data() {
+    buat dari_env = sistem.dapatkan_env("SUPERAPP_DATA", "")
+    jika dari_env != "" {
+        kembalikan dari_env
+    }
+    jika berkas.ada("./SuperApp/celang.mod") {
+        kembalikan "./SuperApp/data"
+    }
+    kembalikan "./data"
+}
+
+publik! fungsi akar_backup() {
+    buat dari_env = sistem.dapatkan_env("SUPERAPP_BACKUP", "")
+    jika dari_env != "" {
+        kembalikan dari_env
+    }
+    jika berkas.ada("./SuperApp/celang.mod") {
+        kembalikan "./SuperApp/backup"
+    }
+    kembalikan "./backup"
+}
+
+publik! fungsi siapkan() {
+    berkas.buat_folder(akar_data())
+    berkas.buat_folder(akar_data() + "/catatan")
+    berkas.buat_folder(akar_backup())
+    jika !berkas.ada(akar_data() + "/pengguna.json") {
+        berkas.simpan(akar_data() + "/pengguna.json", {})
+    }
+    jika !berkas.ada(akar_data() + "/catatan.json") {
+        berkas.simpan(akar_data() + "/catatan.json", {})
+    }
+    kembalikan benar
+}
+
+publik! fungsi muat_pengguna() {
+    jika !berkas.ada(akar_data() + "/pengguna.json") {
+        kembalikan {}
+    }
+    kembalikan berkas.muat(akar_data() + "/pengguna.json")
+}
+
+publik! fungsi simpan_pengguna(data) {
+    berkas.simpan(akar_data() + "/pengguna.json", data)
+    kembalikan benar
+}
+
+publik! fungsi muat_indeks() {
+    jika !berkas.ada(akar_data() + "/catatan.json") {
+        kembalikan {}
+    }
+    kembalikan berkas.muat(akar_data() + "/catatan.json")
+}
+
+publik! fungsi simpan_indeks(data) {
+    berkas.simpan(akar_data() + "/catatan.json", data)
+    kembalikan benar
+}
+
+publik! fungsi simpan_catatan(id, cipher, pemilik) {
+    transaksi {
+        buat indeks = muat_indeks()
+        indeks[id] = {
+            "id": id,
+            "pemilik": pemilik,
+            "dibuat": waktu.sekarang(),
+            "berkas": "catatan/" + id + ".txt"
+        }
+        simpan_indeks(indeks)
+        berkas.tulis(akar_data() + "/catatan/" + id + ".txt", cipher)
+        jika !berkas.ada(akar_data() + "/catatan/" + id + ".txt") {
+            batalkan "gagal menulis catatan"
+        }
+    } pulihkan (e) {
+        lempar e
+    }
+    kembalikan id
+}
+
+publik! fungsi baca_catatan(id) {
+    buat jalur = akar_data() + "/catatan/" + id + ".txt"
+    jika !berkas.ada(jalur) {
+        kembalikan kosong
+    }
+    kembalikan berkas.baca(jalur)
+}
+
+publik! fungsi daftar_catatan(pemilik) {
+    buat indeks = muat_indeks()
+    buat hasil = []
+    untuk id dalam indeks.kunci() {
+        buat item = indeks[id]
+        jika pemilik == kosong atau item.pemilik == pemilik {
+            hasil = hasil + [{"id": id, "pemilik": item.pemilik, "dibuat": item.dibuat}]
+        }
+    }
+    kembalikan hasil
+}
+
+publik! fungsi cadangkan() {
+    buat stempel = waktu.format(waktu.sekarang(), "20060102-150405")
+    buat tujuan = akar_backup() + "/superapp-" + stempel + ".zip"
+    arsip.buat_zip(akar_data(), tujuan)
+    kembalikan {
+        "berkas": tujuan,
+        "ukuran": berkas.ukuran(tujuan),
+        "waktu": waktu.sekarang()
+    }
+}

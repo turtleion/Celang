@@ -1,0 +1,233 @@
+impor http
+impor json
+impor teks
+impor waktu
+impor sistem
+impor kripto
+
+ambil { hash_sandi, cek_sandi, buat_token, baca_token, enkripsi, dekripsi, id_acak, sidik } dari "./keamanan.ce"
+ambil { muat_pengguna, simpan_catatan, baca_catatan, daftar_catatan } dari "./penyimpanan.ce"
+ambil { jalankan, daftar_perintah } dari "./konsol.ce"
+ambil { kirim sebagai kirim_pekerjaan, ambil_hasil sebagai ambil_pekerjaan } dari "./pekerja.ce"
+
+fungsi baca_web(nama) {
+    buat kandidat = ["./web/" + nama, "./SuperApp/web/" + nama]
+    untuk jalur dalam kandidat {
+        jika berkas.ada(jalur) {
+            kembalikan berkas.baca(jalur)
+        }
+    }
+    kembalikan ""
+}
+
+publik! fungsi buat_app(konfig) {
+    buat app = http.server()
+
+    app.use(fungsi(req, res, next) {
+        res.header("X-Content-Type-Options", "nosniff")
+        res.header("X-Frame-Options", "DENY")
+        res.header("Referrer-Policy", "no-referrer")
+        res.header("Cache-Control", "no-store")
+        res.header("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'")
+        next()
+    })
+
+    fungsi klaim_dari(req) {
+        buat header = req.headers["authorization"]
+        jika header == kosong {
+            kembalikan kosong
+        }
+        buat bagian = teks.potong_teks(header, " ")
+        jika bagian.sebelum != "Bearer" {
+            kembalikan kosong
+        }
+        coba {
+            kembalikan baca_token(bagian.sesudah, konfig.rahasia)
+        } tangkap (e) {
+            kembalikan kosong
+        }
+    }
+
+    fungsi wajib_masuk(req, res) {
+        buat klaim = klaim_dari(req)
+        jika klaim == kosong {
+            res.status(401).json({"ok": salah, "galat": "sesi tidak valid"})
+            kembalikan kosong
+        }
+        kembalikan klaim
+    }
+
+    app.get("/", fungsi(req, res) {
+        buat halaman = baca_web("index.html")
+        jika halaman == "" {
+            res.status(500).send("web/index.html tidak ditemukan")
+            kembalikan
+        }
+        res.html(halaman)
+    })
+
+    app.get("/app.js", fungsi(req, res) {
+        res.header("Content-Type", "application/javascript; charset=utf-8").send(baca_web("app.js"))
+    })
+
+    app.get("/app.css", fungsi(req, res) {
+        res.header("Content-Type", "text/css; charset=utf-8").send(baca_web("app.css"))
+    })
+
+    app.get("/api/kesehatan", fungsi(req, res) {
+        buat t1 = titip sidik("a")
+        buat t2 = titip sidik("b")
+        res.json({
+            "ok": benar,
+            "sidik": [jemput(t1), jemput(t2)],
+            "ffi": ffi.is_null(ffi.NULL),
+            "waktu": waktu.sekarang()
+        })
+    })
+
+    app.post("/api/masuk", fungsi(req, res) {
+        buat data = kosong
+        coba {
+            data = req.json()
+        } tangkap (e) {
+            res.status(400).json({"ok": salah, "galat": "JSON tidak valid"})
+            kembalikan
+        }
+        buat nama = data.nama kalau kosong ""
+        buat sandi = data.sandi kalau kosong ""
+        buat pengguna = muat_pengguna()
+        jika !pengguna.memiliki(nama) {
+            res.status(401).json({"ok": salah, "galat": "nama atau sandi salah"})
+            kembalikan
+        }
+        buat akun = pengguna[nama]
+        jika !cek_sandi(sandi, akun.sandi) {
+            res.status(401).json({"ok": salah, "galat": "nama atau sandi salah"})
+            kembalikan
+        }
+        buat klaim = {"sub": nama, "peran": akun.peran, "iat": waktu.sekarang()}
+        buat token = buat_token(klaim, konfig.rahasia)
+        res.json({"ok": benar, "token": token, "peran": akun.peran})
+    })
+
+    app.get("/api/perintah", fungsi(req, res) {
+        buat klaim = wajib_masuk(req, res)
+        jika klaim == kosong {
+            kembalikan
+        }
+        res.json({"ok": benar, "perintah": daftar_perintah()})
+    })
+
+    app.post("/api/konsol", fungsi(req, res) {
+        buat klaim = wajib_masuk(req, res)
+        jika klaim == kosong {
+            kembalikan
+        }
+        buat data = kosong
+        coba {
+            data = req.json()
+        } tangkap (e) {
+            res.status(400).json({"ok": salah, "galat": "JSON tidak valid"})
+            kembalikan
+        }
+        buat perintah = data.perintah kalau kosong ""
+        buat argumen = data.argumen kalau kosong ""
+        buat konteks = {"sub": klaim.sub, "peran": klaim.peran, "kunci": konfig.kunci}
+        res.json(jalankan(perintah, argumen, konteks))
+    })
+
+    app.get("/api/catatan", fungsi(req, res) {
+        buat klaim = wajib_masuk(req, res)
+        jika klaim == kosong {
+            kembalikan
+        }
+        res.json({"ok": benar, "catatan": daftar_catatan(klaim.sub)})
+    })
+
+    app.post("/api/catatan", fungsi(req, res) {
+        buat klaim = wajib_masuk(req, res)
+        jika klaim == kosong {
+            kembalikan
+        }
+        buat data = kosong
+        coba {
+            data = req.json()
+        } tangkap (e) {
+            res.status(400).json({"ok": salah, "galat": "JSON tidak valid"})
+            kembalikan
+        }
+        buat isi = data.isi kalau kosong ""
+        jika teks.potong(isi) == "" {
+            res.status(400).json({"ok": salah, "galat": "isi catatan kosong"})
+            kembalikan
+        }
+        buat id = id_acak()
+        buat cipher = enkripsi(isi, konfig.kunci)
+        simpan_catatan(id, cipher, klaim.sub)
+        res.status(201).json({"ok": benar, "id": id})
+    })
+
+    app.get("/api/catatan/:id", fungsi(req, res) {
+        buat klaim = wajib_masuk(req, res)
+        jika klaim == kosong {
+            kembalikan
+        }
+        buat cipher = baca_catatan(req.params.id)
+        jika cipher == kosong {
+            res.status(404).json({"ok": salah, "galat": "catatan tidak ditemukan"})
+            kembalikan
+        }
+        coba {
+            res.json({"ok": benar, "isi": dekripsi(cipher, konfig.kunci)})
+        } tangkap (e) {
+            res.status(500).json({"ok": salah, "galat": e})
+        }
+    })
+
+    app.get("/api/statistik", fungsi(req, res) {
+        buat klaim = wajib_masuk(req, res)
+        jika klaim == kosong {
+            kembalikan
+        }
+        buat pengguna = muat_pengguna()
+        res.json({
+            "ok": benar,
+            "pengguna": panjang(pengguna),
+            "catatan": panjang(daftar_catatan(kosong)),
+            "uptime_detik": sistem.waktu_aktif(),
+            "os": sistem.os(),
+            "waktu": waktu.format(waktu.sekarang(), "2006-01-02 15:04:05")
+        })
+    })
+
+    app.post("/api/pekerjaan", fungsi(req, res) {
+        buat klaim = wajib_masuk(req, res)
+        jika klaim == kosong {
+            kembalikan
+        }
+        buat data = kosong
+        coba {
+            data = req.json()
+        } tangkap (e) {
+            res.status(400).json({"ok": salah, "galat": "JSON tidak valid"})
+            kembalikan
+        }
+        buat id = kirim_pekerjaan(data.data kalau kosong "")
+        res.status(202).json({"ok": benar, "id": id})
+    })
+
+    app.get("/api/pekerjaan/:id", fungsi(req, res) {
+        buat klaim = wajib_masuk(req, res)
+        jika klaim == kosong {
+            kembalikan
+        }
+        buat hasil = ambil_pekerjaan(req.params.id)
+        res.json({"ok": benar, "selesai": hasil != kosong, "hasil": hasil})
+    })
+
+    app.get("/api/keluar", fungsi(req, res) {
+        res.json({"ok": benar})
+    })
+
+    kembalikan app
+}

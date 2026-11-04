@@ -1,0 +1,143 @@
+impor json
+impor waktu
+impor sistem
+impor teks
+impor matematika
+
+ambil { sidik, enkripsi, dekripsi } dari "./keamanan.ce"
+ambil { cadangkan, daftar_catatan, muat_indeks, akar_data } dari "./penyimpanan.ce"
+
+publik! buat PERINTAH = [
+    "bantuan", "status", "waktu", "echo", "hash",
+    "enkripsi", "dekripsi", "statistik", "siapa",
+    "cadangkan", "catatan", "fitur", "hitung"
+]
+
+buat hitungan = 0
+reaktif ringkasan = "perintah diproses: " + hitungan
+
+pantau hitungan (baru, lama) {
+    berkas.tambah(akar_data() + "/audit.log", "perintah ke-" + baru + " pada " + waktu.format(waktu.sekarang(), "2006-01-02 15:04:05") + "\n")
+}
+
+bentuk Kotak<T> {
+    isi: T
+}
+
+publik! fungsi daftar_perintah() {
+    kembalikan PERINTAH
+}
+
+publik! fungsi jalankan(perintah, argumen, sesi) {
+    hitungan = hitungan + 1
+    buat bersih = teks.potong(perintah kalau kosong "")
+    buat kata = teks.kata(bersih)
+    buat nama = ""
+    jika panjang(kata) > 0 {
+        nama = kata[0]
+    }
+
+    coba {
+        pilih nama {
+            bila "bantuan":
+                kembalikan {"ok": benar, "keluaran": "Perintah: " + teks.gabung(PERINTAH, ", ")}
+            bila "status":
+                kembalikan {"ok": benar, "keluaran": status_sistem()}
+            bila "waktu":
+                kembalikan {"ok": benar, "keluaran": waktu.format(waktu.sekarang(), "2006-01-02 15:04:05")}
+            bila "echo":
+                kembalikan {"ok": benar, "keluaran": argumen}
+            bila "hash":
+                kembalikan {"ok": benar, "keluaran": sidik(argumen)}
+            bila "enkripsi":
+                kembalikan {"ok": benar, "keluaran": enkripsi(argumen, sesi.kunci)}
+            bila "dekripsi":
+                kembalikan {"ok": benar, "keluaran": dekripsi(argumen, sesi.kunci)}
+            bila "statistik":
+                kembalikan {"ok": benar, "keluaran": statistik()}
+            bila "siapa":
+                kembalikan {"ok": benar, "keluaran": {"nama": sesi.sub, "peran": sesi.peran}}
+            bila "cadangkan":
+                kembalikan {"ok": benar, "keluaran": cadangkan()}
+            bila "catatan":
+                kembalikan {"ok": benar, "keluaran": daftar_catatan(sesi.sub)}
+            bila "fitur":
+                kembalikan {"ok": benar, "keluaran": fitur()}
+            bila "hitung":
+                buat argKata = teks.kata(argumen kalau kosong "")
+                jika panjang(argKata) >= 2 dan argKata[0] == "akar" {
+                    kembalikan {"ok": benar, "keluaran": matematika.akar(argKata[1] sebagai Angka)}
+                }
+                kembalikan {"ok": benar, "keluaran": "Gunakan: hitung akar <angka>"}
+            lainnya:
+                kembalikan {"ok": salah, "galat": "perintah tidak dikenal: " + nama}
+        }
+    } tangkap (e) {
+        kembalikan {"ok": salah, "galat": e}
+    } akhirnya {
+        nama = nama
+    }
+}
+
+fungsi status_sistem() {
+    kembalikan {
+        "os": sistem.os(),
+        "arsitektur": sistem.arsitektur(),
+        "cpu": sistem.jumlah_cpu(),
+        "pid": sistem.pid(),
+        "host": sistem.nama_host(),
+        "admin": sistem.apakah_admin(),
+        "waktu": waktu.format(waktu.sekarang(), "2006-01-02 15:04:05")
+    }
+}
+
+fungsi statistik() {
+    buat indeks = muat_indeks()
+    kembalikan {
+        "perintah": hitungan,
+        "catatan": panjang(indeks),
+        "uptime_detik": sistem.waktu_aktif(),
+        "cpu": sistem.jumlah_cpu(),
+        "waktu": waktu.format(waktu.sekarang(), "2006-01-02 15:04:05")
+    }
+}
+
+fungsi fitur() {
+    buat kotak = Kotak<Angka>(42)
+    buat [kiri, kanan] = [1, 2]
+    buat bersih = "  celang  " |> teks.potong() |> teks.kapital()
+    buat total = kiri + kanan + kotak.isi
+    buat catatan = "total={total}"
+    rujuk alias_total = total
+    alias_total = alias_total + 1
+
+    transaksi {
+        total = 999
+        batalkan "demo rollback"
+    } pulihkan (e) {
+        catatan = catatan + " rollback=" + e
+    }
+
+    coba {
+        lempar "demo galat"
+    } tangkap (e) {
+        catatan = catatan + " galat=" + e
+    } akhirnya {
+        catatan = catatan + " selesai"
+    }
+
+    saat_selesai {
+        catatan = catatan
+    }
+
+    kembalikan {
+        "generik": kotak.isi,
+        "destrukturisasi": [kiri, kanan],
+        "pipeline": bersih,
+        "interpolasi": catatan,
+        "rujukan": total,
+        "histori": hitungan.histori,
+        "sebelumnya": hitungan.sebelumnya,
+        "reaktif": ringkasan
+    }
+}

@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SuperApp</title>
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+<main>
+<h1>SuperApp</h1>
+<p class="sub">Konsol web aman: kriptografi, catatan terenkripsi, dan diagnostik sistem. Tidak ada eksekusi perintah OS.</p>
+
+<section id="login">
+<h2>Masuk</h2>
+<form id="form-masuk">
+<input id="nama" placeholder="nama" autocomplete="username">
+<input id="sandi" type="password" placeholder="sandi" autocomplete="current-password">
+<button>Masuk</button>
+</form>
+<p id="pesan" class="pesan"></p>
+</section>
+
+<section id="konsol" hidden>
+<div class="baris">
+<strong id="siapa"></strong>
+<button id="keluar" class="kecil">Keluar</button>
+</div>
+
+<h2>Konsol</h2>
+<div class="baris">
+<input id="perintah" placeholder="bantuan">
+<input id="argumen" placeholder="argumen (opsional)">
+<button id="kirim">Jalankan</button>
+</div>
+<pre id="keluaran"></pre>
+
+<h2>Catatan terenkripsi</h2>
+<div class="baris">
+<input id="catatan" placeholder="isi catatan rahasia">
+<button id="simpan">Simpan</button>
+</div>
+<ul id="daftar-catatan"></ul>
+<pre id="isi-catatan"></pre>
+
+<h2>Statistik</h2>
+<button id="muat-statistik" class="kecil">Muat</button>
+<pre id="statistik"></pre>
+</section>
+</main>
+<script src="/app.js"></script>
+</body>
+</html>

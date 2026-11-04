@@ -1,0 +1,47 @@
+ambil { siapkan, muat_pengguna, simpan_pengguna, akar_data } dari "./lib/penyimpanan.ce"
+ambil { hash_sandi, id_acak } dari "./lib/keamanan.ce"
+ambil { buat_app } dari "./lib/rute.ce"
+ambil { mulai } dari "./lib/pekerja.ce"
+
+siapkan()
+mulai()
+
+buat pengguna = muat_pengguna()
+jika panjang(pengguna) == 0 {
+    buat sandi = sistem.dapatkan_env("SUPERAPP_ADMIN_PASSWORD", "")
+    jika sandi == "" {
+        sandi = kripto.acak_heks(16)
+        cetak("Kata sandi admin dibuat otomatis:", sandi)
+    }
+    pengguna["admin"] = {
+        "nama": "admin",
+        "sandi": hash_sandi(sandi),
+        "peran": "admin",
+        "dibuat": waktu.sekarang()
+    }
+    simpan_pengguna(pengguna)
+    cetak("Akun admin dibuat. Ganti kata sandi lewat env SUPERAPP_ADMIN_PASSWORD.")
+}
+
+buat port = sistem.dapatkan_env("SUPERAPP_PORT", "8080")
+buat rahasia = sistem.dapatkan_env("SUPERAPP_SECRET", "")
+jika rahasia == "" {
+    rahasia = kripto.acak_heks(32)
+}
+buat kunci = sistem.dapatkan_env("SUPERAPP_KEY", "")
+jika kunci == "" {
+    kunci = kripto.buat_kunci()
+}
+
+buat konfig = {
+    "rahasia": rahasia,
+    "kunci": kunci,
+    "port": port,
+    "mulai": waktu.sekarang()
+}
+
+buat app = buat_app(konfig)
+cetak("SuperApp aktif di http://127.0.0.1:" + port)
+cetak("Data:", akar_data())
+cetak("Masuk sebagai admin, lalu buka konsol.")
+app.listen("127.0.0.1:" + port)

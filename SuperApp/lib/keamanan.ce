@@ -1,0 +1,68 @@
+impor json
+impor kripto
+
+publik! fungsi hash_sandi(sandi) {
+    kembalikan kripto.hash_sandi(sandi)
+}
+
+publik! fungsi cek_sandi(sandi, hash) {
+    coba {
+        kembalikan kripto.verifikasi_sandi(sandi, hash)
+    } tangkap (e) {
+        kembalikan salah
+    }
+}
+
+publik! fungsi buat_token(klaim, rahasia) {
+    buat isi = json.format(klaim, 0)
+    buat b64 = bita(isi).ke_base64()
+    buat sig = kripto.hmac_sha256(rahasia, b64)
+    kembalikan b64 + "." + sig
+}
+
+publik! fungsi baca_token(token, rahasia) {
+    buat bagian = teks.potong_teks(token, ".")
+    jika !bagian.ditemukan {
+        lempar "format token tidak valid"
+    }
+    buat b64 = bagian.sebelum
+    buat sig = bagian.sesudah
+    buat harapan = kripto.hmac_sha256(rahasia, b64)
+    jika !kripto.konstanta_sama(sig, harapan) {
+        lempar "tanda tangan token tidak valid"
+    }
+    buat isi = bita.dari_base64(b64).ke_teks()
+    kembalikan json.uraikan(isi)
+}
+
+publik! fungsi enkripsi(teks, kunci) {
+    kembalikan kripto.enkripsi(teks, kunci)
+}
+
+publik! fungsi dekripsi(cipher, kunci) {
+    kembalikan kripto.dekripsi(cipher, kunci)
+}
+
+publik! fungsi sidik(data) {
+    kembalikan kripto.sha256(data)
+}
+
+publik! fungsi id_acak() {
+    kembalikan kripto.uuid()
+}
+
+publik! fungsi pasangan_kunci() {
+    kembalikan kripto.buat_pasangan_kunci()
+}
+
+publik! fungsi tanda_tangan(data, kunci_privat) {
+    kembalikan kripto.tanda_tangan(data, kunci_privat)
+}
+
+publik! fungsi verifikasi_tanda_tangan(data, sig, kunci_publik) {
+    coba {
+        kembalikan kripto.verifikasi_tanda_tangan(data, sig, kunci_publik)
+    } tangkap (e) {
+        kembalikan salah
+    }
+}

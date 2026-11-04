@@ -1,0 +1,203 @@
+impor json
+impor kripto
+impor http
+impor waktu
+impor matematika
+impor teks
+
+ambil {
+    hash_sandi, cek_sandi, buat_token, baca_token,
+    enkripsi, dekripsi, sidik, pasangan_kunci,
+    tanda_tangan, verifikasi_tanda_tangan, id_acak
+} dari "../lib/keamanan.ce"
+
+ambil {
+    siapkan, muat_pengguna, simpan_pengguna,
+    simpan_catatan, baca_catatan, daftar_catatan, cadangkan
+} dari "../lib/penyimpanan.ce"
+
+ambil { jalankan, daftar_perintah, PERINTAH } dari "../lib/konsol.ce"
+ambil { mulai, kirim, ambil_hasil } dari "../lib/pekerja.ce"
+ambil { buat_app } dari "../lib/rute.ce"
+
+buat AKAR_UJI = "/tmp/opencode/superapp-uji"
+sistem.setel_env("SUPERAPP_DATA", AKAR_UJI + "/data")
+sistem.setel_env("SUPERAPP_BACKUP", AKAR_UJI + "/backup")
+coba {
+    berkas.hapus_semua(AKAR_UJI)
+} tangkap (e) {
+    cetak("bersih awal:", e)
+}
+siapkan()
+
+buat kunci_uji = kripto.buat_kunci()
+buat rahasia_uji = "rahasia-uji-superapp"
+
+uji "Kripto: hash sandi dan verifikasi" {
+    buat hash = hash_sandi("SandiRahasia2026!")
+    harus_benar(teks.berisi(hash, "$pbkdf2-sha256$"), "hash harus berformat PHC PBKDF2")
+    harus_benar(cek_sandi("SandiRahasia2026!", hash), "sandi benar harus lolos")
+    harus_benar(!cek_sandi("sandi-salah", hash), "sandi salah harus ditolak")
+}
+
+uji "Kripto: AES-256-GCM round-trip dan deteksi manipulasi" {
+    buat cipher = enkripsi("dokumen rahasia", kunci_uji)
+    harus_sama(dekripsi(cipher, kunci_uji), "dokumen rahasia", "dekripsi harus memulihkan teks asli")
+    buat kunci_lain = kripto.buat_kunci()
+    buat tertangkap = salah
+    coba {
+        dekripsi(cipher, kunci_lain)
+    } tangkap (e) {
+        tertangkap = benar
+    }
+    harus_benar(tertangkap, "kunci salah harus melempar galat autentikasi")
+}
+
+uji "Kripto: token sesi bertanda tangan HMAC" {
+    buat token = buat_token({"sub": "admin", "peran": "admin"}, rahasia_uji)
+    buat klaim = baca_token(token, rahasia_uji)
+    harus_sama(klaim.sub, "admin", "subjek token harus utuh")
+    buat tertangkap = salah
+    coba {
+        baca_token(token + "00", rahasia_uji)
+    } tangkap (e) {
+        tertangkap = benar
+    }
+    harus_benar(tertangkap, "token yang dimodifikasi harus ditolak")
+}
+
+uji "Kripto: tanda tangan Ed25519" {
+    buat kp = pasangan_kunci()
+    buat sig = tanda_tangan("rilis-superapp", kp.kunci_privat)
+    harus_benar(verifikasi_tanda_tangan("rilis-superapp", sig, kp.kunci_publik), "tanda tangan valid harus lolos")
+    harus_benar(!verifikasi_tanda_tangan("data-lain", sig, kp.kunci_publik), "data lain harus gagal verifikasi")
+}
+
+uji "Penyimpanan: simpan dan muat pengguna" {
+    buat pengguna = muat_pengguna()
+    pengguna["admin"] = {
+        "nama": "admin",
+        "sandi": hash_sandi("uji-sandi"),
+        "peran": "admin",
+        "dibuat": waktu.sekarang()
+    }
+    simpan_pengguna(pengguna)
+    buat lagi = muat_pengguna()
+    harus_benar(lagi.memiliki("admin"), "pengguna admin harus tersimpan")
+    harus_sama(lagi["admin"].peran, "admin", "peran harus tersimpan")
+}
+
+uji "Penyimpanan: catatan terenkripsi" {
+    buat id = id_acak()
+    buat cipher = enkripsi("catatan sangat rahasia", kunci_uji)
+    simpan_catatan(id, cipher, "admin")
+    buat dibaca = baca_catatan(id)
+    harus_benar(dibaca != kosong, "catatan harus ada di disk")
+    harus_sama(dekripsi(dibaca, kunci_uji), "catatan sangat rahasia", "isi catatan harus dapat didekripsi")
+    buat daftar = daftar_catatan("admin")
+    harus_benar(panjang(daftar) > 0, "daftar catatan admin tidak boleh kosong")
+}
+
+uji "Konsol: allowlist menolak perintah OS" {
+    buat konteks = {"sub": "admin", "peran": "admin", "kunci": kunci_uji}
+    buat ok = jalankan("bantuan", "", konteks)
+    harus_benar(ok.ok, "bantuan harus berhasil")
+    buat tolak = jalankan("rm -rf /", "", konteks)
+    harus_benar(!tolak.ok, "perintah di luar allowlist harus ditolak")
+    buat status = jalankan("status", "", konteks)
+    harus_benar(status.ok, "status harus berhasil")
+    harus_benar(status.keluaran.memiliki("os"), "status harus memuat informasi OS")
+}
+
+uji "Konsol: demonstrasi fitur bahasa" {
+    buat konteks = {"sub": "admin", "peran": "admin", "kunci": kunci_uji}
+    buat hasil = jalankan("fitur", "", konteks)
+    harus_benar(hasil.ok, "perintah fitur harus berhasil")
+    harus_sama(hasil.keluaran.generik, 42, "nilai generik harus 42")
+    harus_sama(hasil.keluaran.destrukturisasi, [1, 2], "destrukturisasi harus benar")
+    harus_sama(hasil.keluaran.pipeline, "CELANG", "pipeline harus menghasilkan CELANG")
+    harus_benar(panjang(hasil.keluaran.histori) > 0, "histori variabel harus terisi")
+    buat resHitung = jalankan("hitung", "akar 144", konteks)
+    harus_benar(resHitung.ok, "hitung akar harus berhasil")
+    harus_sama(resHitung.keluaran, 12, "akar 144 harus 12")
+}
+
+uji "Arsip: cadangan ZIP data aplikasi" {
+    buat hasil = cadangkan()
+    harus_benar(berkas.ada(hasil.berkas), "berkas cadangan harus dibuat")
+    harus_benar(hasil.ukuran > 0, "berkas cadangan tidak boleh kosong")
+}
+
+uji "Pekerja: antrean CSP memproses hash" {
+    mulai()
+    buat id = kirim("halo pekerja")
+    buat hasil = kosong
+    buat percobaan = 0
+    selama hasil == kosong dan percobaan < 100 {
+        waktu.tidur(10)
+        hasil = ambil_hasil(id)
+        percobaan = percobaan + 1
+    }
+    harus_sama(hasil, sidik("halo pekerja"), "hash pekerja harus cocok")
+}
+
+uji "HTTP: kesehatan, login, konsol, catatan, dan 401" {
+    buat app = buat_app({"rahasia": rahasia_uji, "kunci": kunci_uji})
+    app.mulai("127.0.0.1:0")
+    waktu.tidur(50)
+    buat port = app.ambil_port()
+    buat dasar = "http://127.0.0.1:" + port
+
+    buat sehat = http.get(dasar + "/api/kesehatan")
+    harus_sama(sehat.status, 200, "rute kesehatan harus 200")
+    harus_benar(sehat.json().ok, "kesehatan harus ok")
+
+    buat masuk = http.request({
+        "method": "POST",
+        "url": dasar + "/api/masuk",
+        "json": {"nama": "admin", "sandi": "uji-sandi"}
+    })
+    harus_sama(masuk.status, 200, "login harus 200")
+    buat token = masuk.json().token
+
+    buat konsol = http.request({
+        "method": "POST",
+        "url": dasar + "/api/konsol",
+        "headers": {"Authorization": "Bearer " + token},
+        "json": {"perintah": "status"}
+    })
+    harus_sama(konsol.status, 200, "konsol harus 200")
+    harus_benar(konsol.json().ok, "konsol harus ok")
+
+    buat catat = http.request({
+        "method": "POST",
+        "url": dasar + "/api/catatan",
+        "headers": {"Authorization": "Bearer " + token},
+        "json": {"isi": "rahasia lewat HTTP"}
+    })
+    harus_sama(catat.status, 201, "buat catatan harus 201")
+    buat id_catatan = catat.json().id
+
+    buat baca = http.request({
+        "method": "GET",
+        "url": dasar + "/api/catatan/" + id_catatan,
+        "headers": {"Authorization": "Bearer " + token}
+    })
+    harus_sama(baca.json().isi, "rahasia lewat HTTP", "isi catatan lewat HTTP harus cocok")
+
+    buat tanpa_token = http.get(dasar + "/api/statistik")
+    harus_sama(tanpa_token.status, 401, "rute terproteksi harus 401 tanpa token")
+
+    app.tutup()
+}
+
+uji "FFI: pointer NULL aman" {
+    harus_benar(ffi.is_null(ffi.NULL), "ffi.NULL harus terdeteksi null")
+}
+
+uji "Stdlib: matematika, teks, JSON, waktu" {
+    harus_sama(matematika.akar(144), 12, "akar 144 harus 12")
+    harus_sama(teks.kapital("halo"), "HALO", "kapital harus mengubah ke huruf besar")
+    harus_sama(json.uraikan("{\"a\": 1}").a, 1, "JSON harus terurai")
+    harus_benar(waktu.sekarang() > 0, "timestamp harus positif")
+}

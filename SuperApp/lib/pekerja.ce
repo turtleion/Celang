@@ -1,0 +1,26 @@
+impor kripto
+
+buat antrean = Saluran(16)
+buat hasil = {}
+
+publik! fungsi mulai() {
+    sambil {
+        untuk tugas dalam antrean {
+            hasil[tugas.id] = kripto.sha256(tugas.data)
+        }
+    }
+    kembalikan benar
+}
+
+publik! fungsi kirim(data) {
+    buat id = kripto.uuid()
+    antrean.kirim({"id": id, "data": data})
+    kembalikan id
+}
+
+publik! fungsi ambil_hasil(id) {
+    jika hasil.memiliki(id) {
+        kembalikan hasil[id]
+    }
+    kembalikan kosong
+}
