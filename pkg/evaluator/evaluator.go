@@ -1135,7 +1135,7 @@ func Eval(node uast.Node, env *Environment) Object {
 			}
 			return applyFunction(callee, []Object{leftVal}, n.GetMetadata())
 		}
-		if n.Operator == "&&" || n.Operator == "dan" || n.Operator == "and" {
+		if n.Operator == "&&" || n.Operator == "dan" || n.Operator == "and" || n.Operator == "lan" {
 			left := Eval(n.Left, env)
 			if isError(left) {
 				return left
@@ -1149,7 +1149,7 @@ func Eval(node uast.Node, env *Environment) Object {
 			}
 			return nativeBool(CoerceToBoolean(right))
 		}
-		if n.Operator == "||" || n.Operator == "atau" || n.Operator == "or" {
+		if n.Operator == "||" || n.Operator == "atau" || n.Operator == "or" || n.Operator == "utawa" {
 			left := Eval(n.Left, env)
 			if isError(left) {
 				return left
@@ -1557,10 +1557,10 @@ func evalBinaryOp(op string, left, right Object, meta *uast.NodeMetadata) Object
 			return nativeBool(left.Inspect() >= right.Inspect())
 		}
 
-	case "&&", "and", "dan":
+	case "&&", "and", "dan", "lan":
 		return nativeBool(CoerceToBoolean(left) && CoerceToBoolean(right))
 
-	case "||", "or", "atau":
+	case "||", "or", "atau", "utawa":
 		return nativeBool(CoerceToBoolean(left) || CoerceToBoolean(right))
 	}
 
@@ -1569,7 +1569,7 @@ func evalBinaryOp(op string, left, right Object, meta *uast.NodeMetadata) Object
 
 func evalUnaryOp(op string, right Object, meta *uast.NodeMetadata) Object {
 	switch op {
-	case "!", "bukan", "not":
+	case "!", "bukan", "not", "tidak", "ora", "dudu":
 		return nativeBool(!CoerceToBoolean(right))
 	case "-":
 		if intVal, floatVal, isInt, ok := CoerceToNumeric(right); ok {
@@ -1580,7 +1580,7 @@ func evalUnaryOp(op string, right Object, meta *uast.NodeMetadata) Object {
 		}
 		return newError(meta, fmt.Sprintf("Operator '-' tidak dapat diterapkan pada %s", right.Type()), "Gunakan angka untuk negasi numerik.")
 	}
-	return newError(meta, fmt.Sprintf("Operator unary '%s' tidak dikenal", op), "Operator unary yang didukung: '!', 'bukan', '-'.")
+	return newError(meta, fmt.Sprintf("Operator unary '%s' tidak dikenal", op), "Operator unary yang didukung: '!', 'bukan', 'not', '-'.")
 }
 
 // ApplyFunction calls a function or builtin object with the given arguments.

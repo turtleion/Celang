@@ -417,7 +417,13 @@ func runFile(filePath string, styleName string, scriptArgs []string, useAST bool
 	virtualMachine := vm.NewWithEnv(chunk, env)
 	result, err := virtualMachine.Run()
 	if err != nil {
-		diag := empathy.NewRuntimeDiagnostic(&evaluator.Error{Message: err.Error()}, sourceStr)
+		var evalErr *evaluator.Error
+		if ee, ok := err.(*evaluator.Error); ok {
+			evalErr = ee
+		} else {
+			evalErr = &evaluator.Error{Message: err.Error()}
+		}
+		diag := empathy.NewRuntimeDiagnostic(evalErr, sourceStr)
 		fmt.Print(diag.Render())
 		os.Exit(1)
 	}
@@ -691,7 +697,13 @@ func tryRunEmbedded() bool {
 	virtualMachine := vm.NewWithEnv(chunk, env)
 	result, err := virtualMachine.Run()
 	if err != nil {
-		diag := empathy.NewRuntimeDiagnostic(&evaluator.Error{Message: err.Error()}, sourceStr)
+		var evalErr *evaluator.Error
+		if ee, ok := err.(*evaluator.Error); ok {
+			evalErr = ee
+		} else {
+			evalErr = &evaluator.Error{Message: err.Error()}
+		}
+		diag := empathy.NewRuntimeDiagnostic(evalErr, sourceStr)
 		fmt.Print(diag.Render())
 		os.Exit(1)
 	}

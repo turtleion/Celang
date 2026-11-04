@@ -22,6 +22,7 @@ type CompiledFunction struct {
 	NumParams  int
 	Chunk      *Chunk
 	LocalNames []string
+	Env        *evaluator.Environment
 }
 
 func (cf *CompiledFunction) Type() evaluator.ObjectType { return "COMPILED_FUNCTION" }

@@ -17,7 +17,7 @@ Evidence: `README.md`, `ROADMAP.md`, `cmd/celang/main.go` dispatch table, `pkg/e
 
 ## Current Capabilities (Verified)
 
-All items below pass `go test ./...` (10 packages, ~203 tests) and run via `celang run`.
+All items below pass `go test ./...` (10 packages, ~310 tests) and run via `celang run`.
 
 - **Variables**: `buat` (mutable), `konstanta`/`tetep` (immutable), `mungkin` (nullable), `rujuk` (reference/pointer `*`), `reaktif` (reactive cell). Time-travel accessors `.sebelumnya` / `.awal` / `.histori` are implemented on `VariableEntry` with a bounded ring buffer of 50 entries (`pkg/evaluator/environment.go:12`).
 - **Control flow**: `jika`/`selain jika`/`selain`, `selama`, `untuk .. dalam`, `pilih`/`bila`/`lainnya`, `berhenti`/`lanjut`, `coba`/`tangkap`/`akhirnya`/`lempar`.
@@ -43,7 +43,7 @@ Confidence: **Verified** (tests + manual `celang run` on `examples/*.ce`).
 | Language | Go 1.27.1 | `go.mod` |
 | Binary | Single `celang` from `cmd/celang` | `Makefile` `CMD_PATH := ./cmd/celang` |
 | WASM | `cmd/celang-wasm` (js/wasm build) | `ffi_loader_wasm.go`, `stdlib_ffi_wasm.go` |
-| Stdlib ext | `github.com/ebitengine/purego v0.11.2` for FFI | `go.mod` |
+| Dependencies | `purego v0.11.2` (FFI), `blake3 v0.2.4` (BLAKE3), `x/crypto v0.58.0` (KDF/AEAD/Ed25519) | `go.mod` |
 | Docs | VitePress 1.6.4 | `package.json` |
 | Tests | `go test` + custom `tester` package | `pkg/tester/runner.go` |
 

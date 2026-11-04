@@ -88,7 +88,7 @@ celang format file.ce --style=jawa|path/to/custom.style
   if -w → write file else print
 ```
 
-`StyleProfile` is only consulted by `Formatter`; `Lexer`/`Parser` never import `pkg/syntax`. Verified by `grep -r "syntax" pkg/parser pkg/uast --include="*.go"` → zero hits.
+`StyleProfile` is primarily consulted by `Formatter`; `Lexer`/`Parser` do not directly import `pkg/syntax`, but `pkg/syntax/profile.go:init()` registers `parser.GlobalStyleResolver` allowing `Lexer.ApplyStyle` to resolve custom `.style` keywords dynamically.
 
 ### In-code block `gaya "name" { ... }`
 
@@ -172,7 +172,7 @@ Time-travel accessors `.sebelumnya`/`.awal`/`.histori` are not fields — they a
 Makefile:  build  →  go build -o celang ./cmd/celang
            test   →  go test -count=1 ./...
            docs-* →  npm run docs:build/dev/preview  (VitePress)
-go.mod:    go 1.27.1, dep: purego v0.11.2
+go.mod:    go 1.27.1, deps: purego v0.11.2, blake3 v0.2.4, x/crypto v0.58.0
 Binary:    ~13 MB on linux/amd64
 ```
 
@@ -180,7 +180,7 @@ Binary:    ~13 MB on linux/amd64
 
 ### Test Execution
 
-1. **Unit tests** — `go test ./...` via Makefile target `test`. ~203 cases across `bytecode`, `compiler`, `empathy`, `evaluator`, `parser`, `repl`, `syntax`, `tester`, `uast`, `vm`.
+1. **Unit tests** — `go test ./...` via Makefile target `test`. ~310 cases across `bytecode`, `compiler`, `empathy`, `evaluator`, `parser`, `repl`, `syntax`, `tester`, `uast`, `vm`.
 2. **In-language tests** — `celang uji [path] [-f filter]` / `celang test ...` (`pkg/tester/runner.go:Run`). Discovery: scan args for files/dirs, collect `*.ce` files, sort. Per file: parse→resolve imports→`evaluator.Eval`. Collection: top-level `uji "desc" { ... }` nodes become `TestCase{Name: desc}`. Builtins `harus_sama(actual, expected, msg?)` / `harus_benar` / `harus_salah` etc. set pass/fail via returned `AssertionError`. Runner aggregates `FileResult{FilePath, Cases, Duration, Error}` and prints colored `✓`/`✕` + summary `SUKSES/GAGAL`; exit 1 on any failure.
 3. **Examples as smoke tests** — `examples/*.ce` are exercised manually via `celang run examples/<file>.ce`; no harness auto-runs them.
 

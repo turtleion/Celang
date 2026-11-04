@@ -127,11 +127,24 @@ func getStdlibModuleMap(canonicalName string) *Map {
 	return stdlibMaps[canonicalName]
 }
 
+func cloneStdlibMap(m *Map) *Map {
+	if m == nil {
+		return &Map{Pairs: make(map[string]Object)}
+	}
+	pairs := make(map[string]Object, len(m.Pairs))
+	order := make([]string, len(m.Order))
+	for k, v := range m.Pairs {
+		pairs[k] = v
+	}
+	copy(order, m.Order)
+	return &Map{Pairs: pairs, Order: order}
+}
+
 // RegisterStdlibGlobals injects standard library modules as global objects (e.g., berkas, fs, matematika, math, teks, strings, waktu, time, json, sistem, os, http, jaringan, net, arsip, archive).
 func RegisterStdlibGlobals(env *Environment) {
 	canonicalList := []string{"berkas", "matematika", "teks", "waktu", "json", "sistem", "http", "ffi", "kripto", "arsip"}
 	for _, canon := range canonicalList {
-		modMap := getStdlibModuleMap(canon)
+		modMap := cloneStdlibMap(getStdlibModuleMap(canon))
 		// Register canonical Indonesian name
 		env.Define(canon, modMap, false, "Map")
 

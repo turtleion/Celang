@@ -14,6 +14,7 @@ type Chunk struct {
 	Instructions []byte
 	Constants    []evaluator.Object
 	Lines        []int
+	Columns      []int
 }
 
 func NewChunk() *Chunk {
@@ -21,24 +22,30 @@ func NewChunk() *Chunk {
 		Instructions: make([]byte, 0, 128),
 		Constants:    make([]evaluator.Object, 0, 32),
 		Lines:        make([]int, 0, 128),
+		Columns:      make([]int, 0, 128),
 	}
 }
 
 // Write appends a single byte instruction to the chunk.
-func (c *Chunk) Write(b byte, line int) {
+func (c *Chunk) Write(b byte, line int, col ...int) {
 	c.Instructions = append(c.Instructions, b)
 	c.Lines = append(c.Lines, line)
+	cCol := 1
+	if len(col) > 0 && col[0] > 0 {
+		cCol = col[0]
+	}
+	c.Columns = append(c.Columns, cCol)
 }
 
 // WriteOp appends an Opcode.
-func (c *Chunk) WriteOp(op Opcode, line int) {
-	c.Write(byte(op), line)
+func (c *Chunk) WriteOp(op Opcode, line int, col ...int) {
+	c.Write(byte(op), line, col...)
 }
 
 // WriteUint16 appends a 16-bit big-endian unsigned integer (operand).
-func (c *Chunk) WriteUint16(val uint16, line int) {
-	c.Write(byte(val>>8), line)
-	c.Write(byte(val&0xFF), line)
+func (c *Chunk) WriteUint16(val uint16, line int, col ...int) {
+	c.Write(byte(val>>8), line, col...)
+	c.Write(byte(val&0xFF), line, col...)
 }
 
 // AddConstant adds an object to the constant pool and returns its 16-bit index.

@@ -6,33 +6,15 @@ import (
 	"math"
 	"os"
 	"strconv"
-	"sync"
 
 	"celang/pkg/bytecode"
 	"celang/pkg/evaluator"
 	"celang/pkg/uast"
 )
 
-var (
-	activeVMEnv   *evaluator.Environment
-	activeVMEnvMu sync.RWMutex
-)
-
-func getActiveEnv() *evaluator.Environment {
-	activeVMEnvMu.RLock()
-	defer activeVMEnvMu.RUnlock()
-	return activeVMEnv
-}
-
-func setActiveEnv(env *evaluator.Environment) {
-	activeVMEnvMu.Lock()
-	defer activeVMEnvMu.Unlock()
-	activeVMEnv = env
-}
-
 func init() {
 	bytecode.SetVMRunner(func(fn *bytecode.CompiledFunction, args []evaluator.Object) evaluator.Object {
-		env := getActiveEnv()
+		env := fn.Env
 		if env == nil {
 			env = evaluator.NewEnvironment()
 			evaluator.RegisterBuiltins(env, os.Stdout)
@@ -46,6 +28,9 @@ func init() {
 		}
 		res, err := virtualMachine.Run()
 		if err != nil {
+			if evalErr, ok := err.(*evaluator.Error); ok {
+				return evalErr
+			}
 			return &evaluator.Error{Message: err.Error()}
 		}
 		return res
@@ -137,9 +122,6 @@ func (vm *VM) peek(distance int) evaluator.Object {
 
 // Run starts bytecode execution.
 func (vm *VM) Run() (evaluator.Object, error) {
-	if vm.env != nil {
-		setActiveEnv(vm.env)
-	}
 	for vm.frameCount > 0 {
 		frame := &vm.frames[vm.frameCount-1]
 		chunk := frame.fn.Chunk
@@ -149,6 +131,7 @@ func (vm *VM) Run() (evaluator.Object, error) {
 		}
 
 		op := bytecode.Opcode(chunk.Instructions[frame.ip])
+		opIP := frame.ip
 		frame.ip++
 
 		switch op {
@@ -174,7 +157,7 @@ func (vm *VM) Run() (evaluator.Object, error) {
 			a := vm.pop()
 			res, err := vm.evalAdd(a, b)
 			if err != nil {
-				return nil, err
+				return nil, vm.wrapRuntimeError(opIP, err)
 			}
 			vm.push(res)
 
@@ -183,7 +166,7 @@ func (vm *VM) Run() (evaluator.Object, error) {
 			a := vm.pop()
 			res, err := vm.evalSub(a, b)
 			if err != nil {
-				return nil, err
+				return nil, vm.wrapRuntimeError(opIP, err)
 			}
 			vm.push(res)
 
@@ -192,7 +175,7 @@ func (vm *VM) Run() (evaluator.Object, error) {
 			a := vm.pop()
 			res, err := vm.evalMul(a, b)
 			if err != nil {
-				return nil, err
+				return nil, vm.wrapRuntimeError(opIP, err)
 			}
 			vm.push(res)
 
@@ -201,7 +184,7 @@ func (vm *VM) Run() (evaluator.Object, error) {
 			a := vm.pop()
 			res, err := vm.evalDiv(a, b)
 			if err != nil {
-				return nil, err
+				return nil, vm.wrapRuntimeError(opIP, err, "Pastikan penyebut pembagian tidak bernilai nol.")
 			}
 			vm.push(res)
 
@@ -210,7 +193,7 @@ func (vm *VM) Run() (evaluator.Object, error) {
 			a := vm.pop()
 			res, err := vm.evalMod(a, b)
 			if err != nil {
-				return nil, err
+				return nil, vm.wrapRuntimeError(opIP, err, "Operasi modulo memerlukan penyebut bukan nol.")
 			}
 			vm.push(res)
 
@@ -218,7 +201,7 @@ func (vm *VM) Run() (evaluator.Object, error) {
 			a := vm.pop()
 			res, err := vm.evalNeg(a)
 			if err != nil {
-				return nil, err
+				return nil, vm.wrapRuntimeError(opIP, err)
 			}
 			vm.push(res)
 
@@ -237,7 +220,7 @@ func (vm *VM) Run() (evaluator.Object, error) {
 			a := vm.pop()
 			res, err := vm.evalCompare(a, b, ">")
 			if err != nil {
-				return nil, err
+				return nil, vm.wrapRuntimeError(opIP, err)
 			}
 			vm.push(res)
 
@@ -246,7 +229,7 @@ func (vm *VM) Run() (evaluator.Object, error) {
 			a := vm.pop()
 			res, err := vm.evalCompare(a, b, ">=")
 			if err != nil {
-				return nil, err
+				return nil, vm.wrapRuntimeError(opIP, err)
 			}
 			vm.push(res)
 
@@ -255,7 +238,7 @@ func (vm *VM) Run() (evaluator.Object, error) {
 			a := vm.pop()
 			res, err := vm.evalCompare(a, b, "<")
 			if err != nil {
-				return nil, err
+				return nil, vm.wrapRuntimeError(opIP, err)
 			}
 			vm.push(res)
 
@@ -264,7 +247,7 @@ func (vm *VM) Run() (evaluator.Object, error) {
 			a := vm.pop()
 			res, err := vm.evalCompare(a, b, "<=")
 			if err != nil {
-				return nil, err
+				return nil, vm.wrapRuntimeError(opIP, err)
 			}
 			vm.push(res)
 
@@ -311,7 +294,7 @@ func (vm *VM) Run() (evaluator.Object, error) {
 				val, exists = vm.globals[name]
 			}
 			if !exists {
-				return nil, fmt.Errorf("variabel global '%s' belum didefinisikan", name)
+				return nil, vm.makeRuntimeError(opIP, fmt.Sprintf("variabel global '%s' belum didefinisikan", name), "Periksa ejaan nama variabel atau pastikan variabel sudah dideklarasikan sebelum digunakan.")
 			}
 			vm.push(val)
 
@@ -321,17 +304,17 @@ func (vm *VM) Run() (evaluator.Object, error) {
 			name := chunk.Constants[constIdx].(*evaluator.String).Value
 			val := vm.peek(0)
 			if vm.constants != nil && vm.constants[name] {
-				return nil, fmt.Errorf("variabel '%s' bersifat tetap (immutable) dan tidak dapat diubah", name)
+				return nil, vm.makeRuntimeError(opIP, fmt.Sprintf("variabel '%s' bersifat tetap (immutable) dan tidak dapat diubah", name), "Gunakan deklarasi variabel yang dapat diubah ('buat' alih-alih 'tetap').")
 			}
 			if vm.env != nil {
 				if entry, ok := vm.env.GetEntry(name); ok {
 					root := entry.Resolve()
 					if !root.IsMutable {
-						return nil, fmt.Errorf("variabel '%s' bersifat tetap (immutable) dan tidak dapat diubah", name)
+						return nil, vm.makeRuntimeError(opIP, fmt.Sprintf("variabel '%s' bersifat tetap (immutable) dan tidak dapat diubah", name), "Gunakan deklarasi variabel yang dapat diubah ('buat' alih-alih 'tetap').")
 					}
 				}
 				if err := vm.env.Assign(name, val); err != nil {
-					return nil, err
+					return nil, vm.wrapRuntimeError(opIP, err)
 				}
 				if entry, ok := vm.env.GetEntry(name); ok {
 					root := entry.Resolve()
@@ -403,7 +386,7 @@ func (vm *VM) Run() (evaluator.Object, error) {
 			targetObj := vm.pop()
 			res, err := vm.evalIndex(targetObj, indexObj)
 			if err != nil {
-				return nil, err
+				return nil, vm.wrapRuntimeError(opIP, err)
 			}
 			vm.push(res)
 
@@ -412,14 +395,14 @@ func (vm *VM) Run() (evaluator.Object, error) {
 			targetObj := vm.pop()
 			val := vm.peek(0)
 			if err := vm.evalSetIndex(targetObj, indexObj, val); err != nil {
-				return nil, err
+				return nil, vm.wrapRuntimeError(opIP, err)
 			}
 
 		case bytecode.OpCall:
 			argCount := int(chunk.Instructions[frame.ip])
 			frame.ip++
 			if err := vm.callValue(argCount); err != nil {
-				return nil, err
+				return nil, vm.wrapRuntimeError(opIP, err)
 			}
 
 		case bytecode.OpReturn:
@@ -459,7 +442,7 @@ func (vm *VM) Run() (evaluator.Object, error) {
 			}
 			res := evaluator.Eval(wrapper.Node, evalEnv)
 			if errObj, ok := res.(*evaluator.Error); ok {
-				return nil, fmt.Errorf("%s", errObj.Inspect())
+				return nil, vm.wrapRuntimeError(opIP, errObj)
 			}
 			if evalEnv != env {
 				for slot, name := range frame.fn.LocalNames {
@@ -534,11 +517,11 @@ func (vm *VM) Run() (evaluator.Object, error) {
 		case bytecode.OpGetIter:
 			iterable := vm.pop()
 			if errObj, ok := iterable.(*evaluator.Error); ok {
-				return nil, fmt.Errorf("%s", errObj.Inspect())
+				return nil, vm.wrapRuntimeError(opIP, errObj)
 			}
 			iter, err := evaluator.NewIterator(iterable)
 			if err != nil {
-				return nil, err
+				return nil, vm.wrapRuntimeError(opIP, err)
 			}
 			vm.push(iter)
 
@@ -550,7 +533,7 @@ func (vm *VM) Run() (evaluator.Object, error) {
 			iterObj := vm.stack[frame.basePointer+int(iterSlot)]
 			iterator, ok := iterObj.(*evaluator.IteratorObject)
 			if !ok {
-				return nil, fmt.Errorf("objek di slot %d bukan iterator yang valid", iterSlot)
+				return nil, vm.makeRuntimeError(opIP, fmt.Sprintf("objek di slot %d bukan iterator yang valid", iterSlot))
 			}
 			val, hasNext := iterator.Next()
 			if !hasNext {
@@ -560,7 +543,7 @@ func (vm *VM) Run() (evaluator.Object, error) {
 			}
 
 		default:
-			return nil, fmt.Errorf("opcode tidak dikenal: 0x%02X (%s)", byte(op), op.String())
+			return nil, vm.makeRuntimeError(opIP, fmt.Sprintf("opcode tidak dikenal: 0x%02X (%s)", byte(op), op.String()))
 		}
 	}
 
@@ -600,7 +583,7 @@ func (vm *VM) callValue(argCount int) error {
 		vm.sp -= argCount + 1
 		res := fn.Fn(args...)
 		if errObj, ok := res.(*evaluator.Error); ok {
-			return fmt.Errorf("%s", errObj.Inspect())
+			return errObj
 		}
 		vm.push(res)
 		return nil
@@ -613,7 +596,7 @@ func (vm *VM) callValue(argCount int) error {
 		vm.sp -= argCount + 1
 		res := evaluator.ApplyFunction(fn, args, nil)
 		if errObj, ok := res.(*evaluator.Error); ok {
-			return fmt.Errorf("%s", errObj.Inspect())
+			return errObj
 		}
 		vm.push(res)
 		return nil
@@ -626,7 +609,7 @@ func (vm *VM) callValue(argCount int) error {
 		vm.sp -= argCount + 1
 		res := evaluator.ApplyFunction(fn, args, nil)
 		if errObj, ok := res.(*evaluator.Error); ok {
-			return fmt.Errorf("%s", errObj.Inspect())
+			return errObj
 		}
 		vm.push(res)
 		return nil
@@ -1117,4 +1100,55 @@ func (vm *VM) evalCompare(a, b evaluator.Object, op string) (evaluator.Object, e
 
 func isTruthy(obj evaluator.Object) bool {
 	return evaluator.CoerceToBoolean(obj)
+}
+
+func (vm *VM) makeRuntimeError(opIP int, msg string, friendlyHint ...string) *evaluator.Error {
+	line := 1
+	col := 1
+	if vm.frameCount > 0 {
+		frame := &vm.frames[vm.frameCount-1]
+		if frame.fn != nil && frame.fn.Chunk != nil {
+			if opIP >= 0 && opIP < len(frame.fn.Chunk.Lines) {
+				line = frame.fn.Chunk.Lines[opIP]
+			}
+			if opIP >= 0 && opIP < len(frame.fn.Chunk.Columns) {
+				col = frame.fn.Chunk.Columns[opIP]
+			}
+		}
+	}
+	hint := ""
+	if len(friendlyHint) > 0 {
+		hint = friendlyHint[0]
+	}
+	return &evaluator.Error{
+		Message:      msg,
+		FriendlyHint: hint,
+		Pos:          &uast.Position{Line: line, Column: col},
+	}
+}
+
+func (vm *VM) wrapRuntimeError(opIP int, err error, friendlyHint ...string) *evaluator.Error {
+	if evalErr, ok := err.(*evaluator.Error); ok {
+		if evalErr.Pos == nil || (evalErr.Pos.Line <= 1 && evalErr.Pos.Column <= 1) {
+			line := 1
+			col := 1
+			if vm.frameCount > 0 {
+				frame := &vm.frames[vm.frameCount-1]
+				if frame.fn != nil && frame.fn.Chunk != nil {
+					if opIP >= 0 && opIP < len(frame.fn.Chunk.Lines) {
+						line = frame.fn.Chunk.Lines[opIP]
+					}
+					if opIP >= 0 && opIP < len(frame.fn.Chunk.Columns) {
+						col = frame.fn.Chunk.Columns[opIP]
+					}
+				}
+			}
+			evalErr.Pos = &uast.Position{Line: line, Column: col}
+		}
+		if evalErr.FriendlyHint == "" && len(friendlyHint) > 0 {
+			evalErr.FriendlyHint = friendlyHint[0]
+		}
+		return evalErr
+	}
+	return vm.makeRuntimeError(opIP, err.Error(), friendlyHint...)
 }

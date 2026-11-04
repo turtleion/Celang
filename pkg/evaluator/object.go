@@ -141,6 +141,8 @@ func (e *Error) Inspect() string {
 	return sb.String()
 }
 
+func (e *Error) Error() string { return e.Message }
+
 // AssertionError represents a failed test assertion.
 type AssertionError struct {
 	Message      string
@@ -151,6 +153,7 @@ type AssertionError struct {
 }
 
 func (a *AssertionError) Type() ObjectType { return ASSERTION_ERROR_OBJ }
+func (a *AssertionError) Error() string     { return a.Message }
 func (a *AssertionError) Inspect() string {
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("Gagal Uji: %s", a.Message))

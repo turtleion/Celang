@@ -2,6 +2,7 @@ package vm_test
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -825,5 +826,157 @@ func TestVM_BytesMultiplication(t *testing.T) {
 	strVal, ok := res.(*evaluator.String)
 	if !ok || strVal.Value != "ABABAB" {
 		t.Fatalf("expected 'ABABAB', got %s", res.Inspect())
+	}
+}
+
+func TestVM_FunctionASTDelegationScoping(t *testing.T) {
+	code := `
+	fungsi f() {
+		buat x = 1
+		coba { buat y = 5 } tangkap (e) { }
+		kembalikan y + x
+	}
+	f()
+	`
+	res, _, _ := runVM(t, code)
+	intVal, ok := res.(*evaluator.Integer)
+	if !ok || intVal.Value != 6 {
+		t.Fatalf("expected 6, got %s", res.Inspect())
+	}
+}
+
+func TestVM_LogicalAndUnaryOperatorParity(t *testing.T) {
+	code := `
+	"use universal"
+	let a = true and false
+	let b = false or true
+	let c = not false
+	let d = true and not false
+	[a, b, c, d]
+	`
+	res, _, _ := runVM(t, code)
+	arr, ok := res.(*evaluator.Array)
+	if !ok || len(arr.Elements) != 4 {
+		t.Fatalf("expected 4 elements, got %s", res.Inspect())
+	}
+	if b, ok := arr.Elements[0].(*evaluator.Boolean); !ok || b.Value != false {
+		t.Errorf("expected false for and, got %s", arr.Elements[0].Inspect())
+	}
+	if b, ok := arr.Elements[1].(*evaluator.Boolean); !ok || b.Value != true {
+		t.Errorf("expected true for or, got %s", arr.Elements[1].Inspect())
+	}
+	if b, ok := arr.Elements[2].(*evaluator.Boolean); !ok || b.Value != true {
+		t.Errorf("expected true for not, got %s", arr.Elements[2].Inspect())
+	}
+	if b, ok := arr.Elements[3].(*evaluator.Boolean); !ok || b.Value != true {
+		t.Errorf("expected true for combined, got %s", arr.Elements[3].Inspect())
+	}
+}
+
+func TestVM_RuntimeErrorSourcePosition(t *testing.T) {
+	code := "buat x = 10\nbuat y = x / 0"
+	l := parser.NewLexer(code)
+	p := parser.NewParser(l)
+	prog, err := p.ParseProgram()
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	comp := compiler.NewCompiler()
+	chunk, err := comp.Compile(prog)
+	if err != nil {
+		t.Fatalf("compile error: %v", err)
+	}
+	env := evaluator.NewEnvironment()
+	evaluator.RegisterBuiltins(env, os.Stdout)
+	virtualMachine := vm.NewWithEnv(chunk, env)
+	_, runErr := virtualMachine.Run()
+	if runErr == nil {
+		t.Fatalf("expected division by zero error, got nil")
+	}
+	evalErr, ok := runErr.(*evaluator.Error)
+	if !ok {
+		t.Fatalf("expected *evaluator.Error, got %T: %v", runErr, runErr)
+	}
+	if evalErr.Pos == nil {
+		t.Fatalf("expected non-nil Pos in runtime error")
+	}
+	if evalErr.Pos.Line != 2 {
+		t.Errorf("expected line 2, got %d", evalErr.Pos.Line)
+	}
+	if evalErr.Pos.Column != 12 {
+		t.Errorf("expected column 12, got %d", evalErr.Pos.Column)
+	}
+	if evalErr.FriendlyHint == "" {
+		t.Errorf("expected friendly hint, got empty string")
+	}
+}
+
+func TestVM_ConcurrentExecution(t *testing.T) {
+	code := `
+	buat total = 0
+	buat i = 1
+	selama i <= 100 {
+		total = total + i
+		i = i + 1
+	}
+	total
+	`
+	l := parser.NewLexer(code)
+	p := parser.NewParser(l)
+	prog, err := p.ParseProgram()
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	comp := compiler.NewCompiler()
+	chunk, err := comp.Compile(prog)
+	if err != nil {
+		t.Fatalf("compile error: %v", err)
+	}
+
+	const goroutines = 10
+	errChan := make(chan error, goroutines)
+	for g := 0; g < goroutines; g++ {
+		go func() {
+			env := evaluator.NewEnvironment()
+			evaluator.RegisterBuiltins(env, os.Stdout)
+			virtualMachine := vm.NewWithEnv(chunk, env)
+			res, runErr := virtualMachine.Run()
+			if runErr != nil {
+				errChan <- runErr
+				return
+			}
+			if intVal, ok := res.(*evaluator.Integer); !ok || intVal.Value != 5050 {
+				errChan <- fmt.Errorf("unexpected result: %s", res.Inspect())
+				return
+			}
+			errChan <- nil
+		}()
+	}
+
+	for g := 0; g < goroutines; g++ {
+		if err := <-errChan; err != nil {
+			t.Errorf("concurrent VM execution failed: %v", err)
+		}
+	}
+}
+
+func TestVM_StdlibMapIsolation(t *testing.T) {
+	env1 := evaluator.NewEnvironment()
+	evaluator.RegisterStdlibGlobals(env1)
+
+	env2 := evaluator.NewEnvironment()
+	evaluator.RegisterStdlibGlobals(env2)
+
+	// Mutate berkas map in env1
+	berkasObj1, _ := env1.Get("berkas")
+	berkasMap1 := berkasObj1.(*evaluator.Map)
+	berkasMap1.Pairs["baca"] = &evaluator.String{Value: "mutated"}
+
+	// Verify env2 berkas map is unmodified
+	berkasObj2, _ := env2.Get("berkas")
+	berkasMap2 := berkasObj2.(*evaluator.Map)
+	baca2 := berkasMap2.Pairs["baca"]
+	if baca2 == nil || baca2.Type() != "BUILTIN" {
+		t.Errorf("expected env2 berkas.baca to remain BUILTIN, got %v", baca2)
 	}
 }

@@ -133,11 +133,24 @@ func (c *Compiler) CompileExpression(expr uast.Expression) (*bytecode.Chunk, err
 	return c.chunk, nil
 }
 
-func (c *Compiler) compileStatement(stmt uast.Statement) error {
-	line := 1
-	if stmt.GetMetadata() != nil && stmt.GetMetadata().Pos != nil {
-		line = stmt.GetMetadata().Pos.Line
+func getPos(node uast.Node) (int, int) {
+	if node != nil && node.GetMetadata() != nil && node.GetMetadata().Pos != nil {
+		l := node.GetMetadata().Pos.Line
+		col := node.GetMetadata().Pos.Column
+		if l <= 0 {
+			l = 1
+		}
+		if col <= 0 {
+			col = 1
+		}
+		return l, col
 	}
+	return 1, 1
+}
+
+func (c *Compiler) compileStatement(stmt uast.Statement) error {
+	line, col := getPos(stmt)
+	_ = col
 
 	switch s := stmt.(type) {
 	case *uast.VariableDeclaration:
@@ -502,11 +515,11 @@ func (c *Compiler) compileStatement(stmt uast.Statement) error {
 				break
 			}
 		}
-		if containsInnerFunction(s.Body) || hasSpecialParams {
+		if functionRequiresAST(s.Body) || hasSpecialParams {
 			wrapper := &evaluator.ASTNodeWrapper{Node: s}
 			constIdx := c.chunk.AddConstant(wrapper)
-			c.emitOp(bytecode.OpEvalAST, line)
-			c.chunk.WriteUint16(constIdx, line)
+			c.emitOp(bytecode.OpEvalAST, line, col)
+			c.chunk.WriteUint16(constIdx, line, col)
 			return nil
 		}
 
@@ -521,8 +534,8 @@ func (c *Compiler) compileStatement(stmt uast.Statement) error {
 				}
 			}
 		}
-		fnComp.emitOp(bytecode.OpNull, line)
-		fnComp.emitOp(bytecode.OpReturn, line)
+		fnComp.emitOp(bytecode.OpNull, line, col)
+		fnComp.emitOp(bytecode.OpReturn, line, col)
 
 		localNames := make([]string, len(fnComp.locals))
 		for i, loc := range fnComp.locals {
@@ -533,17 +546,18 @@ func (c *Compiler) compileStatement(stmt uast.Statement) error {
 			NumParams:  len(s.Parameters),
 			Chunk:      fnComp.chunk,
 			LocalNames: localNames,
+			Env:        c.env,
 		}
 		constIdx := c.chunk.AddConstant(compiledFn)
-		c.emitOp(bytecode.OpConstant, line)
-		c.chunk.WriteUint16(constIdx, line)
+		c.emitOp(bytecode.OpConstant, line, col)
+		c.chunk.WriteUint16(constIdx, line, col)
 
 		if c.scopeDepth > 0 || c.parent != nil {
 			c.addLocal(s.Name, false)
 		} else {
 			nameIdx := c.chunk.AddConstant(&evaluator.String{Value: s.Name})
-			c.emitOp(bytecode.OpDefineGlobal, line)
-			c.chunk.WriteUint16(nameIdx, line)
+			c.emitOp(bytecode.OpDefineGlobal, line, col)
+			c.chunk.WriteUint16(nameIdx, line, col)
 		}
 		return nil
 
@@ -561,11 +575,11 @@ func (c *Compiler) compileStatement(stmt uast.Statement) error {
 		*uast.DestructureDeclaration, *uast.DestructureAssignment, *uast.TryCatchStatement, *uast.ThrowStatement,
 		*uast.ReferenceDeclaration, *uast.TypeAliasDeclaration, *uast.DeferStatement, *uast.SwitchStatement,
 		*uast.TransactionStatement, *uast.RollbackStatement, *uast.ReactiveDeclaration, *uast.WatchStatement,
-		*uast.TestStatement:
+		*uast.TestStatement, *uast.VisibilityStatement:
 		wrapper := &evaluator.ASTNodeWrapper{Node: s}
 		constIdx := c.chunk.AddConstant(wrapper)
-		c.emitOp(bytecode.OpEvalAST, line)
-		c.chunk.WriteUint16(constIdx, line)
+		c.emitOp(bytecode.OpEvalAST, line, col)
+		c.chunk.WriteUint16(constIdx, line, col)
 		return nil
 
 	default:
@@ -574,10 +588,8 @@ func (c *Compiler) compileStatement(stmt uast.Statement) error {
 }
 
 func (c *Compiler) compileExpression(expr uast.Expression) error {
-	line := 1
-	if expr.GetMetadata() != nil && expr.GetMetadata().Pos != nil {
-		line = expr.GetMetadata().Pos.Line
-	}
+	line, col := getPos(expr)
+	_ = col
 
 	switch e := expr.(type) {
 	case *uast.Literal:
@@ -634,26 +646,26 @@ func (c *Compiler) compileExpression(expr uast.Expression) error {
 		return nil
 
 	case *uast.BinaryExpression:
-		if e.Operator == "&&" || e.Operator == "dan" {
+		if e.Operator == "&&" || e.Operator == "dan" || e.Operator == "and" || e.Operator == "lan" {
 			if err := c.compileExpression(e.Left); err != nil {
 				return err
 			}
-			endJump := c.emitJump(bytecode.OpJumpIfFalse, line)
-			c.emitOp(bytecode.OpPop, line)
+			endJump := c.emitJump(bytecode.OpJumpIfFalse, line, col)
+			c.emitOp(bytecode.OpPop, line, col)
 			if err := c.compileExpression(e.Right); err != nil {
 				return err
 			}
 			c.patchJump(endJump)
 			return nil
 		}
-		if e.Operator == "||" || e.Operator == "atau" {
+		if e.Operator == "||" || e.Operator == "atau" || e.Operator == "or" || e.Operator == "utawa" {
 			if err := c.compileExpression(e.Left); err != nil {
 				return err
 			}
-			elseJump := c.emitJump(bytecode.OpJumpIfFalse, line)
-			endJump := c.emitJump(bytecode.OpJump, line)
+			elseJump := c.emitJump(bytecode.OpJumpIfFalse, line, col)
+			endJump := c.emitJump(bytecode.OpJump, line, col)
 			c.patchJump(elseJump)
-			c.emitOp(bytecode.OpPop, line)
+			c.emitOp(bytecode.OpPop, line, col)
 			if err := c.compileExpression(e.Right); err != nil {
 				return err
 			}
@@ -673,27 +685,27 @@ func (c *Compiler) compileExpression(expr uast.Expression) error {
 
 		switch e.Operator {
 		case "+":
-			c.emitOp(bytecode.OpAdd, line)
+			c.emitOp(bytecode.OpAdd, line, col)
 		case "-":
-			c.emitOp(bytecode.OpSub, line)
+			c.emitOp(bytecode.OpSub, line, col)
 		case "*":
-			c.emitOp(bytecode.OpMul, line)
+			c.emitOp(bytecode.OpMul, line, col)
 		case "/":
-			c.emitOp(bytecode.OpDiv, line)
+			c.emitOp(bytecode.OpDiv, line, col)
 		case "%":
-			c.emitOp(bytecode.OpMod, line)
+			c.emitOp(bytecode.OpMod, line, col)
 		case "==", "===":
-			c.emitOp(bytecode.OpEqual, line)
+			c.emitOp(bytecode.OpEqual, line, col)
 		case "!=", "!==":
-			c.emitOp(bytecode.OpNotEqual, line)
+			c.emitOp(bytecode.OpNotEqual, line, col)
 		case ">":
-			c.emitOp(bytecode.OpGreaterThan, line)
+			c.emitOp(bytecode.OpGreaterThan, line, col)
 		case ">=":
-			c.emitOp(bytecode.OpGreaterEqual, line)
+			c.emitOp(bytecode.OpGreaterEqual, line, col)
 		case "<":
-			c.emitOp(bytecode.OpLessThan, line)
+			c.emitOp(bytecode.OpLessThan, line, col)
 		case "<=":
-			c.emitOp(bytecode.OpLessEqual, line)
+			c.emitOp(bytecode.OpLessEqual, line, col)
 		default:
 			return fmt.Errorf("operator biner '%s' belum didukung di bytecode compiler", e.Operator)
 		}
@@ -705,9 +717,9 @@ func (c *Compiler) compileExpression(expr uast.Expression) error {
 		}
 		switch e.Operator {
 		case "-":
-			c.emitOp(bytecode.OpNeg, line)
-		case "!", "bukan":
-			c.emitOp(bytecode.OpNot, line)
+			c.emitOp(bytecode.OpNeg, line, col)
+		case "!", "bukan", "not", "tidak", "ora", "dudu":
+			c.emitOp(bytecode.OpNot, line, col)
 		default:
 			return fmt.Errorf("operator unary '%s' belum didukung di bytecode compiler", e.Operator)
 		}
@@ -906,22 +918,22 @@ func (c *Compiler) compilePipeline(left, right uast.Expression, line int) error 
 	return nil
 }
 
-func (c *Compiler) emitOp(op bytecode.Opcode, line int) {
-	c.chunk.WriteOp(op, line)
+func (c *Compiler) emitOp(op bytecode.Opcode, line int, col ...int) {
+	c.chunk.WriteOp(op, line, col...)
 }
 
-func (c *Compiler) emitJump(op bytecode.Opcode, line int) int {
-	c.emitOp(op, line)
-	c.chunk.Write(0xFF, line)
-	c.chunk.Write(0xFF, line)
+func (c *Compiler) emitJump(op bytecode.Opcode, line int, col ...int) int {
+	c.emitOp(op, line, col...)
+	c.chunk.Write(0xFF, line, col...)
+	c.chunk.Write(0xFF, line, col...)
 	return len(c.chunk.Instructions) - 2
 }
 
-func (c *Compiler) emitForIter(slot uint16, line int) int {
-	c.emitOp(bytecode.OpForIter, line)
-	c.chunk.WriteUint16(slot, line)
-	c.chunk.Write(0xFF, line)
-	c.chunk.Write(0xFF, line)
+func (c *Compiler) emitForIter(slot uint16, line int, col ...int) int {
+	c.emitOp(bytecode.OpForIter, line, col...)
+	c.chunk.WriteUint16(slot, line, col...)
+	c.chunk.Write(0xFF, line, col...)
+	c.chunk.Write(0xFF, line, col...)
 	return len(c.chunk.Instructions) - 2
 }
 
@@ -931,9 +943,9 @@ func (c *Compiler) patchJump(offset int) {
 	c.chunk.Instructions[offset+1] = byte(jumpDist & 0xFF)
 }
 
-func (c *Compiler) emitLoop(loopStart int, line int) {
-	c.emitOp(bytecode.OpLoop, line)
-	c.chunk.WriteUint16(uint16(loopStart), line)
+func (c *Compiler) emitLoop(loopStart int, line int, col ...int) {
+	c.emitOp(bytecode.OpLoop, line, col...)
+	c.chunk.WriteUint16(uint16(loopStart), line, col...)
 }
 
 func (c *Compiler) beginScope() {
@@ -981,7 +993,7 @@ func (c *Compiler) resolveLocal(name string) (uint16, bool) {
 	return 0, false
 }
 
-func containsInnerFunction(stmt uast.Statement) bool {
+func functionRequiresAST(stmt uast.Statement) bool {
 	if stmt == nil {
 		return false
 	}
@@ -992,9 +1004,27 @@ func containsInnerFunction(stmt uast.Statement) bool {
 			return
 		}
 		switch node := n.(type) {
-		case *uast.FunctionDeclaration, *uast.FunctionExpression, *uast.DeferStatement:
+		case *uast.FunctionDeclaration, *uast.FunctionExpression,
+			*uast.DeferStatement, *uast.TryCatchStatement, *uast.ThrowStatement,
+			*uast.SwitchStatement, *uast.ConcurrencyStatement,
+			*uast.TransactionStatement, *uast.RollbackStatement,
+			*uast.DestructureDeclaration, *uast.DestructureAssignment,
+			*uast.ReactiveDeclaration, *uast.WatchStatement,
+			*uast.ReferenceDeclaration, *uast.TypeAliasDeclaration,
+			*uast.TestStatement, *uast.VisibilityStatement,
+			*uast.TitipExpression, *uast.JemputExpression:
 			found = true
 			return
+
+		case *uast.CallExpression:
+			if len(node.TypeArguments) > 0 {
+				found = true
+				return
+			}
+			walk(node.Callee)
+			for _, arg := range node.Arguments {
+				walk(arg)
+			}
 		case *uast.BlockStatement:
 			for _, s := range node.Statements {
 				walk(s)
@@ -1034,39 +1064,42 @@ func containsInnerFunction(stmt uast.Statement) bool {
 				walk(node.Update)
 			}
 			walk(node.Body)
-		case *uast.TryCatchStatement:
-			walk(node.Block)
-			if node.Handler != nil {
-				walk(node.Handler.Body)
-			}
-			if node.Finalizer != nil {
-				walk(node.Finalizer)
-			}
-		case *uast.SwitchStatement:
-			walk(node.Discriminant)
-			for _, c := range node.Cases {
-				if c.Value != nil {
-					walk(c.Value)
-				}
-				for _, s := range c.Body {
-					walk(s)
-				}
-			}
-		case *uast.ConcurrencyStatement:
-			for _, t := range node.Tasks {
-				walk(t)
-			}
 		case *uast.StyleBlockStatement:
 			if node.Body != nil {
 				walk(node.Body)
 			}
-		case *uast.CallExpression:
-			walk(node.Callee)
-			for _, arg := range node.Arguments {
-				walk(arg)
+		case *uast.BinaryExpression:
+			walk(node.Left)
+			walk(node.Right)
+		case *uast.UnaryExpression:
+			walk(node.Argument)
+		case *uast.ArrayLiteral:
+			for _, el := range node.Elements {
+				walk(el)
+			}
+		case *uast.MapLiteral:
+			for _, prop := range node.Properties {
+				walk(prop.Key)
+				walk(prop.Value)
+			}
+		case *uast.MemberExpression:
+			walk(node.Object)
+			if node.Computed && node.PropertyExpr != nil {
+				walk(node.PropertyExpr)
+			}
+		case *uast.PipelineExpression:
+			walk(node.Left)
+			walk(node.Right)
+		case *uast.TemplateLiteral:
+			for _, p := range node.Parts {
+				walk(p)
 			}
 		}
 	}
 	walk(stmt)
 	return found
+}
+
+func containsInnerFunction(stmt uast.Statement) bool {
+	return functionRequiresAST(stmt)
 }

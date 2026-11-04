@@ -13,7 +13,7 @@ source .ce  ──►  Lexer  ──►  Parser (Pratt)  ──►  U-AST  ─�
                                            .style JSON                 (cmd/celang, pkg/repl, pkg/tester)
 ```
 
-Key insight verified in code: `pkg/syntax` is **not** used by lexing or parsing. The lexer holds a single global `keywords` map containing every dialect at once (`pkg/parser/lexer.go:8-164` — Indonesian, English, Jawa). Dialects are an output projection: the `Formatter` renders a U-AST back to text using a `StyleProfile`. There is no per-profile lexing pass.
+Key insight verified in code: Built-in dialects (Indonesian, English, Jawa) reside in a single global `keywords` map in `pkg/parser/lexer.go`, while custom `.style` profiles can be dynamically resolved by the lexer via the `parser.GlobalStyleResolver` hook registered by `pkg/syntax/profile.go:init()`. For formatting, the `Formatter` renders a U-AST back to text using a `StyleProfile`.
 
 ## Modules and Responsibilities
 
