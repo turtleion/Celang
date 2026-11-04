@@ -129,6 +129,11 @@ buat md5 = berkas.hash("./dokumen.pdf", "md5")
 cetak("SHA-256:", sha)
 ```
 
+> 💡 **Streaming Hashing Kriptografis Lanjutan:** Untuk kalkulasi hash streaming murni berkecepatan tinggi atau pemeriksaan CRC-32 tanpa alokasi memori, gunakan modul [**`kripto`**](/pustaka-standar/kripto):
+> - `kripto.sha256_berkas("./paket.tar.gz")` / `crypto.sha256_file(...)`
+> - `kripto.sha512_berkas("./paket.tar.gz")` / `crypto.sha512_file(...)`
+> - `kripto.crc32_berkas("./arsip.zip")` / `crypto.crc32_file(...)` (Checksum integritas cepat)
+
 ---
 
 ### 8. Penelusur Folder Rekursif (`telusuri` / `walk`)

@@ -69,9 +69,11 @@ buat memenuhiSyarat = nilai >= 75 // bernilai benar
 
 ```celang
 // 1. Membuat Bita:
-buat b1 = bita("Halo")             // dari teks: bita([72, 97, 108, 111])
-buat b2 = bita(4)                  // alokasi 4 byte nol: bita([0, 0, 0, 0])
-buat b3 = bita([0x43, 0x65, 0x6C]) // dari daftar kode byte ASCII: bita([67, 101, 108])
+buat b1 = bita("Halo")               // dari teks: bita([72, 97, 108, 111])
+buat b2 = bita(4)                    // alokasi buffer 4 byte nol: bita([0, 0, 0, 0])
+buat b3 = bita([0x43, 0x65, 0x6C])   // dari daftar kode byte ASCII: bita([67, 101, 108])
+buat b4 = bita("SmFsbw==", "base64") // dari teks Base64
+buat b5 = bita("4a616c6f", "hex")    // dari teks heksadesimal
 
 // 2. Baca dan ubah byte langsung berdasarkan indeks:
 cetak(b1[0])       // 72 (kode ASCII huruf 'H')
@@ -81,12 +83,44 @@ cetak(b1.ke_teks()) // "Jalo"
 // 3. Konversi format biner:
 cetak(b1.ke_heks())   // "4a616c6f"
 cetak(b1.ke_base64()) // "SmFsbw=="
+cetak(b1.ke_daftar()) // [74, 97, 108, 111] (Array Angka)
 
 // 4. Dekode dari Base64 dan Heksadesimal:
 buat bDariB64 = bita.dari_base64("SmFsbw==")
 buat bDariHex = bita.dari_heks("4a616c6f")
 cetak(bDariB64.ke_teks()) // "Jalo"
+
+// 5. Mutasi, Pemotongan, & Penggabungan:
+b1.tambah(33)                 // Menambah byte ASCII '!' (nilai 33)
+b1.tambah(" Dunia")           // Menambah teks langsung ke bita
+b1.tambah(bita([46, 46, 46])) // Menambah bita lain
+cetak(b1.ke_teks())           // "Jalo! Dunia..."
+
+buat subBita = b1.potong(0, 4) // Potong 4 byte pertama
+cetak(subBita.ke_teks())      // "Jalo"
+
+buat salinan = b1.salin()     // Duplikasi mandiri (deep clone)
+cetak("Ukuran byte:", b1.panjang) // atau b1.length
 ```
+
+#### Ringkasan Metode & Properti `Bita`
+
+| Metode / Properti (Indonesia) | Alias Universal / Inggris | Keterangan |
+| :--- | :--- | :--- |
+| `bita(ukuran)` | `bytes(size)` | Mengalokasikan buffer nol sebesar $N$ byte (maks 100 MB) |
+| `bita(teks, format)` | `bytes(str, enc)` | Membuat bita dari teks dengan encoding `"base64"` atau `"hex"` |
+| `bita.dari_base64(teks)` | `bytes.from_base64(str)` | Mengurai teks Base64 menjadi objek `Bita` |
+| `bita.dari_heks(teks)` | `bytes.from_hex(str)` | Mengurai teks heksadesimal menjadi objek `Bita` |
+| `.ke_teks()` | `.to_string()` / `.to_text()` | Mengonversi deretan bita menjadi teks (*string*) UTF-8 |
+| `.ke_heks()` / `.heks()` | `.to_hex()` / `.hex()` | Mengonversi deretan bita menjadi teks heksadesimal |
+| `.ke_base64()` | `.to_base64()` | Mengonversi deretan bita menjadi string Base64 standar |
+| `.ke_daftar()` | `.to_array()` | Mengonversi bita menjadi daftar array angka `[0..255]` |
+| `.tambah(...)` | `.append(...)` | Menambahkan byte angka, teks, atau bita lain ke akhir buffer |
+| `.potong(awal, [akhir])` | `.slice(start, [end])` | Mengambil potongan bita (mendukung indeks negatif) |
+| `.salin()` | `.clone()` | Mengkloning bita secara independen (*deep copy*) |
+| `.panjang` | `.length` / `.len` | Properti pembaca jumlah total bita |
+
+> 🌍 **Mode Universal:** Saat menggunakan `"use universal"`, panggil fungsi dengan nama bahasa Inggris (`bytes`, `to_string`, `to_hex`, `to_base64`, `to_array`, `append`, `slice`, `clone`, `length`). Celang akan memberikan saran empati jika nama lokal terpanggil.
 
 ### E. Kumpulan Data: Daftar (`Array`) & Kamus (`Map`)
 

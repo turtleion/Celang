@@ -220,5 +220,20 @@ coba {
 }
 ```
 
-Struktur ini dirancang agar siap menyambut *package manager* ekosistem Celang di masa mendatang!
+---
+
+## 📄 Berkas Manifest Modul (`celang.mod`)
+
+Saat Anda membuat proyek baru menggunakan perintah `./celang init nama_proyek`, Celang secara otomatis membuat berkas **`celang.mod`** di direktori utama:
+
+```text
+modul nama_proyek
+versi 1.0.0
+```
+
+### Peran `celang.mod` Saat Ini:
+1. **Penanda Batas Proyek (*Module Root Marker*)**: Menjadi jangkar penentu direktori akar proyek saat menyelesaikan jalur impor relatif dan modul internal.
+2. **Batas Enkapsulasi `privat-modul!`**: Seluruh berkas kode di dalam direktori `celang.mod` (dan subfoldernya) dianggap satu kesatuan modul internal. Berkas di luar modul ini otomatis dicegah mengimpor simbol yang dilindungi.
+3. **Fondasi Package Manager**: Struktur ini disiapkan untuk mendukung deklarasi dependensi eksternal (`butuh (...)`) dan pengunci versi (`celang.kunci`) pada pengembangan *Package Manager* Celang mendatang.
+
 
