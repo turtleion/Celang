@@ -690,7 +690,7 @@ func (vm *VM) evalIndex(targetObj, indexObj evaluator.Object) (evaluator.Object,
 		if s, ok := indexObj.(*evaluator.String); ok {
 			key = s.Value
 		}
-		if val, exists := obj.Pairs[key]; exists {
+		if val, exists := obj.Get(key); exists {
 			return val, nil
 		}
 		if methodObj, ok := evaluator.EvalMapMethod(obj, key, vm.env, nil); ok {
@@ -888,17 +888,7 @@ func (vm *VM) evalSetIndex(targetObj, indexObj, val evaluator.Object) error {
 		if s, ok := indexObj.(*evaluator.String); ok {
 			key = s.Value
 		}
-		obj.Pairs[key] = val
-		found := false
-		for _, k := range obj.Order {
-			if k == key {
-				found = true
-				break
-			}
-		}
-		if !found {
-			obj.Order = append(obj.Order, key)
-		}
+		obj.Set(key, val)
 		return nil
 
 	case *evaluator.StructInstance:

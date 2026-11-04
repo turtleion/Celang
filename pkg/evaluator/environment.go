@@ -24,6 +24,7 @@ type ReactiveWatcher struct {
 }
 
 type VariableEntry struct {
+	mu           sync.RWMutex
 	Name         string
 	InitialVal   Object
 	PreviousVal  Object
@@ -55,42 +56,42 @@ func (ve *VariableEntry) Resolve() *VariableEntry {
 
 // Current returns the most recent value of the variable.
 func (ve *VariableEntry) Current() Object {
-	if ve.AliasedEntry != nil {
-		return ve.AliasedEntry.Current()
+	target := ve.Resolve()
+	target.mu.RLock()
+	defer target.mu.RUnlock()
+	if target.CurrentVal != nil {
+		return target.CurrentVal
 	}
-	if ve.CurrentVal != nil {
-		return ve.CurrentVal
-	}
-	if len(ve.History) > 0 {
-		return ve.History[len(ve.History)-1]
+	if len(target.History) > 0 {
+		return target.History[len(target.History)-1]
 	}
 	return &Null{}
 }
 
 // Previous returns the value right before the current one (if available).
 func (ve *VariableEntry) Previous() (Object, bool) {
-	if ve.AliasedEntry != nil {
-		return ve.AliasedEntry.Previous()
+	target := ve.Resolve()
+	target.mu.RLock()
+	defer target.mu.RUnlock()
+	if target.PreviousVal != nil {
+		return target.PreviousVal, true
 	}
-	if ve.PreviousVal != nil {
-		return ve.PreviousVal, true
-	}
-	if len(ve.History) >= 2 {
-		return ve.History[len(ve.History)-2], true
+	if len(target.History) >= 2 {
+		return target.History[len(target.History)-2], true
 	}
 	return nil, false
 }
 
 // Initial returns the first value ever assigned to this variable.
 func (ve *VariableEntry) Initial() Object {
-	if ve.AliasedEntry != nil {
-		return ve.AliasedEntry.Initial()
+	target := ve.Resolve()
+	target.mu.RLock()
+	defer target.mu.RUnlock()
+	if target.InitialVal != nil {
+		return target.InitialVal
 	}
-	if ve.InitialVal != nil {
-		return ve.InitialVal
-	}
-	if len(ve.History) > 0 {
-		return ve.History[0]
+	if len(target.History) > 0 {
+		return target.History[0]
 	}
 	return &Null{}
 }
@@ -260,14 +261,14 @@ func (e *Environment) DefineWithVisibility(name string, val Object, isMutable bo
 	}
 
 	entry := &VariableEntry{
-		Name:        name,
-		InitialVal:  val,
-		CurrentVal:  val,
-		History:     []Object{val},
-		HistoryCap:  DefaultHistoryCapacity,
-		IsMutable:   isMutable,
-		TypeHint:    typeHint,
-		Visibility:  vis,
+		Name:       name,
+		InitialVal: val,
+		CurrentVal: val,
+		History:    []Object{val},
+		HistoryCap: DefaultHistoryCapacity,
+		IsMutable:  isMutable,
+		TypeHint:   typeHint,
+		Visibility: vis,
 	}
 	e.store[name] = entry
 	return entry, nil
@@ -393,6 +394,7 @@ func (e *Environment) Assign(name string, val Object) error {
 	// Record savepoint for active transaction rollback
 	e.recordSavepoint(target)
 
+	target.mu.Lock()
 	oldVal := target.CurrentVal
 	target.PreviousVal = target.CurrentVal
 	target.CurrentVal = val
@@ -411,6 +413,7 @@ func (e *Environment) Assign(name string, val Object) error {
 	}
 
 	hasReactivity := len(target.Dependents) > 0 || len(target.Watchers) > 0
+	target.mu.Unlock()
 	e.mu.Unlock()
 
 	// Propagate Reactivity and Watchers outside mutex lock
@@ -442,7 +445,7 @@ func (e *Environment) GetEntry(name string) (*VariableEntry, bool) {
 	if ok {
 		root := entry.Resolve()
 		if tracker != nil && tracker != root {
-			e.mu.Lock()
+			root.mu.Lock()
 			found := false
 			for _, dep := range root.Dependents {
 				if dep == tracker {
@@ -453,7 +456,7 @@ func (e *Environment) GetEntry(name string) (*VariableEntry, bool) {
 			if !found {
 				root.Dependents = append(root.Dependents, tracker)
 			}
-			e.mu.Unlock()
+			root.mu.Unlock()
 		}
 		return root, true
 	}
@@ -515,10 +518,15 @@ func (e *Environment) recordSavepoint(target *VariableEntry) {
 		for i := range curr.savepoints {
 			frame := curr.savepoints[i]
 			if _, exists := frame.mutations[target]; !exists {
+				target.mu.RLock()
+				curV := deepClone(target.CurrentVal)
+				prevV := deepClone(target.PreviousVal)
+				hLen := len(target.History)
+				target.mu.RUnlock()
 				frame.mutations[target] = transactionSavepoint{
-					val:        deepClone(target.CurrentVal),
-					prevVal:    deepClone(target.PreviousVal),
-					historyLen: len(target.History),
+					val:        curV,
+					prevVal:    prevV,
+					historyLen: hLen,
 				}
 			}
 		}
@@ -642,6 +650,7 @@ func (e *Environment) triggerReactivity(target *VariableEntry, newVal, oldVal Ob
 	e.incReactivityDepth()
 	defer e.decReactivityDepth()
 
+	target.mu.RLock()
 	var watchers []*ReactiveWatcher
 	if len(target.Watchers) > 0 {
 		watchers = append([]*ReactiveWatcher{}, target.Watchers...)
@@ -650,6 +659,7 @@ func (e *Environment) triggerReactivity(target *VariableEntry, newVal, oldVal Ob
 	if len(target.Dependents) > 0 {
 		dependents = append([]*VariableEntry{}, target.Dependents...)
 	}
+	target.mu.RUnlock()
 
 	// 1. Notify watchers (pantau)
 	for _, w := range watchers {

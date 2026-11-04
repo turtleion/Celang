@@ -258,6 +258,7 @@ func main() {
 		filter := ""
 		verbose := false
 		noColor := false
+		useAST := false
 
 		for i := 2; i < len(os.Args); i++ {
 			arg := os.Args[i]
@@ -272,6 +273,10 @@ func main() {
 				verbose = true
 			} else if arg == "--no-color" {
 				noColor = true
+			} else if arg == "--ast" {
+				useAST = true
+			} else if arg == "--vm" {
+				useAST = false
 			} else if !strings.HasPrefix(arg, "-") {
 				targets = append(targets, arg)
 			}
@@ -281,6 +286,7 @@ func main() {
 			Filter:  filter,
 			Verbose: verbose,
 			NoColor: noColor,
+			UseAST:  useAST,
 			Out:     os.Stdout,
 		})
 		if err != nil {
@@ -321,8 +327,8 @@ func printHelp() {
 	fmt.Println("  celang build  <file> [-o out] [--ast]   Alias internasional untuk 'bangun'")
 	fmt.Println("  celang disasm <file.ce>                 Membongkar kode menjadi instruksi rakitan Bytecode")
 	fmt.Println("  celang format [-w] <file> [--style=...] Memformat kode (-w untuk langsung menimpa file)")
-	fmt.Println("  celang uji [target...] [-f filter]      Menjalankan pengujian otomatis (test runner)")
-	fmt.Println("  celang test [target...] [-f filter]     Alias internasional untuk 'uji'")
+	fmt.Println("  celang uji [target...] [-f filter] [--ast] Menjalankan pengujian otomatis via VM (default) atau AST")
+	fmt.Println("  celang test [target...] [-f filter] [--ast] Alias internasional untuk 'uji'")
 	fmt.Println("  celang compile <file.ce> [-o out.ast]   Mengompilasi kode teks menjadi berkas U-AST JSON")
 	fmt.Println("  celang ast <file.ce>                    Mencetak pohon struktur U-AST JSON ke terminal")
 	fmt.Println("  celang init [nama_proyek]               Menginisialisasi proyek baru (celang.mod & utama.ce)")
@@ -928,4 +934,3 @@ func buildFile(inputFile, outputFile, targetOS, runnerPath string, useAST bool, 
 		fmt.Printf("   Jalankan dengan: ./%s\n", outputFile)
 	}
 }
-

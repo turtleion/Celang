@@ -381,7 +381,7 @@ func Eval(node uast.Node, env *Environment) Object {
 			if mp, ok := obj.(*Map); ok {
 				if n.Operator != "=" && len(n.Operator) > 1 && n.Operator[len(n.Operator)-1] == '=' {
 					baseOp := n.Operator[:len(n.Operator)-1]
-					curVal := mp.Pairs[prop]
+					curVal, _ := mp.Get(prop)
 					if curVal == nil {
 						curVal = NULL
 					}
@@ -390,17 +390,7 @@ func Eval(node uast.Node, env *Environment) Object {
 						return val
 					}
 				}
-				mp.Pairs[prop] = val
-				found := false
-				for _, k := range mp.Order {
-					if k == prop {
-						found = true
-						break
-					}
-				}
-				if !found {
-					mp.Order = append(mp.Order, prop)
-				}
+				mp.Set(prop, val)
 				return val
 			}
 			if arr, ok := obj.(*Array); ok {
@@ -1106,7 +1096,6 @@ func Eval(node uast.Node, env *Environment) Object {
 		}
 		return evalMemberAccess(obj, n, env)
 
-
 	case *uast.BinaryExpression:
 		if n.Operator == "|>" {
 			leftVal := Eval(n.Left, env)
@@ -1306,6 +1295,8 @@ func Eval(node uast.Node, env *Environment) Object {
 			res := Eval(n.Argument, subEnv)
 			if isError(res) {
 				ticket.Fail(res)
+			} else if ret, ok := res.(*ReturnValue); ok {
+				ticket.Resolve(ret.Value)
 			} else {
 				ticket.Resolve(res)
 			}
@@ -2151,7 +2142,7 @@ func evalMemberAccess(obj Object, n *uast.MemberExpression, env *Environment) Ob
 	// 3. Map property access and built-in methods (mp.keys, mp.values, mp.get, etc.)
 	if mp, ok := obj.(*Map); ok {
 		key := propName
-		if val, exists := mp.Pairs[key]; exists {
+		if val, exists := mp.Get(key); exists {
 			return val
 		}
 		if methodObj, ok := EvalMapMethod(mp, key, env, n.GetMetadata()); ok {
@@ -2679,6 +2670,3 @@ func evalTestStatement(stmt *uast.TestStatement, env *Environment) Object {
 	}
 	return NULL
 }
-
-
-

@@ -902,3 +902,43 @@ func TestParser_BareReturnAndRollback(t *testing.T) {
 		})
 	}
 }
+
+func TestParserTitipBlockSyntax(t *testing.T) {
+	input := `
+	buat tugas = titip {
+		buat x = 10
+		kembalikan x * 2
+	}
+	`
+	l := parser.NewLexer(input)
+	p := parser.NewParser(l)
+	prog, err := p.ParseProgram()
+	if err != nil {
+		t.Fatalf("Parse error: %v", err)
+	}
+	if len(p.Errors()) > 0 {
+		t.Fatalf("Parser had errors: %v", p.Errors())
+	}
+	if len(prog.Body) != 1 {
+		t.Fatalf("Expected 1 statement, got %d", len(prog.Body))
+	}
+	v1, ok := prog.Body[0].(*uast.VariableDeclaration)
+	if !ok {
+		t.Fatalf("Expected VariableDeclaration, got %T", prog.Body[0])
+	}
+	titipExpr, ok := v1.Value.(*uast.TitipExpression)
+	if !ok {
+		t.Fatalf("Expected TitipExpression, got %T", v1.Value)
+	}
+	callExpr, ok := titipExpr.Argument.(*uast.CallExpression)
+	if !ok {
+		t.Fatalf("Expected CallExpression as titip argument, got %T", titipExpr.Argument)
+	}
+	fnExpr, ok := callExpr.Callee.(*uast.FunctionExpression)
+	if !ok {
+		t.Fatalf("Expected FunctionExpression as callee, got %T", callExpr.Callee)
+	}
+	if fnExpr.Body == nil || len(fnExpr.Body.Statements) != 2 {
+		t.Fatalf("Expected 2 statements in titip block, got %#v", fnExpr.Body)
+	}
+}

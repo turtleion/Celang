@@ -9,9 +9,11 @@ import (
 	"strings"
 	"time"
 
+	"celang/pkg/compiler"
 	"celang/pkg/evaluator"
 	"celang/pkg/parser"
 	_ "celang/pkg/syntax"
+	"celang/pkg/vm"
 )
 
 // FileResult holds test outcomes for a single test file.
@@ -38,6 +40,7 @@ type Options struct {
 	Verbose bool
 	NoColor bool
 	Out     io.Writer
+	UseAST  bool
 }
 
 // IsTestFile determines whether a file path qualifies as a Celang test file.
@@ -177,15 +180,37 @@ func RunFile(filePath string, opt Options) FileResult {
 	tc := &evaluator.TestContext{Filter: opt.Filter}
 	env.SetTestContext(tc)
 
-	evalRes := evaluator.Eval(prog, env)
+	var runErr error
+	if opt.UseAST {
+		evalRes := evaluator.Eval(prog, env)
+		if evalRes != nil && (evalRes.Type() == evaluator.ERROR_OBJ || evalRes.Type() == evaluator.ASSERTION_ERROR_OBJ) {
+			runErr = fmt.Errorf("%s", evalRes.Inspect())
+		}
+	} else {
+		comp := compiler.NewCompilerWithEnv(env)
+		chunk, err := comp.Compile(prog)
+		if err != nil {
+			// Fall back to AST evaluator if compilation fails on non-bytecode constructs
+			evalRes := evaluator.Eval(prog, env)
+			if evalRes != nil && (evalRes.Type() == evaluator.ERROR_OBJ || evalRes.Type() == evaluator.ASSERTION_ERROR_OBJ) {
+				runErr = fmt.Errorf("%s", evalRes.Inspect())
+			}
+		} else {
+			virtualMachine := vm.NewWithEnv(chunk, env)
+			_, err = virtualMachine.Run()
+			if err != nil {
+				runErr = err
+			}
+		}
+	}
 	dur := time.Since(start)
 
-	if evalRes != nil && (evalRes.Type() == evaluator.ERROR_OBJ || evalRes.Type() == evaluator.ASSERTION_ERROR_OBJ) {
+	if runErr != nil {
 		if len(tc.Results) == 0 {
 			return FileResult{
 				FilePath: filePath,
 				Duration: dur,
-				Error:    evalRes.Inspect(),
+				Error:    runErr.Error(),
 			}
 		}
 	}

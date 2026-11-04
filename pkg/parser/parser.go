@@ -937,12 +937,12 @@ func (p *Parser) parseWatchStatement() *uast.WatchStatement {
 	body := p.parseBlockStatement()
 
 	return &uast.WatchStatement{
-		NodeType:   uast.NodeTypeWatchStatement,
-		Metadata:   meta,
-		Target:     target,
-		NewValVar:  newVar,
-		OldValVar:  oldVar,
-		Body:       body,
+		NodeType:  uast.NodeTypeWatchStatement,
+		Metadata:  meta,
+		Target:    target,
+		NewValVar: newVar,
+		OldValVar: oldVar,
+		Body:      body,
 	}
 }
 
@@ -1000,7 +1000,6 @@ func (p *Parser) parseStyleBlockStatement() *uast.StyleBlockStatement {
 		Body:      body,
 	}
 }
-
 
 func (p *Parser) parseVariableDeclaration(isMutable bool) uast.Statement {
 	meta := p.currentMetadata()
@@ -2261,7 +2260,6 @@ func (p *Parser) parseFunctionExpression() uast.Expression {
 	}
 }
 
-
 func (p *Parser) parseGroupedExpression() uast.Expression {
 	if p.isArrowAheadFromParen() {
 		meta := p.currentMetadata()
@@ -2810,8 +2808,25 @@ func (p *Parser) parseTitipExpression() uast.Expression {
 	if p.IsUniversal && p.curToken.Literal == "titip" {
 		p.addError("Indonesian keyword 'titip' is not allowed in Universal Mode. Use 'spawn' instead.")
 	}
-	p.nextToken() // move to argument expression
-	arg := p.parseExpression(PREFIX)
+	p.nextToken() // move to argument expression or block
+	var arg uast.Expression
+	if p.curTokenIs(LBRACE) {
+		block := p.parseBlockStatement()
+		fnExpr := &uast.FunctionExpression{
+			NodeType:   uast.NodeTypeFunctionExpression,
+			Metadata:   block.Metadata,
+			Parameters: []uast.Parameter{},
+			Body:       block,
+		}
+		arg = &uast.CallExpression{
+			NodeType:  uast.NodeTypeCallExpression,
+			Metadata:  block.Metadata,
+			Callee:    fnExpr,
+			Arguments: []uast.Expression{},
+		}
+	} else {
+		arg = p.parseExpression(PREFIX)
+	}
 	return &uast.TitipExpression{
 		NodeType: uast.NodeTypeTitipExpression,
 		Metadata: meta,
@@ -2842,4 +2857,3 @@ func (p *Parser) parseJemputExpression() uast.Expression {
 		Timeout:  timeout,
 	}
 }
-

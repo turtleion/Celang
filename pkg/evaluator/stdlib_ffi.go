@@ -53,14 +53,43 @@ func normalizeFFIType(raw string) string {
 	}
 }
 
+func getAllocatedSlice(addr uintptr) ([]byte, int, bool) {
+	if addr == 0 {
+		return nil, 0, false
+	}
+	ffiAllocMu.RLock()
+	defer ffiAllocMu.RUnlock()
+	for base, buf := range ffiAllocBuffers {
+		if len(buf) > 0 && addr >= base && addr < base+uintptr(len(buf)) {
+			offset := int(addr - base)
+			return buf, offset, true
+		}
+	}
+	return nil, 0, false
+}
+
+func foreignPointer(addr uintptr) unsafe.Pointer {
+	return *(*unsafe.Pointer)(unsafe.Pointer(&addr))
+}
+
 func readCString(addr uintptr) string {
 	if addr == 0 {
 		return ""
 	}
+	if buf, offset, ok := getAllocatedSlice(addr); ok {
+		slice := buf[offset:]
+		for i, b := range slice {
+			if b == 0 {
+				return string(slice[:i])
+			}
+		}
+		return string(slice)
+	}
+	basePtr := foreignPointer(addr)
 	var bytes []byte
 	const maxLen = 10 * 1024 * 1024 // batas aman 10MB
 	for i := 0; i < maxLen; i++ {
-		b := *(*byte)(unsafe.Pointer(addr + uintptr(i)))
+		b := *(*byte)(unsafe.Add(basePtr, i))
 		if b == 0 {
 			break
 		}
@@ -74,10 +103,19 @@ func writeCString(addr uintptr, s string) int {
 		return 0
 	}
 	b := []byte(s)
-	for i := 0; i < len(b); i++ {
-		*(*byte)(unsafe.Pointer(addr + uintptr(i))) = b[i]
+	if buf, offset, ok := getAllocatedSlice(addr); ok {
+		slice := buf[offset:]
+		n := copy(slice, b)
+		if n < len(slice) {
+			slice[n] = 0
+		}
+		return n
 	}
-	*(*byte)(unsafe.Pointer(addr + uintptr(len(b)))) = 0
+	basePtr := foreignPointer(addr)
+	for i := 0; i < len(b); i++ {
+		*(*byte)(unsafe.Add(basePtr, i)) = b[i]
+	}
+	*(*byte)(unsafe.Add(basePtr, len(b))) = 0
 	return len(b)
 }
 
@@ -85,9 +123,19 @@ func readCBytes(addr uintptr, length int) []byte {
 	if addr == 0 || length <= 0 {
 		return []byte{}
 	}
+	if buf, offset, ok := getAllocatedSlice(addr); ok {
+		slice := buf[offset:]
+		if length > len(slice) {
+			length = len(slice)
+		}
+		res := make([]byte, length)
+		copy(res, slice[:length])
+		return res
+	}
+	basePtr := foreignPointer(addr)
 	res := make([]byte, length)
 	for i := 0; i < length; i++ {
-		res[i] = *(*byte)(unsafe.Pointer(addr + uintptr(i)))
+		res[i] = *(*byte)(unsafe.Add(basePtr, i))
 	}
 	return res
 }
@@ -96,8 +144,13 @@ func writeCBytes(addr uintptr, b []byte) int {
 	if addr == 0 || len(b) == 0 {
 		return 0
 	}
+	if buf, offset, ok := getAllocatedSlice(addr); ok {
+		slice := buf[offset:]
+		return copy(slice, b)
+	}
+	basePtr := foreignPointer(addr)
 	for i := 0; i < len(b); i++ {
-		*(*byte)(unsafe.Pointer(addr + uintptr(i))) = b[i]
+		*(*byte)(unsafe.Add(basePtr, i)) = b[i]
 	}
 	return len(b)
 }

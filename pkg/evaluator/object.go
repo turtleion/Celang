@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 
 	"celang/pkg/uast"
 )
@@ -12,18 +13,18 @@ import (
 type ObjectType string
 
 const (
-	INTEGER_OBJ      ObjectType = "INTEGER"
-	FLOAT_OBJ        ObjectType = "FLOAT"
-	BOOLEAN_OBJ      ObjectType = "BOOLEAN"
-	STRING_OBJ       ObjectType = "STRING"
-	NULL_OBJ         ObjectType = "NULL"
-	RETURN_VALUE_OBJ ObjectType = "RETURN_VALUE"
-	ERROR_OBJ        ObjectType = "ERROR"
+	INTEGER_OBJ         ObjectType = "INTEGER"
+	FLOAT_OBJ           ObjectType = "FLOAT"
+	BOOLEAN_OBJ         ObjectType = "BOOLEAN"
+	STRING_OBJ          ObjectType = "STRING"
+	NULL_OBJ            ObjectType = "NULL"
+	RETURN_VALUE_OBJ    ObjectType = "RETURN_VALUE"
+	ERROR_OBJ           ObjectType = "ERROR"
 	ASSERTION_ERROR_OBJ ObjectType = "ASSERTION_ERROR"
-	FUNCTION_OBJ     ObjectType = "FUNCTION"
-	BUILTIN_OBJ      ObjectType = "BUILTIN"
-	ARRAY_OBJ        ObjectType = "ARRAY"
-	MAP_OBJ          ObjectType = "MAP"
+	FUNCTION_OBJ        ObjectType = "FUNCTION"
+	BUILTIN_OBJ         ObjectType = "BUILTIN"
+	ARRAY_OBJ           ObjectType = "ARRAY"
+	MAP_OBJ             ObjectType = "MAP"
 	POINTER_OBJ         ObjectType = "POINTER"
 	STRUCT_DEF_OBJ      ObjectType = "STRUCT_DEF"
 	STRUCT_INSTANCE_OBJ ObjectType = "STRUCT_INSTANCE"
@@ -53,7 +54,7 @@ type ASTNodeWrapper struct {
 }
 
 func (w *ASTNodeWrapper) Type() ObjectType { return "AST_NODE" }
-func (w *ASTNodeWrapper) Inspect() string   { return "<ast-node>" }
+func (w *ASTNodeWrapper) Inspect() string  { return "<ast-node>" }
 
 // Integer represents a 64-bit signed integer.
 type Integer struct {
@@ -153,7 +154,7 @@ type AssertionError struct {
 }
 
 func (a *AssertionError) Type() ObjectType { return ASSERTION_ERROR_OBJ }
-func (a *AssertionError) Error() string     { return a.Message }
+func (a *AssertionError) Error() string    { return a.Message }
 func (a *AssertionError) Inspect() string {
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("Gagal Uji: %s", a.Message))
@@ -231,6 +232,7 @@ func (a *Array) Inspect() string {
 
 // Map represents a key-value dictionary.
 type Map struct {
+	mu    sync.RWMutex
 	Pairs map[string]Object
 	Order []string // maintains key order for readable inspection
 }
@@ -240,8 +242,69 @@ func (m *Map) Inspect() string {
 	return inspectObjectWithVisited(m, make(map[any]bool))
 }
 
+func (m *Map) Lock() {
+	m.mu.Lock()
+}
+
+func (m *Map) Unlock() {
+	m.mu.Unlock()
+}
+
+func (m *Map) RLock() {
+	m.mu.RLock()
+}
+
+func (m *Map) RUnlock() {
+	m.mu.RUnlock()
+}
+
+func (m *Map) Get(key string) (Object, bool) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	if m.Pairs == nil {
+		return nil, false
+	}
+	val, ok := m.Pairs[key]
+	return val, ok
+}
+
+func (m *Map) Set(key string, val Object) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.Pairs == nil {
+		m.Pairs = make(map[string]Object)
+	}
+	if _, exists := m.Pairs[key]; !exists {
+		m.Order = append(m.Order, key)
+	}
+	m.Pairs[key] = val
+}
+
+func (m *Map) Delete(key string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.Pairs == nil {
+		return
+	}
+	delete(m.Pairs, key)
+	for i, k := range m.Order {
+		if k == key {
+			m.Order = append(m.Order[:i], m.Order[i+1:]...)
+			break
+		}
+	}
+}
+
+func (m *Map) Len() int {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return len(m.Pairs)
+}
+
 // GetKeys returns the ordered keys of the Map, automatically reconciling with Pairs if needed.
 func (m *Map) GetKeys() []string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	if len(m.Order) != len(m.Pairs) {
 		orderSet := make(map[string]bool, len(m.Order))
 		var newOrder []string
@@ -260,7 +323,9 @@ func (m *Map) GetKeys() []string {
 		sort.Strings(remaining)
 		m.Order = append(newOrder, remaining...)
 	}
-	return m.Order
+	res := make([]string, len(m.Order))
+	copy(res, m.Order)
+	return res
 }
 
 // Pointer represents a memory reference to a variable in an Environment.
@@ -362,9 +427,17 @@ func inspectObjectWithVisited(obj Object, visited map[any]bool) string {
 		}
 		visited[o] = true
 		defer delete(visited, o)
+		keys := o.GetKeys()
+		o.RLock()
+		snapshot := make(map[string]Object, len(keys))
+		for _, k := range keys {
+			snapshot[k] = o.Pairs[k]
+		}
+		o.RUnlock()
+
 		var pairs []string
-		for _, k := range o.GetKeys() {
-			v := o.Pairs[k]
+		for _, k := range keys {
+			v := snapshot[k]
 			pairs = append(pairs, fmt.Sprintf("%q: %s", k, inspectObjectWithVisited(v, visited)))
 		}
 		return fmt.Sprintf("{%s}", strings.Join(pairs, ", "))
@@ -380,7 +453,7 @@ type IteratorObject struct {
 }
 
 func (it *IteratorObject) Type() ObjectType { return ITERATOR_OBJ }
-func (it *IteratorObject) Inspect() string   { return "<iterator>" }
+func (it *IteratorObject) Inspect() string  { return "<iterator>" }
 func (it *IteratorObject) Next() (Object, bool) {
 	if it.NextFunc == nil {
 		return nil, false
@@ -485,5 +558,3 @@ var (
 	BREAK_SIGNAL    = &BreakSignal{}
 	CONTINUE_SIGNAL = &ContinueSignal{}
 )
-
-

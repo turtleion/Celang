@@ -74,23 +74,23 @@ func TestEvaluator_SmartFallbackCoercion(t *testing.T) {
 		expected string
 	}{
 		{
-			name: "Pure String Number + Int: '100' + 25 -> 125",
-			node: uast.NewBinaryExpr(uast.NewStringLiteral("100"), "+", uast.NewIntLiteral(25)),
+			name:     "Pure String Number + Int: '100' + 25 -> 125",
+			node:     uast.NewBinaryExpr(uast.NewStringLiteral("100"), "+", uast.NewIntLiteral(25)),
 			expected: "125",
 		},
 		{
-			name: "String - Int with extraction: '100' - 20 -> 80",
-			node: uast.NewBinaryExpr(uast.NewStringLiteral("100"), "-", uast.NewIntLiteral(20)),
+			name:     "String - Int with extraction: '100' - 20 -> 80",
+			node:     uast.NewBinaryExpr(uast.NewStringLiteral("100"), "-", uast.NewIntLiteral(20)),
 			expected: "80",
 		},
 		{
-			name: "RegEx Extraction: 'Rp 50000' / 2 -> 25000",
-			node: uast.NewBinaryExpr(uast.NewStringLiteral("Rp 50000"), "/", uast.NewIntLiteral(2)),
+			name:     "RegEx Extraction: 'Rp 50000' / 2 -> 25000",
+			node:     uast.NewBinaryExpr(uast.NewStringLiteral("Rp 50000"), "/", uast.NewIntLiteral(2)),
 			expected: "25000",
 		},
 		{
-			name: "String + Number Human Description: 'Total: ' + 50 -> 'Total: 50'",
-			node: uast.NewBinaryExpr(uast.NewStringLiteral("Total: "), "+", uast.NewIntLiteral(50)),
+			name:     "String + Number Human Description: 'Total: ' + 50 -> 'Total: 50'",
+			node:     uast.NewBinaryExpr(uast.NewStringLiteral("Total: "), "+", uast.NewIntLiteral(50)),
 			expected: "Total: 50",
 		},
 	}
@@ -1449,6 +1449,20 @@ func TestEvaluator_TitipJemput(t *testing.T) {
 		t.Fatalf("expected 50, got %s", res.Inspect())
 	}
 
+	// 1b. titip block statement
+	inputBlock := `
+	buat tiket = titip {
+		buat a = 15
+		buat b = 25
+		kembalikan a + b
+	}
+	jemput tiket
+	`
+	resBlock := testEvalSource(t, inputBlock)
+	if intVal, ok := resBlock.(*evaluator.Integer); !ok || intVal.Value != 40 {
+		t.Fatalf("expected 40 from titip block, got %s", resBlock.Inspect())
+	}
+
 	// 2. jemput dengan batas waktu (timeout)
 	inputTimeout := `
 	buat tiket = titip 42
@@ -2197,7 +2211,7 @@ func TestEvaluator_BreakAndContinue(t *testing.T) {
 	sum
 	`
 	res := testEvalSource(t, code)
-	if intVal, ok := res.(*evaluator.Integer); !ok || intVal.Value != (1 + 3 + 4 + 5) {
+	if intVal, ok := res.(*evaluator.Integer); !ok || intVal.Value != (1+3+4+5) {
 		t.Fatalf("expected sum 13, got %s", res.Inspect())
 	}
 
@@ -2654,7 +2668,3 @@ func TestAudit_MemberAccessErrorPropagation(t *testing.T) {
 		t.Errorf("expected error message to be propagated, got: %s", errObj.Message)
 	}
 }
-
-
-
-
