@@ -184,6 +184,7 @@ func loadModule(targetAbsPath string, env *Environment) (*Environment, error) {
 	targetEnv.ModuleRoot = findModuleRoot(targetAbsPath)
 	targetEnv.ModuleRegistry = env.ModuleRegistry
 	targetEnv.IsUniversal = prog.IsUniversal
+	RegisterBuiltins(targetEnv, nil)
 
 	// Cache early to support recursive or mutual imports
 	env.ModuleRegistry.mu.Lock()
